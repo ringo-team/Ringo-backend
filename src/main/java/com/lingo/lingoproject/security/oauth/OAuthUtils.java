@@ -23,7 +23,7 @@ public class OAuthUtils {
   private final UserRepository userRepository;
   private final OAuthTokenRepository oAuthTokenRepository;
 
-  public void signup(Long userToken){
+  public void signup(String userToken){
     log.info("가입되지 않은 회원입니다. 새로 계정을 만듭니다.");
     String email = UUID.randomUUID().toString();
     UserEntity user = UserEntity.builder()

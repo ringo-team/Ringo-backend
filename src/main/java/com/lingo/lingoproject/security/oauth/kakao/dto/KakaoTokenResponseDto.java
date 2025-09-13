@@ -1,8 +1,10 @@
 package com.lingo.lingoproject.security.oauth.kakao.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public record KakaoTokenResponseDto(
-    String tokenType,
-    String accessToken,
-    Integer expiresIn,
-    String refreshTokenExpiresIn
+    @JsonProperty("token_type") String tokenType,
+    @JsonProperty("access_token") String accessToken,
+    @JsonProperty("expires_in") Integer expiresIn,
+    @JsonProperty("refresh_token_expires_in") String refreshTokenExpiresIn
     ) { }

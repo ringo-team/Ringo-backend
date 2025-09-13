@@ -25,5 +25,5 @@ public class OAuthToken {
   @JoinColumn(name = "user_id")
   private UserEntity user;
 
-  private Long userToken;
+  private String userToken;
 }
