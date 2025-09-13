@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -32,6 +33,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(claims.getSubject(), "password")
         );
+      }
+      /*
+        유효시간이 지난 토큰은 refresh token 재발급 요청
+       */
+      else if (jwtUtil.isAuthenticatedToken(accessToken)){
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
       }
     }
     filterChain.doFilter(request, response);

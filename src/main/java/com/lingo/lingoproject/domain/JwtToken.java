@@ -26,8 +26,5 @@ public class JwtToken {
   private int rand;
 
   @Column(nullable = false)
-  private String token;
-
-  @Column(nullable = false)
   private String refreshToken;
 }

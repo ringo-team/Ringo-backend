@@ -1,7 +1,7 @@
 package com.lingo.lingoproject.security.util;
 
 
-import ch.qos.logback.classic.spi.IThrowableProxy;
+
 import com.lingo.lingoproject.domain.UserEntity;
 import com.lingo.lingoproject.repository.JwtTokenRepository;
 import com.lingo.lingoproject.repository.UserRepository;
@@ -12,13 +12,10 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import javax.swing.text.html.Option;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -76,27 +73,12 @@ public class JwtUtil {
     }
   }
 
+  /*
+   유효한 토큰인지를 검증
+   */
   public boolean validateToken(String token){
-    try{
-      Claims claims = Jwts.parser().setSigningKey(secret)
-          .build()
-          .parseClaimsJws(token)
-          .getPayload();
-      /*
-       토큰에 저장된 userId가 데이터베이스에 존재하지 않을 경우 유효하지 않은 토큰으로 간주
-       */
-      Optional<UserEntity> user = userRepository.findById((UUID) claims.get("userId"));
-      if (user.isEmpty()){
-        return false;
-      }
-      /*
-       저장된 random 값과 일치하지 않는 경우 유효하지 않는 토큰으로 간주
-       */
-      int rand = (int) claims.get("rand");
-      int storedRand = jwtTokenRepository.findByUser(user.get()).getRand();
-      if(storedRand != rand){
-        return false;
-      }
+    try {
+      Claims claims = getClaims(token);
       /*
        토큰의 유효시간이 지나면 유효하지 않은 토큰으로 간주
        */
@@ -111,12 +93,36 @@ public class JwtUtil {
     }
   }
 
+  /*
+   정말 유저가 발급한 토큰인지를 검증
+   */
+  public boolean isAuthenticatedToken(String token){
+      try {
+        Claims claims = getClaims(token);
+        /*
+         토큰에 저장된 userId가 데이터베이스에 존재하지 않을 경우 유효하지 않은 토큰으로 간주
+         */
+        Optional<UserEntity> user = userRepository.findById((UUID) claims.get("userId"));
+        if (user.isEmpty()) {
+          return false;
+        }
+        /*
+         저장된 random 값과 일치하지 않는 경우 유효하지 않는 토큰으로 간주
+        */
+        int rand = (int) claims.get("rand");
+        int storedRand = jwtTokenRepository.findByUser(user.get()).getRand();
+        if (storedRand != rand) {
+          return false;
+        }
+        return true;
+      } catch (Exception e) {
+          return false;
+      }
+  }
+
   public boolean validateRefreshToken(String token){
     try{
-      Claims claims = Jwts.parser().setSigningKey(secret)
-          .build()
-          .parseClaimsJws(token)
-          .getPayload();
+      Claims claims = getClaims(token);
       /*
        토큰의 유효시간이 지나면 유효하지 않은 토큰으로 간주
        */
