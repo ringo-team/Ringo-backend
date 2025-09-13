@@ -16,6 +16,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -27,6 +28,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 @NoArgsConstructor
 @Getter
 @Setter
+@Builder
 public class UserEntity extends Timestamp implements UserDetails {
 
   @Override
@@ -48,21 +50,19 @@ public class UserEntity extends Timestamp implements UserDetails {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @Column(nullable = false)
   private String nickname;
 
   @Column(unique = true)
   private String email;
   private String password;
 
-  @Column(nullable = false, unique = true)
+  @Column(unique = true)
   private String phoneNumber;
 
-  @Column(nullable = false, unique = true)
+  @Column(unique = true)
   private String deviceToken;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false)
   private Gender gender;
 
   private String height;
