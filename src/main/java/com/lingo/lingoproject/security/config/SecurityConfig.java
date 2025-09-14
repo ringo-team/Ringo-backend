@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lingo.lingoproject.repository.JwtTokenRepository;
 import com.lingo.lingoproject.security.form.CustomAuthenticationFilter;
 import com.lingo.lingoproject.security.jwt.JwtAuthenticationFilter;
 import com.lingo.lingoproject.security.response.LogoutResponseDto;
@@ -20,11 +21,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
-@RequiredArgsConstructor
 public class SecurityConfig {
-
-  private final JwtAuthenticationFilter jwtAuthenticationFilter;
-  private final CustomAuthenticationFilter  customAuthenticationFilter;
 
   @Bean
   public PasswordEncoder bCryptPasswordEncoder() {
@@ -35,7 +32,9 @@ public class SecurityConfig {
       "/login/**",
       "/login",
       "/signUp/**",
-      "/signUp"
+      "/signUp",
+      "/google/callback/**",
+      "/kakao/callback/**",
   };
 
   @Bean
@@ -44,10 +43,10 @@ public class SecurityConfig {
         .cors((cors) -> cors.configurationSource(corsConfigurationSource()))
         .authorizeHttpRequests(authorize ->
             authorize
-                .anyRequest().authenticated()
                 .requestMatchers(whiteList).permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                .requestMatchers("/photo/**").hasRole("PHOTOGRAPHER"))
+                .requestMatchers("/photo/**").hasRole("PHOTOGRAPHER")
+                .anyRequest().authenticated())
         .formLogin(AbstractHttpConfigurer::disable)
         .csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(session -> session.sessionCreationPolicy(
@@ -58,11 +57,12 @@ public class SecurityConfig {
             .logoutSuccessHandler((request, response, authentication) -> {
               String jsonResponse = new ObjectMapper().writeValueAsString(
                   new LogoutResponseDto(HttpStatus.OK, "로그아웃 되었습니다.", null));
+              // refreshtoken 삭제
               // HTTP 상태 코드 200 OK, JSON 형식 리턴
               response.setStatus(HttpStatus.OK.value());
-              response.setContentType("application/json;charset=UTF-8");//응답 데이터 타입 지정
-              response.getWriter().write(jsonResponse);//응답 데이터 출력
-              response.getWriter().flush();//즉시 응답(더 빠름)
+              response.setContentType("application/json;charset=UTF-8"); //응답 데이터 타입 지정
+              response.getWriter().write(jsonResponse); //응답 데이터 출력
+              response.getWriter().flush(); //즉시 응답(더 빠름)
             })
             .invalidateHttpSession(true));
     return http.build();

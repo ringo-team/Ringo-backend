@@ -2,6 +2,7 @@ package com.lingo.lingoproject.domain;
 
 import com.lingo.lingoproject.domain.enums.InspectStatus;
 import com.lingo.lingoproject.utils.Timestamp;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -26,6 +27,8 @@ public class Profile extends Timestamp {
 
   private String imageUrl;
   private String description;
+
+  @Column(name = "sort_order")
   private int order;
 
   @Enumerated(EnumType.STRING)

@@ -48,9 +48,12 @@ public class JwtUtil {
     else{
       throw new IllegalArgumentException("Invalid token type.");
     }
-    UserEntity user = userRepository.findByUsername(username);
+    Optional<UserEntity> user = userRepository.findByEmail(username);
+    if (user.isEmpty()){
+      throw new IllegalArgumentException("Invalid username or password.");
+    }
     Map<String, Object> claims = new HashMap<>();
-    claims.put("userId", user.getId());
+    claims.put("userId", user.get().getId());
     claims.put("rand", rand);
     return Jwts.builder()
         .issuer("lingo")

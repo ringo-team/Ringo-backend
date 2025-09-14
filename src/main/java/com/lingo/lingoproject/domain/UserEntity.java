@@ -77,9 +77,6 @@ public class UserEntity extends Timestamp implements UserDetails {
 
   private String job;
 
-  @Enumerated(EnumType.STRING)
-  private HashTag hashTag;
-
   private boolean isActive;
   private String etc;
 }

@@ -8,8 +8,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 public class GoogleLoginController {
+
+  private final GoogleLoginService googleLoginService;
+
   @GetMapping("/google/callback")
   public void callback(@RequestParam String code){
-
+    googleLoginService.saveUserLoginInfo(code);
   }
 }
