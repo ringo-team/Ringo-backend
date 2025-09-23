@@ -1,11 +1,12 @@
 package com.lingo.lingoproject.domain;
 
+import com.lingo.lingoproject.utils.Timestamp;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,14 +17,17 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OAuthToken {
+public class Messages extends Timestamp {
   @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  private String id;
 
-  @OneToOne
-  @JoinColumn(name = "user_id")
+  @ManyToOne
+  @JoinColumn(name = "chatroomId")
+  private ChattingRoom chattingRoom;
+
+  @ManyToOne
+  @JoinColumn(name = "userId")
   private UserEntity user;
 
-  private String userToken;
+  private String message;
 }

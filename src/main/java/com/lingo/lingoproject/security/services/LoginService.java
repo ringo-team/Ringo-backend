@@ -11,7 +11,6 @@ import com.lingo.lingoproject.security.util.JwtUtil;
 import com.lingo.lingoproject.security.util.RandomUtil;
 import io.jsonwebtoken.Claims;
 import java.util.Optional;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,18 +26,6 @@ public class LoginService {
   private final JwtTokenRepository jwtTokenRepository;
 
   public LoginResponseDto login(LoginInfoDto dto){
-    if(dto.method().equals("google")){
-
-    }
-    else if(dto.method().equals("apple")){
-
-    }
-    else if(dto.method().equals("kakao")){
-
-    }
-    else{
-
-    }
     if (SecurityContextHolder.getContext().getAuthentication() == null) {
       throw new IllegalArgumentException("Invalid login info.");
     }
@@ -50,7 +37,7 @@ public class LoginService {
 
   public LoginResponseDto regenerateToken(String refreshToken) throws NotFoundException {
     Claims claims =  jwtUtil.getClaims(refreshToken);
-    Optional<UserEntity> user = userRepository.findById((UUID) claims.get("userId"));
+    Optional<UserEntity> user = userRepository.findById((String) claims.get("userId"));
     if (user.isEmpty()){
       throw new NotFoundException();
     }

@@ -35,6 +35,7 @@ public class SecurityConfig {
       "/signUp",
       "/google/callback/**",
       "/kakao/callback/**",
+      "/image/**"
   };
 
   @Bean

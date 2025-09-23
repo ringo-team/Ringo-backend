@@ -1,15 +1,14 @@
 package com.lingo.lingoproject.security.oauth.kakao;
 
 
-import com.lingo.lingoproject.domain.OAuthToken;
-import com.lingo.lingoproject.repository.OAuthTokenRepository;
+
+import com.lingo.lingoproject.domain.UserEntity;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.oauth.OAuthUtils;
 import com.lingo.lingoproject.security.oauth.kakao.dto.KakaoTokenResponseDto;
 import com.lingo.lingoproject.security.oauth.kakao.dto.KakaoUserInfoResponseDto;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -37,7 +36,6 @@ public class KakaoLoginService {
   private final RestTemplate restTemplate;
   private final OAuthUtils oAuthUtils;
   private final UserRepository userRepository;
-  private final OAuthTokenRepository oAuthTokenRepository;
 
   public String getKakaoAccessToken(String code){
     MultiValueMap<String, Object> params = new LinkedMultiValueMap<>();
@@ -77,10 +75,14 @@ public class KakaoLoginService {
     if(response == null){
       throw new RestClientException("Kakao user info response is null");
     }
-    Optional<OAuthToken> oAuthToken = oAuthTokenRepository.findByUserToken(response.id().toString());
-    if(oAuthToken.isEmpty()){
-      oAuthUtils.signup(response.id().toString());
+    Optional<UserEntity> user = userRepository.findByEmail(response.id().toString());
+    UserEntity loginUser = null;
+    if(user.isEmpty()){
+      loginUser = oAuthUtils.signup(response.id().toString());
     }
-    oAuthUtils.login(oAuthToken.get());
+    else{
+      loginUser = user.get();
+    }
+    oAuthUtils.login(loginUser);
   }
 }

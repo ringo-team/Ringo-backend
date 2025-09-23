@@ -1,9 +1,9 @@
 package com.lingo.lingoproject.security.oauth;
 
-import com.lingo.lingoproject.domain.OAuthToken;
+
 import com.lingo.lingoproject.domain.UserEntity;
 import com.lingo.lingoproject.domain.enums.Role;
-import com.lingo.lingoproject.repository.OAuthTokenRepository;
+import com.lingo.lingoproject.domain.enums.SignUpStatus;
 import com.lingo.lingoproject.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,28 +21,25 @@ import org.springframework.stereotype.Component;
 public class OAuthUtils {
 
   private final UserRepository userRepository;
-  private final OAuthTokenRepository oAuthTokenRepository;
 
-  public void signup(String userToken){
+  public UserEntity signup(String email){
     log.info("가입되지 않은 회원입니다. 새로 계정을 만듭니다.");
-    String email = UUID.randomUUID().toString();
+    String id = UUID.randomUUID().toString();
     UserEntity user = UserEntity.builder()
+        .id(id)
         .email(email)
         .role(Role.USER)
+        .status(SignUpStatus.BEFORE)
         .build();
-    userRepository.save(user);
-    OAuthToken oAuthToken = OAuthToken.builder()
-        .user(user)
-        .userToken(userToken)
-        .build();
-    oAuthTokenRepository.save(oAuthToken);
+    UserEntity savedUser = userRepository.save(user);
+    return savedUser;
   }
-  public void login(OAuthToken oAuthToken){
+  public void login(UserEntity user){
     List<SimpleGrantedAuthority> authorities = new ArrayList<>();
     authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
-    UserEntity user = oAuthToken.getUser();
+    System.out.println("유저가 로그인 되었습니다.");
     SecurityContextHolder.getContext().setAuthentication(
-        new UsernamePasswordAuthenticationToken(user.getEmail(), "passwword", authorities)
+        new UsernamePasswordAuthenticationToken(user.getEmail(), "password", authorities)
     );
   }
 }

@@ -105,7 +105,7 @@ public class JwtUtil {
         /*
          토큰에 저장된 userId가 데이터베이스에 존재하지 않을 경우 유효하지 않은 토큰으로 간주
          */
-        Optional<UserEntity> user = userRepository.findById((UUID) claims.get("userId"));
+        Optional<UserEntity> user = userRepository.findById((String) claims.get("userId"));
         if (user.isEmpty()) {
           return false;
         }

@@ -4,6 +4,7 @@ import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.HashTag;
 import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
+import com.lingo.lingoproject.domain.enums.SignUpStatus;
 import com.lingo.lingoproject.utils.Timestamp;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,7 +15,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -47,8 +47,7 @@ public class UserEntity extends Timestamp implements UserDetails {
   }
 
   @Id
-  @GeneratedValue(strategy = GenerationType.UUID)
-  private UUID id;
+  private String id;
 
   private String nickname;
 
@@ -76,6 +75,14 @@ public class UserEntity extends Timestamp implements UserDetails {
   private Religion religion;
 
   private String job;
+
+  /*
+   * 회원가입 진행상황
+   *   시작전
+   *   진행중
+   *   완료
+   */
+  private SignUpStatus status;
 
   private boolean isActive;
   private String etc;
