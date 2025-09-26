@@ -29,7 +29,7 @@ public class ImageService {
   private final ProfileRepository profileRepository;
 
   @Transactional
-  public String uploadImage(MultipartFile file, String userId, int order) throws IOException {
+  public String uploadImage(MultipartFile file, Long userId, int order) throws IOException {
 
     /**
      * 1. 유저 id로 해당 유저 찾기
@@ -73,13 +73,13 @@ public class ImageService {
     return savedProfile.getImageUrl();
   }
 
-  public String getImageUrl(String userId, int order){
+  public String getImageUrl(Long userId, int order){
     UserEntity user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
     Profile profile = profileRepository.findByUserAndOrder(user, order);
     return profile.getImageUrl();
   }
 
-  public void deleteProfile(String userId, int order){
+  public void deleteProfile(Long userId, int order){
     UserEntity user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
     Profile profile = profileRepository.findByUserAndOrder(user, order);
     profileRepository.delete(profile);

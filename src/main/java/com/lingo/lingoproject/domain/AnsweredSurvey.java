@@ -17,7 +17,5 @@ public class AnsweredSurvey {
   @JoinColumn
   private Survey serveryNum;
 
-  @ManyToOne
-  @JoinColumn
-  private SurveyQuestion answerNum;
+  private String answer;
 }

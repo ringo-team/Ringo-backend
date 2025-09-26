@@ -59,7 +59,7 @@ public class KakaoLoginService {
     return response.accessToken();
   }
 
-  public void saveUserLoginInfo(String code){
+  public UserEntity saveUserLoginInfo(String code){
     String token = getKakaoAccessToken(code);
     HttpHeaders headers = new HttpHeaders();
     headers.set("Authorization", "Bearer " + token);
@@ -84,5 +84,6 @@ public class KakaoLoginService {
       loginUser = user.get();
     }
     oAuthUtils.login(loginUser);
+    return loginUser;
   }
 }

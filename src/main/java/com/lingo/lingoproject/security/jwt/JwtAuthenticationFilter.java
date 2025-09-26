@@ -1,7 +1,6 @@
 package com.lingo.lingoproject.security.jwt;
 
 
-import com.lingo.lingoproject.security.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

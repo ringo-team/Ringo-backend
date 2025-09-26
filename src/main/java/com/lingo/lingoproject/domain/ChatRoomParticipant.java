@@ -8,15 +8,16 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 
 @Entity
-public class SurveyQuestion {
+public class ChatRoomParticipant {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
   @ManyToOne
-  @JoinColumn
-  private Survey survey;
+  @JoinColumn(name = "chatting_room_id")
+  private ChatRoom chattingRoom;
 
-  private int questionNum;
-  private String content;
+  @ManyToOne
+  @JoinColumn(name = "participant_user_id")
+  private UserEntity participant;
 }

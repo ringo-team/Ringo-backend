@@ -1,4 +1,4 @@
 package com.lingo.lingoproject.security.response;
 
-public record LoginResponseDto(String accessToken, String refreshToken) {
+public record LoginResponseDto(Long userId, String accessToken, String refreshToken) {
 }

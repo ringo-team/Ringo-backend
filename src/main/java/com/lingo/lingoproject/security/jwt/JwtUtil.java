@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.security.util;
+package com.lingo.lingoproject.security.jwt;
 
 
 
@@ -6,18 +6,22 @@ import com.lingo.lingoproject.domain.UserEntity;
 import com.lingo.lingoproject.repository.JwtTokenRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.TokenType;
+import com.lingo.lingoproject.security.util.RandomUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
+import javax.crypto.SecretKey;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtUtil {
@@ -48,6 +52,7 @@ public class JwtUtil {
     else{
       throw new IllegalArgumentException("Invalid token type.");
     }
+    log.info(username);
     Optional<UserEntity> user = userRepository.findByEmail(username);
     if (user.isEmpty()){
       throw new IllegalArgumentException("Invalid username or password.");
@@ -59,19 +64,25 @@ public class JwtUtil {
         .issuer("lingo")
         .claims(claims)
         .issuedAt(new Date())
-        .subject(username)
+        .subject(username.substring(0, username.lastIndexOf("@")))
         .expiration(new Date(System.currentTimeMillis() + expiration))
-        .signWith(SignatureAlgorithm.HS256, secret)
+        .signWith(this.getSigningKey())
         .compact();
+  }
+
+  private SecretKey getSigningKey(){
+    byte[] keyBytes = Decoders.BASE64.decode(secret);
+    return Keys.hmacShaKeyFor(keyBytes);
   }
 
   public Claims getClaims(String token){
     try{
-      return Jwts.parser().setSigningKey(secret)
+      return Jwts.parser().verifyWith(getSigningKey())
           .build()
-          .parseClaimsJws(token)
-          .getBody();
+          .parseSignedClaims(token)
+          .getPayload();
     } catch (Exception e) {
+      e.printStackTrace();
       return null;
     }
   }
@@ -105,7 +116,7 @@ public class JwtUtil {
         /*
          토큰에 저장된 userId가 데이터베이스에 존재하지 않을 경우 유효하지 않은 토큰으로 간주
          */
-        Optional<UserEntity> user = userRepository.findById((String) claims.get("userId"));
+        Optional<UserEntity> user = userRepository.findById((Long) claims.get("userId"));
         if (user.isEmpty()) {
           return false;
         }

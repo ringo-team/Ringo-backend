@@ -47,7 +47,8 @@ public class UserEntity extends Timestamp implements UserDetails {
   }
 
   @Id
-  private String id;
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
   private String nickname;
 

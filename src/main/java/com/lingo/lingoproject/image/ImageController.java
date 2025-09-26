@@ -21,19 +21,19 @@ public class ImageController {
   private final ImageService imageService;
 
   @PostMapping("/profile/upload")
-  public ResponseEntity<?> uploadImage(@RequestPart MultipartFile file, @RequestParam("userId") String userId, @RequestParam("order") int order) throws IOException {
+  public ResponseEntity<?> uploadImage(@RequestPart MultipartFile file, @RequestParam("userId") Long userId, @RequestParam("order") int order) throws IOException {
     String imageUrl = imageService.uploadImage(file, userId, order);
     return ResponseEntity.status(HttpStatus.CREATED).body(imageUrl);
   }
 
   @GetMapping("/profile/imageUrl")
-  public ResponseEntity<?> getImageUrl(@RequestParam("userId") String userId, @RequestParam("order") int order){
+  public ResponseEntity<?> getImageUrl(@RequestParam("userId") Long userId, @RequestParam("order") int order){
     String imageUrl = imageService.getImageUrl(userId, order);
     return ResponseEntity.status(HttpStatus.OK).body(imageUrl);
   }
 
   @DeleteMapping("/profile")
-  public ResponseEntity<?> deleteImage(@RequestParam("userId") String userId, @RequestParam("order") int order){
+  public ResponseEntity<?> deleteImage(@RequestParam("userId") Long userId, @RequestParam("order") int order){
     imageService.deleteProfile(userId, order);
     return ResponseEntity.ok().build();
   }

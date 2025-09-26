@@ -1,19 +1,23 @@
 package com.lingo.lingoproject.domain;
 
-
-import com.lingo.lingoproject.utils.Timestamp;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
-import org.hibernate.annotations.ColumnDefault;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-public class Participation extends Timestamp {
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class JwtRefreshToken {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -22,8 +26,11 @@ public class Participation extends Timestamp {
   @JoinColumn(name = "user_id")
   private UserEntity user;
 
-  @ColumnDefault("0")
-  private int numOfAccess;
+  /*
+   토큰의 유효성을 확인하기 위한 값
+   */
+  private int rand;
 
-  private int continuousAccess;
+  @Column(nullable = false)
+  private String refreshToken;
 }

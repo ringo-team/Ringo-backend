@@ -1,8 +1,9 @@
 package com.lingo.lingoproject.security.form;
 
 
-import com.lingo.lingoproject.domain.UserEntity;
-import com.lingo.lingoproject.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lingo.lingoproject.security.controller.LoginInfoDto;
+import com.lingo.lingoproject.utils.RequestCacheWrapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebFilter;
@@ -10,31 +11,23 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @WebFilter("/login")
 @Order(1)
 @RequiredArgsConstructor
-@Component
+@Slf4j
 public class CustomAuthenticationFilter extends OncePerRequestFilter {
 
-  private final AuthenticationProvider authenticationProvider;
-  private final UserRepository userRepository;
+  private final CustomAuthenticationManager customAuthenticationManager;
+  private final RequestCacheWrapper requestCache;
 
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -43,29 +36,20 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
       String requestBody = request.getReader()
           .lines()
           .collect(Collectors.joining(System.lineSeparator()));
-      JSONParser  jsonParser = new JSONParser();
-      JSONObject jsonObject = null;
+      ObjectMapper mapper = new ObjectMapper();
+      LoginInfoDto info = null;
+
       try {
-        jsonObject = (JSONObject) jsonParser.parse(requestBody);
-      } catch (ParseException e) {
+        requestCache.setContent(requestBody);
+        info = mapper.readValue(requestBody, LoginInfoDto.class);
+      } catch (Exception e) {
         throw new RuntimeException(e);
       }
-      String method = jsonObject.get("method").toString();
-      if (method.equals("form")){
-        Optional<UserEntity> user = userRepository.findByEmail(jsonObject.get("email").toString());
-        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.get().getRole().toString()));
-
-        Authentication authentication = authenticationProvider.authenticate(
-            new UsernamePasswordAuthenticationToken(jsonObject.get("email").toString(), "password", authorities)
-        );
-        if(authentication.isAuthenticated()){
-          SecurityContextHolder.getContext().setAuthentication(authentication);
-        }
-        else{
-          throw new BadCredentialsException("Bad credentials");
-        }
-      }
+      Authentication authentication = customAuthenticationManager.authenticate(
+          new UsernamePasswordAuthenticationToken(info.email(), info.password(),
+              new ArrayList<>())
+      );
+      SecurityContextHolder.getContext().setAuthentication(authentication);
     }
     filterChain.doFilter(request, response);
   }

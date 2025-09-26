@@ -1,12 +1,12 @@
 package com.lingo.lingoproject.repository;
 
-import com.lingo.lingoproject.domain.ChattingRoom;
-import com.lingo.lingoproject.domain.Messages;
+import com.lingo.lingoproject.domain.ChatRoom;
+import com.lingo.lingoproject.domain.Message;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface MessagesRepository extends JpaRepository<Messages, String> {
+public interface MessagesRepository extends JpaRepository<Message, String> {
 
-  Page<Messages> findAllByChattingRoom(Pageable pageable, ChattingRoom chattingRoom);
+  Page<Message> findAllByChattingRoom(Pageable pageable, ChatRoom chattingRoom);
 }

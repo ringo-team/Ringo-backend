@@ -15,7 +15,7 @@ public class PhotographerUserMapping {
 
   @ManyToOne
   @JoinColumn(name = "photographer_id")
-  private RoleEntity photographer;
+  private UserEntity photographer;
 
   @ManyToOne
   @JoinColumn(name = "user_id")

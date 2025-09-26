@@ -7,7 +7,6 @@ import com.lingo.lingoproject.domain.enums.SignUpStatus;
 import com.lingo.lingoproject.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -24,9 +23,7 @@ public class OAuthUtils {
 
   public UserEntity signup(String email){
     log.info("가입되지 않은 회원입니다. 새로 계정을 만듭니다.");
-    String id = UUID.randomUUID().toString();
     UserEntity user = UserEntity.builder()
-        .id(id)
         .email(email)
         .role(Role.USER)
         .status(SignUpStatus.BEFORE)

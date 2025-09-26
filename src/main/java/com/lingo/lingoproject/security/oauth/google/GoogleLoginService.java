@@ -67,7 +67,7 @@ public class GoogleLoginService {
    * 3. 유저의 email 정보를 통해서 이전 가입여부를 확인한다. 가입한 적이 없으면 자동 회원가입이 진행된다.
    */
   @Transactional
-  public void saveUserLoginInfo(String code){
+  public UserEntity saveUserLoginInfo(String code){
     //1
     String token = getGoogleAccessToken(code);
 
@@ -98,5 +98,6 @@ public class GoogleLoginService {
     }
     // 로그인을 진행한다.
     oAuthUtils.login(loginUser);
+    return loginUser;
   }
 }
