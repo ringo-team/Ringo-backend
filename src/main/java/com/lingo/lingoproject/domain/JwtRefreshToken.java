@@ -24,7 +24,7 @@ public class JwtRefreshToken {
 
   @OneToOne
   @JoinColumn(name = "user_id")
-  private UserEntity user;
+  private User user;
 
   /*
    토큰의 유효성을 확인하기 위한 값

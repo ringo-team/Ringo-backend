@@ -2,7 +2,7 @@ package com.lingo.lingoproject.security.jwt;
 
 
 
-import com.lingo.lingoproject.domain.UserEntity;
+import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.repository.JwtTokenRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.TokenType;
@@ -53,7 +53,7 @@ public class JwtUtil {
       throw new IllegalArgumentException("Invalid token type.");
     }
     log.info(username);
-    Optional<UserEntity> user = userRepository.findByEmail(username);
+    Optional<User> user = userRepository.findByEmail(username);
     if (user.isEmpty()){
       throw new IllegalArgumentException("Invalid username or password.");
     }
@@ -116,7 +116,7 @@ public class JwtUtil {
         /*
          토큰에 저장된 userId가 데이터베이스에 존재하지 않을 경우 유효하지 않은 토큰으로 간주
          */
-        Optional<UserEntity> user = userRepository.findById((Long) claims.get("userId"));
+        Optional<User> user = userRepository.findById((Long) claims.get("userId"));
         if (user.isEmpty()) {
           return false;
         }

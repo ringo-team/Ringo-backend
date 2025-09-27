@@ -15,7 +15,7 @@ public class BlockedFriend {
 
   @ManyToOne
   @JoinColumn(name = "user_id")
-  private UserEntity user;
+  private User user;
 
   /*
   회원 A에게 친구추천시

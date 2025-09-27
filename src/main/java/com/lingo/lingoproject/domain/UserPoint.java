@@ -5,19 +5,21 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
-public class ChatRoomParticipant {
+@Table(name = "Users")
+public class UserPoint {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @ManyToOne
-  @JoinColumn(name = "chatting_room_id")
-  private ChatRoom chattingRoom;
+  @OneToOne
+  @JoinColumn(name = "user_id")
+  private User user;
 
-  @ManyToOne
-  @JoinColumn(name = "participant_user_id")
-  private UserEntity participant;
+  @ColumnDefault("0")
+  private int point;
 }

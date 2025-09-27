@@ -1,6 +1,6 @@
 package com.lingo.lingoproject.security.oauth.google;
 
-import com.lingo.lingoproject.domain.UserEntity;
+import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.security.TokenType;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.security.response.LoginResponseDto;
@@ -22,7 +22,7 @@ public class GoogleLoginController {
   @GetMapping("/google/callback")
   public ResponseEntity<?> callback(@RequestParam String code){
 
-    UserEntity user = googleLoginService.saveUserLoginInfo(code);
+    User user = googleLoginService.saveUserLoginInfo(code);
     int rand = randomUtil.getRandomNumber();
     String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user.getEmail(), rand);
     String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user.getEmail(), rand);

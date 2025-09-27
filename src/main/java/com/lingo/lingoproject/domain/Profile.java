@@ -29,7 +29,7 @@ public class Profile extends Timestamp {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id")
-  private UserEntity user;
+  private User user;
 
   private String imageUrl;
   private String description;

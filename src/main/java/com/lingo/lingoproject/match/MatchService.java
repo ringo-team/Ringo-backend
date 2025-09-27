@@ -1,11 +1,12 @@
 package com.lingo.lingoproject.match;
 
 import com.lingo.lingoproject.domain.Matching;
-import com.lingo.lingoproject.domain.UserEntity;
+import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
-import com.lingo.lingoproject.repository.MatchingsRepository;
+import com.lingo.lingoproject.repository.BlockedFriendRepository;
+import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import java.util.HashSet;
 import java.util.List;
@@ -19,19 +20,37 @@ import org.springframework.stereotype.Service;
 public class MatchService {
 
   private final UserRepository userRepository;
-  private final MatchingsRepository  matchingsRepository;
+  private final MatchingRepository matchingRepository;
+  private final BlockedFriendRepository blockedFriendRepository;
 
-  public void matchRequest(MatchingRequestDto dto){
-    UserEntity requestedUser = userRepository.findById(dto.requestedId())
+  public Matching matchRequest(MatchingRequestDto dto){
+    User requestedUser = userRepository.findById(dto.requestedId())
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    UserEntity requestUser = userRepository.findById(dto.requestId())
+    User requestUser = userRepository.findById(dto.requestId())
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
     Matching matching = Matching.builder()
         .requestedUser(requestedUser)
         .requestUser(requestUser)
         .matchingStatus(MatchingStatus.PENDING)
         .build();
-    matchingsRepository.save(matching);
+    return matchingRepository.save(matching);
+  }
+
+  public void responseToRequest(String decision, Long matchingId){
+    MatchingStatus status = null;
+    if(decision.equals(MatchingStatus.ACCEPTED.toString())){
+      status = MatchingStatus.ACCEPTED;
+    }
+    else if(decision.equals(MatchingStatus.REJECTED.toString())){
+      status = MatchingStatus.REJECTED;
+    }
+    else{
+      throw new IllegalArgumentException("decision 값이 적절하지 않습니다.");
+    }
+    Matching matching = matchingRepository.findById(matchingId)
+        .orElseThrow(() -> new IllegalArgumentException("적절하지 않은 매칭 id 입니다."));
+    matching.setMatchingStatus(status);
+    matchingRepository.save(matching);
   }
 
   @Cacheable(key = "#userId", value = "Recommend", cacheManager = "cacheManager")
@@ -39,8 +58,10 @@ public class MatchService {
     Set<Long> rtnSet = new HashSet<>();
     int count =  0;
     int setSize = 0;
-    UserEntity userEntity = userRepository.findById(userId)
+    User userEntity = userRepository.findById(userId)
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    // block 하거나 된 사람은 추천하지 않도록
+    List<User> blockedFriends = blockedFriendRepository.findBlockedFriends(userId);
     // 이성을 추천하도록
     Gender gender = null;
     if(userEntity.getGender().equals(Gender.MALE)){
@@ -49,9 +70,13 @@ public class MatchService {
       gender = Gender.MALE;
     }
     while(setSize < 10 && count < 10){
-      List<UserEntity> randUserId = userRepository.findRandomUsers();
-      for(UserEntity user : randUserId){
-        if(!user.getGender().equals(gender)){
+      List<User> randUserId = userRepository.findRandomUsers();
+      for(User user : randUserId){
+        // 성별이 같은 유저거나 블락된 사람의 경우 pass
+        if(user.getGender().equals(gender)){
+          continue;
+        }
+        if(blockedFriends.contains(user)){
           continue;
         }
         // 7명은 매칭이 가능하도록
@@ -76,5 +101,28 @@ public class MatchService {
 
   public boolean isMatch(Long user1, Long user2){
     return true;
+  }
+
+  public List<Long> getUserIdRequested(Long userId){
+    User requestUser = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    return matchingRepository.findByRequestUserAndMatchingStatus(requestUser, MatchingStatus.PENDING)
+        .stream()
+        .map(Matching::getRequestedUser)
+        .map(User::getId)
+        .toList();
+  }
+  public List<Long> getUserIdRequests(Long userId){
+    User requestedUser = userRepository.findById(userId)
+        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    return matchingRepository.findByRequestedUserAndMatchingStatus(requestedUser, MatchingStatus.PENDING)
+        .stream()
+        .map(Matching::getRequestUser)
+        .map(User::getId)
+        .toList();
+  }
+
+  public void deleteMatching(Long id){
+    matchingRepository.deleteById(id);
   }
 }

@@ -20,7 +20,7 @@ public class ParticipationLogs extends Timestamp {
 
   @OneToOne
   @JoinColumn(name = "user_id")
-  private UserEntity user;
+  private User user;
 
   @ColumnDefault("0")
   private int numOfAccess;

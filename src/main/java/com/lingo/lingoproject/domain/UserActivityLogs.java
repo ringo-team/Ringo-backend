@@ -15,7 +15,7 @@ public class UserActivityLogs extends Timestamp {
   private Long id;
 
   @OneToOne
-  private UserEntity user;
+  private User user;
 
   @ColumnDefault("0")
   private Long connect;

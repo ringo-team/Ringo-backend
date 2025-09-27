@@ -21,11 +21,11 @@ public class Message extends Timestamp {
 
   @ManyToOne
   @JoinColumn(name = "chatroomId")
-  private ChatRoom chattingRoom;
+  private Chatroom chattingRoom;
 
   @ManyToOne
   @JoinColumn(name = "userId")
-  private UserEntity user;
+  private User user;
 
   private String message;
 }

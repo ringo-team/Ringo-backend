@@ -8,12 +8,20 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
-public class ChatRoom {
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+public class Chatroom {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

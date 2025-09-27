@@ -1,7 +1,7 @@
 package com.lingo.lingoproject.security.services;
 
 import com.lingo.lingoproject.domain.JwtRefreshToken;
-import com.lingo.lingoproject.domain.UserEntity;
+import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.repository.JwtTokenRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.TokenType;
@@ -34,7 +34,7 @@ public class LoginService {
     int rand = randomUtil.getRandomNumber();
     String access = jwtUtil.generateToken(TokenType.ACCESS, dto.email(), rand);
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, dto.email(), rand);
-    UserEntity user = userRepository.findByEmail(dto.email())
+    User user = userRepository.findByEmail(dto.email())
         .orElseThrow(() -> new IllegalArgumentException("Invalid username or password."));
     JwtRefreshToken refreshToken = JwtRefreshToken.builder()
         .refreshToken(refresh)
@@ -47,11 +47,11 @@ public class LoginService {
 
   public LoginResponseDto regenerateToken(String refreshToken) throws NotFoundException {
     Claims claims =  jwtUtil.getClaims(refreshToken);
-    Optional<UserEntity> user = userRepository.findById(Long.parseLong(claims.get("userId").toString()));
+    Optional<User> user = userRepository.findById(Long.parseLong(claims.get("userId").toString()));
     if (user.isEmpty()){
       throw new NotFoundException();
     }
-    UserEntity userEntity = user.get();
+    User userEntity = user.get();
     JwtRefreshToken token = jwtTokenRepository.findByUser(userEntity);
     if(token.getRefreshToken().equals(refreshToken) && jwtUtil.validateToken(token.getRefreshToken())){
       int rand = randomUtil.getRandomNumber();
@@ -65,7 +65,7 @@ public class LoginService {
   }
 
   public void signup(LoginInfoDto dto){
-    UserEntity user = UserEntity.builder()
+    User user = User.builder()
         .email(dto.email())
         .password(passwordEncoder.encode(dto.password()))
         .build();

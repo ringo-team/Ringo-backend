@@ -15,11 +15,11 @@ public class Report {
 
   @ManyToOne
   @JoinColumn(name = "report_user_id")
-  private UserEntity reportUser;
+  private User reportUser;
 
   @ManyToOne
   @JoinColumn(name = "reported_user_id")
-  private UserEntity reportedUser;
+  private User reportedUser;
 
 
 }

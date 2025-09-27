@@ -2,7 +2,7 @@ package com.lingo.lingoproject.security.oauth.kakao;
 
 
 
-import com.lingo.lingoproject.domain.UserEntity;
+import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.oauth.OAuthUtils;
 import com.lingo.lingoproject.security.oauth.kakao.dto.KakaoTokenResponseDto;
@@ -59,7 +59,7 @@ public class KakaoLoginService {
     return response.accessToken();
   }
 
-  public UserEntity saveUserLoginInfo(String code){
+  public User saveUserLoginInfo(String code){
     String token = getKakaoAccessToken(code);
     HttpHeaders headers = new HttpHeaders();
     headers.set("Authorization", "Bearer " + token);
@@ -75,8 +75,8 @@ public class KakaoLoginService {
     if(response == null){
       throw new RestClientException("Kakao user info response is null");
     }
-    Optional<UserEntity> user = userRepository.findByEmail(response.id().toString());
-    UserEntity loginUser = null;
+    Optional<User> user = userRepository.findByEmail(response.id().toString());
+    User loginUser = null;
     if(user.isEmpty()){
       loginUser = oAuthUtils.signup(response.id().toString());
     }

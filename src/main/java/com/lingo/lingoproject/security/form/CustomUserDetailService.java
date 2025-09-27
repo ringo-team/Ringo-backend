@@ -1,6 +1,6 @@
 package com.lingo.lingoproject.security.form;
 
-import com.lingo.lingoproject.domain.UserEntity;
+import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.repository.UserRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ public class CustomUserDetailService implements UserDetailsService {
 
   @Override
   public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-    Optional<UserEntity> user = userRepository.findByEmail(username);
+    Optional<User> user = userRepository.findByEmail(username);
     if (user.isEmpty()) {
       throw new UsernameNotFoundException(username);
     }

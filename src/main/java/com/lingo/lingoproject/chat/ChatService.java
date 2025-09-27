@@ -1,10 +1,13 @@
 package com.lingo.lingoproject.chat;
 
-import com.lingo.lingoproject.domain.ChatRoom;
+import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
+import com.lingo.lingoproject.domain.Chatroom;
+import com.lingo.lingoproject.domain.ChatroomParticipant;
 import com.lingo.lingoproject.domain.Message;
-import com.lingo.lingoproject.domain.UserEntity;
-import com.lingo.lingoproject.repository.ChattingRoomsRepository;
-import com.lingo.lingoproject.repository.MessagesRepository;
+import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
+import com.lingo.lingoproject.repository.ChatroomRepository;
+import com.lingo.lingoproject.repository.MessageRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import java.util.List;
 import java.util.UUID;
@@ -18,20 +21,21 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ChatService {
 
-  private final ChattingRoomsRepository chattingRoomsRepository;
-  private final MessagesRepository messagesRepository;
+  private final ChatroomRepository chatroomRepository;
+  private final MessageRepository messageRepository;
   private final UserRepository userRepository;
+  private final ChatroomParticipantRepository chatroomParticipantRepository;
 
   public List<ChatResponseDto> getChattingMessages(Long roomId, int page, int size){
-    ChatRoom chattingRoom = chattingRoomsRepository.findById(roomId)
+    Chatroom chatroom = chatroomRepository.findById(roomId)
         .orElseThrow(() -> new IllegalArgumentException("Room not found"));
 
     Pageable pageable = PageRequest.of(page, size);
 
-    Page<Message> messages = messagesRepository.findAllByChattingRoom(pageable, chattingRoom);
+    Page<Message> messages = messageRepository.findAllByChattingRoom(chatroom, pageable);
     List<ChatResponseDto> messageResponses = messages.stream()
         .map(m -> {
-          UserEntity user = m.getUser();
+          User user = m.getUser();
           return new ChatResponseDto(user.getId(), user.getNickname(), m.getMessage(), m.getCreatedAt());
         })
         .toList();
@@ -39,16 +43,46 @@ public class ChatService {
   }
 
   public void saveMessage(ChatResponseDto message, Long roomId){
-    ChatRoom chattingRoom = chattingRoomsRepository.findById(roomId)
+    Chatroom chatroom = chatroomRepository.findById(roomId)
         .orElseThrow(() -> new IllegalArgumentException("Room not found"));
-    UserEntity user = userRepository.findById(message.userId())
+    User user = userRepository.findById(message.userId())
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
     Message messages = Message.builder()
         .id(UUID.randomUUID().toString())
-        .chattingRoom(chattingRoom)
+        .chattingRoom(chatroom)
         .user(user)
         .message(message.content())
         .build();
-    messagesRepository.save(messages);
+    messageRepository.save(messages);
+  }
+
+  public Chatroom createChatroom(CreateChatroomDto dto){
+    User user1 = userRepository.findById(dto.user1Id())
+        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    User user2 = userRepository.findById(dto.user2Id())
+        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    Chatroom chatroom = Chatroom.builder()
+        .chatroomName(dto.user1Id().toString() +"_" +dto.user2Id().toString())
+        .type(dto.chatType())
+        .build();
+    Chatroom savedChatroom = chatroomRepository.save(chatroom);
+    ChatroomParticipant participant1 = ChatroomParticipant.builder()
+        .participant(user1)
+        .chatroom(chatroom)
+        .build();
+    ChatroomParticipant participant2 = ChatroomParticipant.builder()
+        .participant(user2)
+        .chatroom(chatroom)
+        .build();
+    chatroomParticipantRepository.saveAll(List.of(participant1, participant2));
+    return savedChatroom;
+  }
+
+  public void deleteChatroom(Long id){
+    Chatroom chatroom = chatroomRepository.findById(id)
+        .orElseThrow(() -> new IllegalArgumentException("chatroom not found"));
+    chatroomParticipantRepository.deleteAllByChatroom(chatroom);
+    messageRepository.deleteAllByChattingRoom(chatroom);
+    chatroomRepository.delete(chatroom);
   }
 }

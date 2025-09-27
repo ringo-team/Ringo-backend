@@ -1,7 +1,7 @@
 package com.lingo.lingoproject.security.oauth.google;
 
 
-import com.lingo.lingoproject.domain.UserEntity;
+import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.oauth.OAuthUtils;
 import com.lingo.lingoproject.security.oauth.google.dto.GoogleTokenResponseDto;
@@ -67,7 +67,7 @@ public class GoogleLoginService {
    * 3. 유저의 email 정보를 통해서 이전 가입여부를 확인한다. 가입한 적이 없으면 자동 회원가입이 진행된다.
    */
   @Transactional
-  public UserEntity saveUserLoginInfo(String code){
+  public User saveUserLoginInfo(String code){
     //1
     String token = getGoogleAccessToken(code);
 
@@ -88,8 +88,8 @@ public class GoogleLoginService {
     }
 
     // 3
-    Optional<UserEntity> user = userRepository.findByEmail(response.email());
-    UserEntity loginUser = null;
+    Optional<User> user = userRepository.findByEmail(response.email());
+    User loginUser = null;
 
     if(user.isEmpty()){
       loginUser = oAuthUtils.signup(response.email());

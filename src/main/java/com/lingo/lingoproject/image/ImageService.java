@@ -4,7 +4,7 @@ package com.lingo.lingoproject.image;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.lingo.lingoproject.domain.Profile;
-import com.lingo.lingoproject.domain.UserEntity;
+import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -38,7 +38,7 @@ public class ImageService {
      * 4. 데이터베이스에 profile imageUrl 저장하기
      */
     //1
-    UserEntity user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+    User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     //2
     String originalFilename = file.getOriginalFilename();
@@ -74,13 +74,13 @@ public class ImageService {
   }
 
   public String getImageUrl(Long userId, int order){
-    UserEntity user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+    User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
     Profile profile = profileRepository.findByUserAndOrder(user, order);
     return profile.getImageUrl();
   }
 
   public void deleteProfile(Long userId, int order){
-    UserEntity user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+    User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
     Profile profile = profileRepository.findByUserAndOrder(user, order);
     profileRepository.delete(profile);
     String imageUrl = getOriginalFilename(profile.getImageUrl());

@@ -16,7 +16,7 @@ public class Notification {
 
   @ManyToOne
   @JoinColumn(name = "user_id")
-  private UserEntity user;
+  private User user;
 
   private NotificationType type;
   private boolean isRead;

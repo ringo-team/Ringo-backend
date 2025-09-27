@@ -1,17 +1,26 @@
 package com.lingo.lingoproject.chat;
 
+import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
+import com.lingo.lingoproject.chat.dto.CreateChatroomResponseDto;
+import com.lingo.lingoproject.domain.Chatroom;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/chat")
 @RequiredArgsConstructor
@@ -32,14 +41,23 @@ public class ChatController {
   /*
    * 채팅방 생성
    */
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  public ResponseEntity<?> createChatRoom(@RequestBody CreateChatroomDto dto){
+    Chatroom chatroom = chatService.createChatroom(dto);
+    log.info("채팅방을 생성하였습니다. 채팅방명: {}", chatroom.getChatroomName());
+    return ResponseEntity.status(HttpStatus.CREATED).body(new CreateChatroomResponseDto(
+        chatroom.getId()));
+  }
   /*
    * 채팅방 삭제
    */
-  /*
-   * 채팅방 가져오기
-   * userId에 해당하는 채팅방 정보를 모두 불러온다.
-   */
-
+  @DeleteMapping()
+  public ResponseEntity<?> deleteChatroom(@RequestParam("roomId") Long roomId){
+    chatService.deleteChatroom(roomId);
+    log.info("채팅방을 삭제했습니다. 삭제한 채팅방 id:  {}", roomId);
+    return ResponseEntity.status(HttpStatus.OK).body("채팅방을 성공적으로 삭제했습니다.");
+  }
   /*
    * messageMapping에는 메세지를 받을 경로를 적는다.
    * 메세지 받을 경로의 prefix인 app이 빠져있음

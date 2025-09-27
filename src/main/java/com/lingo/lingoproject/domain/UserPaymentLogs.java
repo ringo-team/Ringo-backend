@@ -23,7 +23,7 @@ public class UserPaymentLogs {
 
   @ManyToOne
   @JoinColumn(name = "user_id")
-  private UserEntity user;
+  private User user;
 
   private PaymentMethod method;
   private int amount;
