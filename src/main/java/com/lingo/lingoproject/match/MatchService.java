@@ -12,9 +12,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MatchService {
@@ -61,26 +63,29 @@ public class MatchService {
     User userEntity = userRepository.findById(userId)
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
     // block 하거나 된 사람은 추천하지 않도록
-    List<User> blockedFriends = blockedFriendRepository.findBlockedFriends(userId);
+    List<Long> blockedFriendIds = blockedFriendRepository.findBlockedFriends(userId)
+        .stream()
+        .map(User::getId)
+        .toList();
     // 이성을 추천하도록
     Gender gender = null;
     if(userEntity.getGender().equals(Gender.MALE)){
-      gender = Gender.FEMALE;
-    }else{
       gender = Gender.MALE;
+    }else{
+      gender = Gender.FEMALE;
     }
     while(setSize < 10 && count < 10){
-      List<User> randUserId = userRepository.findRandomUsers();
-      for(User user : randUserId){
+      List<User> randUsers = userRepository.findRandomUsers();
+      for(User user : randUsers){
         // 성별이 같은 유저거나 블락된 사람의 경우 pass
         if(user.getGender().equals(gender)){
           continue;
         }
-        if(blockedFriends.contains(user)){
+        if(blockedFriendIds.contains(user.getId())){
           continue;
         }
         // 7명은 매칭이 가능하도록
-        if(setSize <= 7){
+        if(setSize <= 6){
           if (!userId.equals(user.getId()) && isMatch(userId, user.getId())) {
             rtnSet.add(user.getId());
             setSize++;

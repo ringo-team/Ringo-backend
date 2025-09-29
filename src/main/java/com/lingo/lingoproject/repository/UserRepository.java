@@ -9,6 +9,6 @@ import org.springframework.data.jpa.repository.Query;
 public interface UserRepository extends JpaRepository<User, Long> {
   Optional<User> findByEmail(String email);
 
-  @Query(value = "select * from UserEntity u order by RAND() limit 100", nativeQuery = true)
+  @Query(value = "select * from user u order by RAND() limit 100", nativeQuery = true)
   public List<User> findRandomUsers();
 }
