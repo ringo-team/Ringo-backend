@@ -17,5 +17,5 @@ public class AnsweredSurvey {
   @JoinColumn
   private Survey serveryNum;
 
-  private String answer;
+  private int answer;
 }
