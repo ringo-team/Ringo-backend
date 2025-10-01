@@ -9,7 +9,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "dormant_accounts")
+@Table(name = "DORMANT_ACCOUNTS")
 public class DormantAccount {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

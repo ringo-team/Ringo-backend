@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-@Table(name = "chatroom_participants")
+@Table(name = "CHATROOM_PARTICIPANTS")
 public class ChatroomParticipant {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

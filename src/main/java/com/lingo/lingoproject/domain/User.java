@@ -29,7 +29,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 @Getter
 @Setter
 @Builder
-@Table(name = "users")
+@Table(name = "USERS")
 public class User extends Timestamp implements UserDetails {
 
   @Override

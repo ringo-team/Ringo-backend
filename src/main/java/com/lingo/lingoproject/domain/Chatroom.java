@@ -22,7 +22,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
-@Table(name = "chatrooms")
+@Table(name = "CHATROOMS")
 public class Chatroom {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

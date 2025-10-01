@@ -7,7 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "blocked_users")
+@Table(name = "BLOCKED_USERS")
 public class BlockedUser {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

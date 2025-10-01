@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "jwt_refresh_tokens")
+@Table(name = "JWT_REFRESH_TOKENS")
 public class JwtRefreshToken {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

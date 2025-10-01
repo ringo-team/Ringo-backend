@@ -15,7 +15,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
-@Table(name = "payment_transactions")
+@Table(name = "PAYMENT_TRANSACTIONS")
 public class PaymentTransaction {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

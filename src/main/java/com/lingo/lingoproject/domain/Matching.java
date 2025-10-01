@@ -28,7 +28,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @AllArgsConstructor
 @Setter
 @Getter
-@Table(name = "matchings")
+@Table(name = "MATCHINGS")
 public class Matching {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

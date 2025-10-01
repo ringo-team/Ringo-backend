@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "profiles")
+@Table(name = "PROFILES")
 public class Profile extends Timestamp {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
