@@ -1,0 +1,28 @@
+version: 0.2
+env:
+  variables:
+    AWS_DEFAULT_REGION: ap-northeast-2
+    AWS_ACCOUNT_ID: 554000694354
+    IMAGE_REPO_NAME: ringo-backend-repo
+    IMAGE_TAG: v0.0.1
+    S3_BUCKET: ringo-dockerrun-bucket
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+  build:
+    commands:
+      - echo Build and push Ringo Project...
+      - ./gradlew clean build -x test
+      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Compress dockerrun file and upload to s3
+      - zip deploy.zip Dockerrun.aws.json
+      - aws s3 cp deploy.zip s3://$S3_BUCKET/deploy-$(date +%Y%m%d%H%M%S).zip
+artifacts:
+  files:
+    - Dockerrun.aws.json
