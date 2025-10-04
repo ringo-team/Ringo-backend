@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.auth;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.io.UnsupportedEncodingException;
 import java.security.InvalidAlgorithmParameterException;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,9 +23,11 @@ public class SelfAuthController {
   private final SelfAuthService selfAuthService;
 
   @GetMapping("self-auth/callback")
-  public ResponseEntity<?> selfAuthCallback(@RequestBody GetUserInfoResponseDto dto, HttpSession session)
+  public ResponseEntity<?> selfAuthCallback(@RequestParam(value = "token_version_id") String tokenVersionId,
+      @RequestParam(value = "enc_data") String encryptedData,
+      @RequestParam(value = "integrity_value") String integrityValue)
       throws Exception {
-    String decryptedData = selfAuthService.integrityCheckAndDecryptData(dto.encryptedData(), dto.integrityValue(), session);
+    String decryptedData = selfAuthService.integrityCheckAndDecryptData(tokenVersionId, encryptedData, integrityValue);
     selfAuthService.deserializeAndSaveData(decryptedData);
     return ResponseEntity.ok().build();
   }

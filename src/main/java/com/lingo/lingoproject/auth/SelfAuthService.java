@@ -6,6 +6,7 @@ import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.Nation;
 import com.lingo.lingoproject.repository.UserRepository;
+import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.servlet.http.HttpSession;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
@@ -14,7 +15,6 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Date;
@@ -47,9 +47,7 @@ public class SelfAuthService {
   private final RestTemplate restTemplate;
   private final ObjectMapper objectMapper;
   private final UserRepository userRepository;
-
-  private String siteCode = null;
-  private String tokenVersionId = null;
+  private final RedisUtils redisUtils;
 
   @Value("${self-auth.url}")
   private String apiUrl;
@@ -92,7 +90,7 @@ public class SelfAuthService {
     return response.getBody().accessToken();
   }
 
-  public String getCryptoToken(String accessToken){
+  public CryptoTokenInfo getCryptoTokenInfo(String accessToken) throws NoSuchAlgorithmException {
     apiUrl += "digital/niceid/api/v1.0/common/crypto/token";
 
     Timestamp timestamp = new Timestamp(System.currentTimeMillis());
@@ -141,41 +139,52 @@ public class SelfAuthService {
     ){
       throw new RestClientException("null 또는 오류 메세지를 받았습니다.");
     }
-    siteCode = response.getBody().siteCode();
-    tokenVersionId = response.getBody().tokenVersionId();
+    String siteCode = response.getBody().siteCode();
+    String tokenVersionId = response.getBody().tokenVersionId();
 
-    return dateTime.trim() + trId.trim() + response.getBody().tokenVal().trim();
-  }
-
-  public String makeKeyByToken(String token) throws NoSuchAlgorithmException {
+    String token = dateTime.trim() + trId.trim() + response.getBody().tokenVal().trim();
     MessageDigest md = MessageDigest.getInstance("SHA-256");
     md.update(token.getBytes());
-    return Base64.getEncoder().encodeToString(md.digest());
+    String encodedToken = Base64.getEncoder().encodeToString(md.digest());
+
+    CryptoTokenInfo info = CryptoTokenInfo.builder()
+        .siteCode(siteCode)
+        .tokenVersionId(tokenVersionId)
+        .token(encodedToken)
+        .build();
+
+    return info;
   }
+
 
   public PopUpCompositionDto makeAndReturnEncryptedDataAndIntegrityValueAndTokenVersionId (HttpSession session)
       throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, JsonProcessingException, IllegalBlockSizeException, BadPaddingException {
-    String cryptoToken = getCryptoToken(getAccessToken());
-    String result = makeKeyByToken(cryptoToken);
+    CryptoTokenInfo info = getCryptoTokenInfo(getAccessToken());
 
-    String key = result.substring(0, 16);
-    String iv = result.substring(result.length() - 16);
-    String hmacKey = result.substring(0, 32);
+    String token = info.getToken();
 
-    session.setAttribute("key", key);
-    session.setAttribute("iv", iv);
-    session.setAttribute("hmacKey", hmacKey);
+    String key = token.substring(0, 16);
+    String iv = token.substring(token.length() - 16);
+    String hmacKey = token.substring(0, 32);
+
+
+    DecryptKeyObject object = DecryptKeyObject.builder()
+        .key(key)
+        .iv(iv)
+        .hmacKey(hmacKey)
+        .build();
+    redisUtils.save(info.getTokenVersionId(), object);
 
     SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "AES");
     Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
     cipher.init(Cipher.ENCRYPT_MODE, secretKey, new IvParameterSpec(iv.getBytes(StandardCharsets.UTF_8)));
 
     PlainRequestData dto = null;
-    if(siteCode != null) {
+    if(info.getSiteCode() != null) {
       dto = PlainRequestData.builder()
           .requestno(UUID.randomUUID().toString())
-          .sitecode(returnUrl)
-          .sitecode(siteCode)
+          .returnurl(returnUrl)
+          .sitecode(info.getSiteCode())
           .authtype("M")
           .methodtype("GET")
           .build();
@@ -193,18 +202,19 @@ public class SelfAuthService {
 
     return PopUpCompositionDto.builder()
         .m("m")
-        .tokenVersionId(tokenVersionId)
+        .tokenVersionId(info.getTokenVersionId())
         .encryptedData(encryptedData)
         .integrityValue(integrityValue)
         .build();
   }
 
-  public String integrityCheckAndDecryptData(String returnEncryptedData, String returnIntegrityValue, HttpSession session)
+  public String integrityCheckAndDecryptData(String tokenVersionId, String returnEncryptedData, String returnIntegrityValue)
       throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException {
 
-    String key = (String) session.getAttribute("key");
-    String iv = (String) session.getAttribute("iv");
-    String hmacKey = (String) session.getAttribute("hmacKey");
+    DecryptKeyObject object = (DecryptKeyObject) redisUtils.get(tokenVersionId);
+    String key = object.getKey();
+    String iv = object.getIv();
+    String hmacKey = object.getHmacKey();
 
     Mac mac = Mac.getInstance("HmacSHA256");
     SecretKeySpec secretKey = new SecretKeySpec(hmacKey.getBytes(), "HmacSHA256");
