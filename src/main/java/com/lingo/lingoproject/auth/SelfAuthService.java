@@ -267,5 +267,8 @@ public class SelfAuthService {
         .gender(gender)
         .build();
     userRepository.save(user);
+
+    String id = "self-auth" + user.getId();
+    redisUtils.save(id, true);
   }
 }
