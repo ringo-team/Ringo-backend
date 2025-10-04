@@ -2,6 +2,10 @@ package com.lingo.lingoproject.auth;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.enums.Gender;
+import com.lingo.lingoproject.domain.enums.Nation;
+import com.lingo.lingoproject.repository.UserRepository;
 import jakarta.servlet.http.HttpSession;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
@@ -10,8 +14,10 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
+import java.util.Date;
 import java.util.UUID;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -40,6 +46,7 @@ public class SelfAuthService {
 
   private final RestTemplate restTemplate;
   private final ObjectMapper objectMapper;
+  private final UserRepository userRepository;
 
   private String siteCode = null;
   private String tokenVersionId = null;
@@ -215,5 +222,40 @@ public class SelfAuthService {
     cipher.init(Cipher.DECRYPT_MODE, secretKey, new IvParameterSpec(iv.getBytes()));
     String returnDecryptedData = new String(cipher.doFinal(Base64.getDecoder().decode(returnEncryptedData)), "EUC-KR");
     return returnDecryptedData;
+  }
+
+  public void deserializeAndSaveData(String data) throws Exception{
+    UserInfo userInfo = null;
+    Date birthday = null;
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
+    try {
+      userInfo = objectMapper.readValue(data, UserInfo.class);
+      birthday = sdf.parse(userInfo.getBirthday());
+    } catch (Exception e) {
+      log.info(e.getMessage());
+      throw new Exception(e.getMessage());
+    }
+    log.info("gender format : {}", userInfo.getGender());
+    Gender gender = null;
+    if (userInfo.getGender().equals("1")) {
+      gender = Gender.MALE;
+    }else{
+      gender = Gender.FEMALE;
+    }
+    Nation nation = null;
+    if (userInfo.getNationalInfo().equals("0")){
+      nation = Nation.DOMESTIC;
+    }else{
+      nation = Nation.FOREIGN;
+    }
+    User user = User.builder()
+        .name(userInfo.getName())
+        .phoneNumber(userInfo.getPhoneNumber())
+        .mobileCarrier(userInfo.getMobileCarrier())
+        .nationalInfo(nation)
+        .birthday(birthday)
+        .gender(gender)
+        .build();
+    userRepository.save(user);
   }
 }

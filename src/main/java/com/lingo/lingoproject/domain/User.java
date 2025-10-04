@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.domain;
 
 import com.lingo.lingoproject.domain.enums.Gender;
+import com.lingo.lingoproject.domain.enums.Nation;
 import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.SignUpStatus;
@@ -13,6 +14,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -51,12 +53,31 @@ public class User extends Timestamp implements UserDetails {
 
   private String nickname;
 
+  private String name;
+
   @Column(unique = true)
   private String email;
   private String password;
 
   @Column(unique = true)
   private String phoneNumber;
+
+
+  /**
+   * 이동 통신사
+   * 1: SKT
+   * 2: KT
+   * 3: LGU+
+   * 4: SKT 알뜰폰
+   * 5: KT 알뜰폰
+   * 6: LGU+ 알뜰폰
+   */
+  private String mobileCarrier;
+
+  @Enumerated(EnumType.STRING)
+  private Nation nationalInfo;
+
+  private Date birthday;
 
   @Column(unique = true)
   private String deviceToken;
@@ -76,7 +97,7 @@ public class User extends Timestamp implements UserDetails {
 
   private String job;
 
-  /*
+  /**
    * 회원가입 진행상황
    *   시작전
    *   진행중
