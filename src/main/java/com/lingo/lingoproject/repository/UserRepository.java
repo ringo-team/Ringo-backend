@@ -11,4 +11,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   @Query(value = "select * from UserEntity u order by RAND() limit 100", nativeQuery = true)
   public List<User> findRandomUsers();
+
+  Optional<User> findByPhoneNumber(String phoneNumber);
 }
