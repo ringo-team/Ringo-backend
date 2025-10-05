@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: ringo-project
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${db.url}
+    username: ${db.username}
+    password: ${db.password}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate.format_sql: true
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+  redis:
+    port: 6379
+    host: ${redis-host}
+  flyway:
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+jwt:
+  issuer: ${jwt-issuer}
+  secret: ${jwt-secret}
+  token:
+    expiration: 172800000
+  refresh:
+    expiration: 2592000000
+
+oauth:
+  kakao:
+    client_id: ${kakao-client-id}
+    redirect_uri: ${kakao-redirect-url}
+  google:
+    client_id: ${google-client-id}
+    client_secret: ${google-client-secret}
+    redirect_uri: ${google-redirect-url}
+
+aws:
+  credentials:
+    access-key: ${aws-access-key}
+    secret-key: ${aws-secret-key}
+  region:
+    static: ap-northeast-2
+  s3:
+    bucket: image-bucket-v3
+
+self-auth:
+  client_id: ${self-client-id}
+  client_secret: ${self-client-secret}
+  return_url: ${self-auth-redirect-url}
+  product_id: 2101979031
+  url: https://svc.niceapi.co.kr:22001

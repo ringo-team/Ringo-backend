@@ -6,7 +6,7 @@ services:
     container_name: Ringo-database
     restart: always
     environment:
-      MYSQL_DATABASE: lingo-mysql
+      MYSQL_DATABASE: ringo_mysql
       MYSQL_ROOT_PASSWORD: 1234
     ports:
       - "3306:3306"

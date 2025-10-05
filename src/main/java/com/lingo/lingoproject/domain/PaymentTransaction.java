@@ -8,12 +8,14 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
+@Table(name = "PAYMENT_TRANSACTIONS")
 public class PaymentTransaction {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

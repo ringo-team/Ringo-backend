@@ -9,11 +9,13 @@ import jakarta.persistence.ManyToOne;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
+import jakarta.persistence.Table;
 
 @Entity
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
+@Table(name = "BLOCKED_FRIENDS")
 public class BlockedFriend {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
