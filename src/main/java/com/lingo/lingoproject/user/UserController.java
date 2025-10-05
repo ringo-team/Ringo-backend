@@ -9,11 +9,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/users")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -26,14 +27,26 @@ public class UserController {
   }
 
   @GetMapping("/find-id")
-  public ResponseEntity<?> findUserId(HttpSession session) throws Exception{
-    String username = userService.findUserId(session);
+  public ResponseEntity<?> findUserId(@RequestHeader(value = "token") String token) throws Exception{
+    String username = userService.findUserId(token);
     return ResponseEntity.ok().body(username);
   }
 
   @PatchMapping("reset-password")
-  public ResponseEntity<?> resetPassword(HttpSession session, @RequestBody ResetPasswordRequestDto dto) throws Exception{
-    userService.resetPassword(dto.password(), session);
+  public ResponseEntity<?> resetPassword(@RequestHeader(value = "token") String token, @RequestBody ResetPasswordRequestDto dto) throws Exception{
+    userService.resetPassword(dto.password(), token);
     return ResponseEntity.ok().body("password를 성공적으로 변경하였습니다.");
+  }
+
+  @GetMapping()
+  public ResponseEntity<?> getUserInfo(@RequestHeader(value = "token") String token){
+    GetUserInfoResponseDto dto = userService.getUserInfo(token);
+    return ResponseEntity.ok().body(dto);
+  }
+
+  @PatchMapping()
+  public ResponseEntity<?> updateUserInfo(@RequestHeader(value = "token") String token, @RequestBody UpdateUserInfoRequestDto dto){
+    userService.updateUserInfo(token, dto);
+    return ResponseEntity.ok().body("정상적으로 수정되었습니다.");
   }
 }
