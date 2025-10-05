@@ -1,11 +1,13 @@
 package com.lingo.lingoproject.match;
 
+import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.repository.BlockedFriendRepository;
+import com.lingo.lingoproject.repository.DormantAccountRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import java.util.HashSet;
@@ -24,6 +26,7 @@ public class MatchService {
   private final UserRepository userRepository;
   private final MatchingRepository matchingRepository;
   private final BlockedFriendRepository blockedFriendRepository;
+  private final DormantAccountRepository dormantAccountRepository;
 
   public Matching matchRequest(MatchingRequestDto dto){
     User requestedUser = userRepository.findById(dto.requestedId())
@@ -67,6 +70,11 @@ public class MatchService {
         .stream()
         .map(User::getId)
         .toList();
+    List<Long> dormantUserIds = dormantAccountRepository.findAll()
+        .stream()
+        .map(DormantAccount::getUser)
+        .map(User::getId)
+        .toList();
     // 이성을 추천하도록
     Gender gender = null;
     if(userEntity.getGender().equals(Gender.MALE)){
@@ -77,11 +85,14 @@ public class MatchService {
     while(setSize < 10 && count < 10){
       List<User> randUsers = userRepository.findRandomUsers();
       for(User user : randUsers){
-        // 성별이 같은 유저거나 블락된 사람의 경우 pass
+        // 성별이 같은 유저거나 블락된 유저, 휴면 계정의 경우 pass
         if(user.getGender().equals(gender)){
           continue;
         }
         if(blockedFriendIds.contains(user.getId())){
+          continue;
+        }
+        if(dormantUserIds.contains(user.getId())){
           continue;
         }
         // 7명은 매칭이 가능하도록
