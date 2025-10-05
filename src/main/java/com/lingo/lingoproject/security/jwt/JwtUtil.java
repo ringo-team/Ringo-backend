@@ -64,7 +64,7 @@ public class JwtUtil {
         .issuer("lingo")
         .claims(claims)
         .issuedAt(new Date())
-        .subject(username.substring(0, username.lastIndexOf("@")))
+        .subject(username)
         .expiration(new Date(System.currentTimeMillis() + expiration))
         .signWith(this.getSigningKey())
         .compact();

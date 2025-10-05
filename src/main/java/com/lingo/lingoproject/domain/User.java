@@ -13,6 +13,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -30,6 +31,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 @Getter
 @Setter
 @Builder
+@Table(name = "USERS")
 public class User extends Timestamp implements UserDetails {
 
   @Override
