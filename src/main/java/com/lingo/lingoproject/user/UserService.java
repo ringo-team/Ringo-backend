@@ -1,7 +1,9 @@
 package com.lingo.lingoproject.user;
 
+import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Religion;
+import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.utils.RedisUtils;
@@ -21,6 +23,7 @@ public class UserService {
   private final UserRepository userRepository;
   private final JwtUtil jwtUtil;
   private final RedisUtils redisUtils;
+  private final BlockedUserRepository blockedUserRepository;
 
   public void deleteUser(Long userId){
     userRepository.deleteById(userId);
@@ -110,8 +113,17 @@ public class UserService {
         .toList();
   }
 
-  public void blockUser(Long userId){
-
+  public void blockUser(Long userId, String token){
+    Long adminId = getUserIdByToken(token);
+    User admin = userRepository.findById(adminId)
+        .orElseThrow(() -> new IllegalArgumentException("id 에 해당하는 관리자가 없습니다."));
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new IllegalArgumentException("id에 해당하는 유저가 없습니다."));
+    BlockedUser blockedUser = BlockedUser.builder()
+        .phoneNumber(user.getPhoneNumber())
+        .admin(admin)
+        .build();
+    blockedUserRepository.save(blockedUser);
   }
 
 }
