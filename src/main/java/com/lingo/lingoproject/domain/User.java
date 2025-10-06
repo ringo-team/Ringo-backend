@@ -67,6 +67,15 @@ public class User extends Timestamp implements UserDetails {
   private Gender gender;
 
   private String height;
+
+  private Integer age;
+
+  private String residenceFirstPlace;
+  private String residenceSecondPlace;
+
+  private String activityLocFirstsPlace;
+  private String activityLocSecondsPlace;
+
   private boolean isSmoking;
   private boolean isDrinking;
 
