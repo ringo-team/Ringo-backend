@@ -2,11 +2,13 @@ package com.lingo.lingoproject.match;
 
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.match.dto.RequestMatchingResponseDto;
 import com.lingo.lingoproject.match.dto.RequestUserResponseDto;
 import com.lingo.lingoproject.match.dto.RequestedUserResponseDto;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -42,19 +44,20 @@ public class MatchController {
 
   @GetMapping("/{id}/requested") // 나를 지목한 사람
   public ResponseEntity<?> getUserWhoRequestsToId(@PathVariable("id") Long id){
-    List<Long> requestUserIds = matchService.getUserIdRequests(id);
-    return ResponseEntity.ok().body(new RequestUserResponseDto(requestUserIds));
+    List<GetUserProfileResponseDto> requestUserIds = matchService.getUserIdRequests(id);
+    return ResponseEntity.ok().body(requestUserIds);
   }
 
   @GetMapping("/{id}/requests") // 내가 지목한 사람
   public ResponseEntity<?> getUserRequestedById(@PathVariable("id") Long id){
-    List<Long> requestedUserIds = matchService.getUserIdRequested(id);
-    return ResponseEntity.ok().body(new RequestedUserResponseDto(requestedUserIds));
+    List<GetUserProfileResponseDto> requestedUserIds = matchService.getUserIdRequested(id);
+    return ResponseEntity.ok().body(requestedUserIds);
   }
 
-  @GetMapping("/recommend")
-  public ResponseEntity<?>  recommend(@RequestBody MatchingRequestDto matchingRequestDto) {
-    return ResponseEntity.ok().build();
+  @GetMapping("/{id}/recommend")
+  public ResponseEntity<?>  recommend(@PathVariable Long id) {
+    Set<GetUserProfileResponseDto> rtnSet = matchService.recommend(id);
+    return ResponseEntity.ok().body(rtnSet);
   }
 
   @DeleteMapping("/{id}")
