@@ -1,9 +1,8 @@
 package com.lingo.lingoproject.security.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lingo.lingoproject.security.response.LoginResponseDto;
 import com.lingo.lingoproject.security.services.LoginService;
-import com.lingo.lingoproject.utils.RequestCacheWrapper;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
@@ -23,18 +22,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class LoginController {
 
   private final LoginService loginService;
-  private final RequestCacheWrapper  requestCache;
 
   @PostMapping
-  public ResponseEntity<?> login(){
-    ObjectMapper objectMapper = new ObjectMapper();
-    LoginInfoDto request = null;
+  public ResponseEntity<?> login(HttpServletRequest request){
+    LoginInfoDto info = null;
     try {
-      request = objectMapper.readValue(requestCache.toString(),LoginInfoDto.class);
+      info = (LoginInfoDto) request.getAttribute("requestBody");
     }catch (Exception e){
       e.printStackTrace();
     }
-    LoginResponseDto response = loginService.login(request);
+    LoginResponseDto response = loginService.login(info);
     return ResponseEntity.status(HttpStatus.OK)
         .body(response);
   }

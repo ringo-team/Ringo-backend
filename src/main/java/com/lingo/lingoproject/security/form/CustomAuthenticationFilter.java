@@ -3,7 +3,6 @@ package com.lingo.lingoproject.security.form;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lingo.lingoproject.security.controller.LoginInfoDto;
-import com.lingo.lingoproject.utils.RequestCacheWrapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebFilter;
@@ -27,7 +26,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class CustomAuthenticationFilter extends OncePerRequestFilter {
 
   private final CustomAuthenticationManager customAuthenticationManager;
-  private final RequestCacheWrapper requestCache;
+  private final ObjectMapper objectMapper;
 
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -36,12 +35,11 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
       String requestBody = request.getReader()
           .lines()
           .collect(Collectors.joining(System.lineSeparator()));
-      ObjectMapper mapper = new ObjectMapper();
       LoginInfoDto info = null;
 
       try {
-        requestCache.setContent(requestBody);
-        info = mapper.readValue(requestBody, LoginInfoDto.class);
+        info = objectMapper.readValue(requestBody, LoginInfoDto.class);
+        request.setAttribute("requestBody", info);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
