@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.match.dto;
 
+import com.lingo.lingoproject.domain.enums.Gender;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,14 +16,16 @@ import lombok.Data;
 @Data
 @Builder
 public class GetUserProfileResponseDto {
-  private Long userId;
-  private int age;
-  private String nickname;
-  private String profileUrl;
+  private final Long userId;
+  private final int age;
+  private final Gender gender;
+  private final String nickname;
+  private final String profileUrl;
 
-  public GetUserProfileResponseDto(Long userId, int age, String nickname, String profileUrl) {
+  public GetUserProfileResponseDto(Long userId, int age, Gender gender, String nickname, String profileUrl) {
     this.userId = userId;
     this.age = age;
+    this.gender = gender;
     this.nickname = nickname;
     this.profileUrl = profileUrl;
   }

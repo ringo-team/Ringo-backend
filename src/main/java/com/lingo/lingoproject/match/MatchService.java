@@ -13,6 +13,7 @@ import com.lingo.lingoproject.repository.DormantAccountRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -63,7 +64,7 @@ public class MatchService {
   }
 
   @Cacheable(key = "#userId", value = "Recommend", cacheManager = "cacheManager")
-  public Set<GetUserProfileResponseDto> recommend(Long userId){
+  public List<GetUserProfileResponseDto> recommend(Long userId){
     Set<GetUserProfileResponseDto> rtnSet = new HashSet<>();
     int count =  0;
     int setSize = 0;
@@ -121,6 +122,7 @@ public class MatchService {
                 GetUserProfileResponseDto.builder()
                     .userId(user.getId())
                     .age(user.getAge())
+                    .gender(user.getGender())
                     .nickname(user.getNickname())
                     .profileUrl(profile.getImageUrl())
                     .build()
@@ -132,7 +134,7 @@ public class MatchService {
       }
       count++;
     }
-    return rtnSet;
+    return new ArrayList<>(rtnSet);
   }
 
   public boolean isMatch(Long user1, Long user2){
@@ -148,7 +150,7 @@ public class MatchService {
         .map(User::getId)
         .toList();
     /**
-     * userId 기반으로 user의 id, age, nickname, profileUrl
+     * userId 기반으로 user의 id, age, gender, nickname, profileUrl
      * 을 조회하는 함수
      */
     return profileRepository.getUserProfilesByUserIds(userIds);
