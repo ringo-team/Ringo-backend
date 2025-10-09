@@ -27,7 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     String accessToken = request.getHeader("Authorization");
     if (accessToken != null && accessToken.startsWith("Bearer ")) {
       accessToken = accessToken.substring(7);
-      if (jwtUtil.validateToken(accessToken)) {
+      if (jwtUtil.validateToken(accessToken) && jwtUtil.isAuthenticatedToken(accessToken)) {
         Claims claims = jwtUtil.getClaims(accessToken);
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(claims.getSubject(), "password")
@@ -38,6 +38,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
        */
       else if (jwtUtil.isAuthenticatedToken(accessToken)){
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
+      }
+      else{
+        response.setStatus(HttpStatus.FORBIDDEN.value());
       }
     }
     filterChain.doFilter(request, response);
