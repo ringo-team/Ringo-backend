@@ -9,6 +9,7 @@ import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,10 +74,18 @@ public class ImageService {
     return savedProfile.getImageUrl();
   }
 
-  public String getImageUrl(Long userId, int order){
+  public GetImageUrlRequestDto getImageUrl(Long userId, int order){
     User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
     Profile profile = profileRepository.findByUserAndOrder(user, order);
-    return profile.getImageUrl();
+    return new  GetImageUrlRequestDto(profile.getImageUrl(), order);
+  }
+
+  public List<GetImageUrlRequestDto> getAllImageUrls(Long userId){
+    User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+    List<Profile> profiles = profileRepository.findAllByUser(user);
+    return profiles.stream()
+        .map(profile -> new GetImageUrlRequestDto(profile.getImageUrl(), profile.getOrder()))
+        .toList();
   }
 
   public void deleteProfile(Long userId, int order){
