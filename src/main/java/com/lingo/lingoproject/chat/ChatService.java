@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.chat;
 
+import com.lingo.lingoproject.chat.dto.ChatResponseDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
 import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.ChatroomParticipant;

@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.user;
+package com.lingo.lingoproject.user.dto;
 
 
 public record UpdateUserInfoRequestDto(

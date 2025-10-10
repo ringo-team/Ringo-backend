@@ -12,12 +12,22 @@ public class RedisUtils {
 
   private final RedisTemplate<String, Object> redisTemplate;
 
-  public void save(String key, Object value){
+  public void saveDecryptKeyObject(String key, Object value){
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.set(key,value, 30*60*1000, TimeUnit.MILLISECONDS);
+    ops.set(key,value, 30, TimeUnit.MINUTES);
   }
 
-  public Object get(String key){
+  public Object getDecryptKeyObject(String key){
     return redisTemplate.opsForValue().get(key);
   }
+
+  public void saveBlackList(String key, String value){
+    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
+    ops.set("blacklist::" + key, value, 2, TimeUnit.DAYS);
+  }
+
+  public boolean containsBlackList(String key){
+    return redisTemplate.hasKey("blacklist::" + key);
+  }
 }
+

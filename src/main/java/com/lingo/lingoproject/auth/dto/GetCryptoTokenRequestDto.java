@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.auth;
+package com.lingo.lingoproject.auth.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;

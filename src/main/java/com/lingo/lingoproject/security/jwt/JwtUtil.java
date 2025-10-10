@@ -8,6 +8,7 @@ import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.TokenType;
 import com.lingo.lingoproject.security.util.RandomUtil;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -41,7 +42,7 @@ public class JwtUtil {
   private final UserRepository userRepository;
   private final RandomUtil randomUtil;
 
-  public String generateToken(TokenType classification, String username, int rand){
+  public String generateToken(TokenType classification, String username){
     Long expiration = null;
     if (classification == TokenType.ACCESS) {
       expiration = Long.parseLong(accessTokenExpiration);
@@ -59,7 +60,6 @@ public class JwtUtil {
     }
     Map<String, Object> claims = new HashMap<>();
     claims.put("userId", user.get().getId());
-    claims.put("rand", rand);
     return Jwts.builder()
         .issuer("lingo")
         .claims(claims)
@@ -90,64 +90,32 @@ public class JwtUtil {
   /*
    유효한 토큰인지를 검증
    */
-  public boolean validateToken(String token){
+  public boolean isValidToken(String token){
     try {
-      Claims claims = getClaims(token);
-      /*
-       토큰의 유효시간이 지나면 유효하지 않은 토큰으로 간주
-       */
-      Date expirationTime = claims.getExpiration();
-      Date now = new Date();
-      if (now.before(expirationTime)){
-        return true;
-      }
-      return false;
+      Jwts.parser().verifyWith(getSigningKey())
+          .build()
+          .parseSignedClaims(token);
     }catch (Exception e){
       return false;
     }
+    return true;
   }
 
-  /*
-   정말 유저가 발급한 토큰인지를 검증
+  /**
+   * 유효기간이 지난 코드의 경우 true를 반환함
+   * 유효기간이 지나지 않았거나 그 외 오류가 발생할 시 false를 반환함
+   * @param token
+   * @return
    */
-  public boolean isAuthenticatedToken(String token){
-      try {
-        Claims claims = getClaims(token);
-        /*
-         토큰에 저장된 userId가 데이터베이스에 존재하지 않을 경우 유효하지 않은 토큰으로 간주
-         */
-        Optional<User> user = userRepository.findById((Long) claims.get("userId"));
-        if (user.isEmpty()) {
-          return false;
-        }
-        /**
-         * 저장된 random 값과 일치하지 않는 경우 유효하지 않는 토큰으로 간주
-         */
-        int rand = (int) claims.get("rand");
-        int storedRand = jwtRefreshTokenRepository.findByUser(user.get()).getRand();
-        if (storedRand != rand) {
-          return false;
-        }
-        return true;
-      } catch (Exception e) {
-          return false;
-      }
-  }
-
-  public boolean validateRefreshToken(String token){
+  public boolean isExpiredToken(String token){
     try{
       Claims claims = getClaims(token);
-      /*
-       토큰의 유효시간이 지나면 유효하지 않은 토큰으로 간주
-       */
-      Date expirationTime = claims.getExpiration();
-      Date now = new Date();
-      if (now.before(expirationTime)){
-        return true;
-      }
-      return false;
+      return claims.getExpiration().before(new Date());
+    }catch(ExpiredJwtException e){
+      return true;
     }catch (Exception e){
       return false;
     }
   }
+
 }

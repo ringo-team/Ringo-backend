@@ -6,11 +6,12 @@ import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
+import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
+import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
 import com.lingo.lingoproject.utils.RedisUtils;
 import io.jsonwebtoken.Claims;
-import jakarta.servlet.http.HttpSession;
-import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -25,13 +26,21 @@ public class UserService {
   private final RedisUtils redisUtils;
   private final BlockedUserRepository blockedUserRepository;
 
-  public void deleteUser(Long userId){
+  public void deleteUser(Long userId, String token){
+    Long id = getUserIdByToken(token);
+    if(!Objects.equals(userId, id)){
+      throw new IllegalArgumentException("잘못된 요청입니다.");
+    }
+    userRepository.deleteById(userId);
+  }
+
+  public void adminDeleteUser(Long userId){
     userRepository.deleteById(userId);
   }
 
   public String findUserId(String token) throws Exception{
     Long userId = getUserIdByToken(token);
-    boolean isAuthenticated = (boolean) redisUtils.get("self-auth" + userId);
+    boolean isAuthenticated = (boolean) redisUtils.getDecryptKeyObject("self-auth" + userId);
     if(isAuthenticated){
       User user = userRepository.findById(userId)
           .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
@@ -44,7 +53,7 @@ public class UserService {
 
   public void resetPassword(String password, String token) throws Exception{
     Long userId = getUserIdByToken(token);
-    boolean isAuthenticated = (boolean) redisUtils.get("self-auth" + userId);
+    boolean isAuthenticated = (boolean) redisUtils.getDecryptKeyObject("self-auth" + userId);
     if(isAuthenticated){
       User user = userRepository.findById(userId)
           .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));

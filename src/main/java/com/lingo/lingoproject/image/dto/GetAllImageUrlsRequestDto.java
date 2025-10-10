@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.image;
+package com.lingo.lingoproject.image.dto;
 
 import java.util.List;
 

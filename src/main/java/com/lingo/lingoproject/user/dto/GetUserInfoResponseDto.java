@@ -1,6 +1,5 @@
-package com.lingo.lingoproject.user;
+package com.lingo.lingoproject.user.dto;
 
-import com.lingo.lingoproject.domain.enums.Religion;
 import lombok.Builder;
 
 @Builder

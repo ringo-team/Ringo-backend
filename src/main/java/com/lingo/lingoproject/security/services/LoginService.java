@@ -9,6 +9,7 @@ import com.lingo.lingoproject.security.controller.LoginInfoDto;
 import com.lingo.lingoproject.security.response.LoginResponseDto;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.security.util.RandomUtil;
+import com.lingo.lingoproject.utils.RedisUtils;
 import io.jsonwebtoken.Claims;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class LoginService {
   private final UserRepository userRepository;
   private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
   private final PasswordEncoder passwordEncoder;
+  private final RedisUtils redisUtils;
 
   public LoginResponseDto login(LoginInfoDto dto){
     if (SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -33,11 +35,9 @@ public class LoginService {
     }
     /**
      * 로그인 진행시 access token과 refresh token을 발급한다.
-     * rand 는 토큰의 유효성을 확인할 때 사용된다.
      */
-    int rand = randomUtil.getRandomNumber();
-    String access = jwtUtil.generateToken(TokenType.ACCESS, dto.email(), rand);
-    String refresh = jwtUtil.generateToken(TokenType.REFRESH, dto.email(), rand);
+    String access = jwtUtil.generateToken(TokenType.ACCESS, dto.email());
+    String refresh = jwtUtil.generateToken(TokenType.REFRESH, dto.email());
     User user = userRepository.findByEmail(dto.email())
         .orElseThrow(() -> new IllegalArgumentException("Invalid username or password."));
 
@@ -47,13 +47,11 @@ public class LoginService {
     JwtRefreshToken tokenInfo = jwtRefreshTokenRepository.findByUser(user);
     if(tokenInfo != null){
       tokenInfo.setRefreshToken(refresh);
-      tokenInfo.setRand(rand);
     }
     else {
       tokenInfo = JwtRefreshToken.builder()
           .refreshToken(refresh)
           .user(user)
-          .rand(rand)
           .build();
     }
     jwtRefreshTokenRepository.save(tokenInfo);
@@ -68,12 +66,9 @@ public class LoginService {
     }
     User userEntity = user.get();
     JwtRefreshToken tokenInfo = jwtRefreshTokenRepository.findByUser(userEntity);
-    if(tokenInfo != null && tokenInfo.getRefreshToken().equals(refreshToken) && jwtUtil.validateToken(refreshToken)){
-      int rand = randomUtil.getRandomNumber();
-      String accessToken = jwtUtil.generateToken(TokenType.ACCESS, userEntity.getEmail(), rand);
-      String refresh = jwtUtil.generateToken(TokenType.REFRESH, userEntity.getEmail(), rand);
-      // 토큰정보 업데이트
-      tokenInfo.setRand(rand);
+    if(tokenInfo != null && tokenInfo.getRefreshToken().equals(refreshToken) && jwtUtil.isValidToken(refreshToken)){
+      String accessToken = jwtUtil.generateToken(TokenType.ACCESS, userEntity.getEmail());
+      String refresh = jwtUtil.generateToken(TokenType.REFRESH, userEntity.getEmail());
       tokenInfo.setRefreshToken(refresh);
       jwtRefreshTokenRepository.save(tokenInfo);
       return new  LoginResponseDto(userEntity.getId(), accessToken, refresh);
@@ -95,13 +90,14 @@ public class LoginService {
     Claims claims = jwtUtil.getClaims(accessToken);
     Long userId = (Long) claims.get("userId");
     User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("유효하지 않은 토큰입니다."));
-    JwtRefreshToken token = jwtRefreshTokenRepository.findByUser(user);
-    int rand = randomUtil.getRandomNumber();
-    while(token.getRand() == rand){
-      rand = randomUtil.getRandomNumber();
-    }
-    token.setRand(rand);
-    jwtRefreshTokenRepository.save(token);
+    // redis의 blacklist에 저장해 놓는다.
+    redisUtils.saveBlackList(accessToken, "true");
+
+    /**
+     * 로그아웃 시 refresh 토큰에 관한 정보도 삭제하여 토큰 재발급을 막는다.
+     */
+    jwtRefreshTokenRepository.deleteAllByUser(user);
+
   }
 
 }

@@ -1,7 +1,8 @@
 package com.lingo.lingoproject.user;
 
-import com.amazonaws.Response;
-import jakarta.servlet.http.HttpSession;
+import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
+import com.lingo.lingoproject.user.dto.ResetPasswordRequestDto;
+import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,8 +23,8 @@ public class UserController {
   private final UserService userService;
 
   @DeleteMapping("/{id}")
-  public ResponseEntity<?> deleteUser(@PathVariable Long id){
-    userService.deleteUser(id);
+  public ResponseEntity<?> deleteUser(@RequestParam(value = "token") String token, @PathVariable Long id){
+    userService.deleteUser(id, token);
     return ResponseEntity.ok().body("유저를 성공적으로 삭제하였습니다.");
   }
 

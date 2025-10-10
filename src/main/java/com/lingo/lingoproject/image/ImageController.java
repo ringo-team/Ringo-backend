@@ -1,5 +1,7 @@
 package com.lingo.lingoproject.image;
 
+import com.lingo.lingoproject.image.dto.GetAllImageUrlsRequestDto;
+import com.lingo.lingoproject.image.dto.GetImageUrlRequestDto;
 import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

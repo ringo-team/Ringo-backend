@@ -24,8 +24,8 @@ public class GoogleLoginController {
 
     User user = googleLoginService.saveUserLoginInfo(code);
     int rand = randomUtil.getRandomNumber();
-    String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user.getEmail(), rand);
-    String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user.getEmail(), rand);
+    String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user.getEmail());
+    String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user.getEmail());
     return ResponseEntity.ok(new LoginResponseDto(user.getId(), accessToken, refreshToken));
   }
 

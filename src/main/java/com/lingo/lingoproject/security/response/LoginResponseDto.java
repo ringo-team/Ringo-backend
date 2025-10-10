@@ -1,4 +1,10 @@
 package com.lingo.lingoproject.security.response;
 
-public record LoginResponseDto(Long userId, String accessToken, String refreshToken) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "로그인 및 토큰 재발급 결과")
+public record LoginResponseDto(
+    @Schema(description = "사용자 식별자", example = "101") Long userId,
+    @Schema(description = "액세스 토큰", example = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...") String accessToken,
+    @Schema(description = "리프레시 토큰", example = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...") String refreshToken) {
 }

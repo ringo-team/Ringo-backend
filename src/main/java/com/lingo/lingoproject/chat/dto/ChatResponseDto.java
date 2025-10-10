@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.chat;
+package com.lingo.lingoproject.chat.dto;
 
 import java.time.LocalDateTime;
 

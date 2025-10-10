@@ -2,12 +2,19 @@ package com.lingo.lingoproject.auth;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lingo.lingoproject.auth.dto.CryptoTokenInfo;
+import com.lingo.lingoproject.auth.dto.DecryptKeyObject;
+import com.lingo.lingoproject.auth.dto.GetAccessTokenResponseDto;
+import com.lingo.lingoproject.auth.dto.GetCryptoTokenRequestDto;
+import com.lingo.lingoproject.auth.dto.GetCryptoTokenResponseDto;
+import com.lingo.lingoproject.auth.dto.PlainRequestData;
+import com.lingo.lingoproject.auth.dto.PopUpCompositionDto;
+import com.lingo.lingoproject.auth.dto.UserInfo;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.Nation;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.RedisUtils;
-import jakarta.servlet.http.HttpSession;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
@@ -90,6 +97,12 @@ public class SelfAuthService {
     return response.getBody().accessToken();
   }
 
+  /**
+   * access token으로 암호화하는데 필요한 토큰을 얻는다.
+   * @param accessToken
+   * @return
+   * @throws NoSuchAlgorithmException
+   */
   public CryptoTokenInfo getCryptoTokenInfo(String accessToken) throws NoSuchAlgorithmException {
     apiUrl += "digital/niceid/api/v1.0/common/crypto/token";
 
@@ -157,43 +170,58 @@ public class SelfAuthService {
   }
 
 
-  public PopUpCompositionDto makeAndReturnEncryptedDataAndIntegrityValueAndTokenVersionId (HttpSession session)
+  /**
+   * nice pass에 본인인증을 요청할 때 필요한 값들을 전달한다.
+   * @return
+   */
+  public PopUpCompositionDto makeAndReturnEncryptedDataAndIntegrityValueAndTokenVersionId ()
       throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, JsonProcessingException, IllegalBlockSizeException, BadPaddingException {
-    CryptoTokenInfo info = getCryptoTokenInfo(getAccessToken());
+    CryptoTokenInfo tokenInfo = getCryptoTokenInfo(getAccessToken());
 
-    String token = info.getToken();
+    String token = tokenInfo.getToken();
 
     String key = token.substring(0, 16);
     String iv = token.substring(token.length() - 16);
     String hmacKey = token.substring(0, 32);
 
-
+    /**
+     * 나중에 복호화할 때 쓰기 위해
+     * redis에 key 정보를 보관해놓는다.
+     */
     DecryptKeyObject object = DecryptKeyObject.builder()
         .key(key)
         .iv(iv)
         .hmacKey(hmacKey)
         .build();
-    redisUtils.save(info.getTokenVersionId(), object);
+    redisUtils.saveDecryptKeyObject(tokenInfo.getTokenVersionId(), object);
 
-    SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "AES");
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    cipher.init(Cipher.ENCRYPT_MODE, secretKey, new IvParameterSpec(iv.getBytes(StandardCharsets.UTF_8)));
-
-    PlainRequestData dto = null;
-    if(info.getSiteCode() != null) {
-      dto = PlainRequestData.builder()
+    /**
+     * 데이터를 암호화하기 위해 객체를 string 으로 변환한다. (객체를 직렬화한다.)
+     */
+    PlainRequestData plainRequestData = null;
+    if(tokenInfo.getSiteCode() != null) {
+      plainRequestData = PlainRequestData.builder()
           .requestno(UUID.randomUUID().toString())
           .returnurl(returnUrl)
-          .sitecode(info.getSiteCode())
+          .sitecode(tokenInfo.getSiteCode())
           .authtype("M")
           .methodtype("GET")
           .build();
     }
-    String dtoStringValue = objectMapper.writeValueAsString(dto);
+    String dataStringValue = objectMapper.writeValueAsString(plainRequestData);
 
-    byte[] encryptedByte = cipher.doFinal(dtoStringValue.trim().getBytes(StandardCharsets.UTF_8));
+    /**
+     * plainRequestData를 암호화하는 로직이다.
+     */
+    SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "AES");
+    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+    cipher.init(Cipher.ENCRYPT_MODE, secretKey, new IvParameterSpec(iv.getBytes(StandardCharsets.UTF_8)));
+    byte[] encryptedByte = cipher.doFinal(dataStringValue.trim().getBytes(StandardCharsets.UTF_8));
     String encryptedData = Base64.getEncoder().encodeToString(encryptedByte);
 
+    /**
+     * 암호화 후 무결성을 확인하기 위해 integrityValue를 추가적으로 생성하여 전달한다.
+     */
     Mac mac = Mac.getInstance("HmacSHA256");
     secretKey = new SecretKeySpec(hmacKey.getBytes(), "HmacSHA256");
     mac.init(secretKey);
@@ -202,16 +230,23 @@ public class SelfAuthService {
 
     return PopUpCompositionDto.builder()
         .m("m")
-        .tokenVersionId(info.getTokenVersionId())
+        .tokenVersionId(tokenInfo.getTokenVersionId())
         .encryptedData(encryptedData)
         .integrityValue(integrityValue)
         .build();
   }
 
+  /**
+   * 데이터의 무결성을 확인하고 데이터를 복호화한다.
+   * @param tokenVersionId
+   * @param returnEncryptedData
+   * @param returnIntegrityValue
+   * @return
+   */
   public String integrityCheckAndDecryptData(String tokenVersionId, String returnEncryptedData, String returnIntegrityValue)
       throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException {
 
-    DecryptKeyObject object = (DecryptKeyObject) redisUtils.get(tokenVersionId);
+    DecryptKeyObject object = (DecryptKeyObject) redisUtils.getDecryptKeyObject(tokenVersionId);
     String key = object.getKey();
     String iv = object.getIv();
     String hmacKey = object.getHmacKey();
@@ -269,6 +304,6 @@ public class SelfAuthService {
     userRepository.save(user);
 
     String id = "self-auth" + user.getId();
-    redisUtils.save(id, true);
+    redisUtils.saveDecryptKeyObject(id, true);
   }
 }

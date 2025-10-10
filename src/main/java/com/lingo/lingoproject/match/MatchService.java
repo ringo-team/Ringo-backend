@@ -4,7 +4,6 @@ import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
-import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
@@ -63,7 +62,7 @@ public class MatchService {
     matchingRepository.save(matching);
   }
 
-  @Cacheable(key = "#userId", value = "Recommend", cacheManager = "cacheManager")
+  @Cacheable(key = "#userId", value = "recommend", cacheManager = "cacheManager")
   public List<GetUserProfileResponseDto> recommend(Long userId){
     Set<GetUserProfileResponseDto> rtnSet = new HashSet<>();
     int count =  0;
