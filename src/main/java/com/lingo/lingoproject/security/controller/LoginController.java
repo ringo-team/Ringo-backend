@@ -1,9 +1,9 @@
 package com.lingo.lingoproject.security.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.lingo.lingoproject.security.response.LoginResponseDto;
 import com.lingo.lingoproject.security.services.LoginService;
-import com.lingo.lingoproject.utils.RequestCacheWrapper;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
@@ -12,29 +12,27 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping("/login")
 @RequiredArgsConstructor
 public class LoginController {
 
   private final LoginService loginService;
-  private final RequestCacheWrapper  requestCache;
 
   @PostMapping
-  public ResponseEntity<?> login(){
-    ObjectMapper objectMapper = new ObjectMapper();
-    LoginInfoDto request = null;
+  public ResponseEntity<?> login(HttpServletRequest request){
+    LoginInfoDto info = null;
+    
     try {
-      request = objectMapper.readValue(requestCache.toString(),LoginInfoDto.class);
+      info = (LoginInfoDto) request.getAttribute("requestBody");
     }catch (Exception e){
       e.printStackTrace();
     }
-    LoginResponseDto response = loginService.login(request);
+    LoginResponseDto response = loginService.login(info);
     return ResponseEntity.status(HttpStatus.OK)
         .body(response);
   }
@@ -58,6 +56,13 @@ public class LoginController {
   public ResponseEntity<?> signup(@RequestBody LoginInfoDto dto){
     log.info(dto.toString());
     loginService.signup(dto);
+    return ResponseEntity.status(HttpStatus.OK).build();
+  }
+
+  @PostMapping("/logout")
+  public ResponseEntity<?> logout(@RequestHeader(value = "token") String token){
+    String accessToken = token.substring(7);
+    loginService.logout(accessToken);
     return ResponseEntity.status(HttpStatus.OK).build();
   }
 }

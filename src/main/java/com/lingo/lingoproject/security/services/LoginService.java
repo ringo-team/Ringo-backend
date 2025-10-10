@@ -91,4 +91,17 @@ public class LoginService {
     userRepository.save(user);
   }
 
+  public void logout(String accessToken){
+    Claims claims = jwtUtil.getClaims(accessToken);
+    Long userId = (Long) claims.get("userId");
+    User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("유효하지 않은 토큰입니다."));
+    JwtRefreshToken token = jwtTokenRepository.findByUser(user);
+    int rand = randomUtil.getRandomNumber();
+    while(token.getRand() == rand){
+      rand = randomUtil.getRandomNumber();
+    }
+    token.setRand(rand);
+    jwtTokenRepository.save(token);
+  }
+
 }

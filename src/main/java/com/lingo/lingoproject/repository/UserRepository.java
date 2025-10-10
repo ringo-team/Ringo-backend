@@ -16,4 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
       + "where u.gender <> :gender and u.id not in :banIds "
       + "order by RAND() limit 100", nativeQuery = true)
   public List<User> findRandomUsers(Gender gender, @Param("banIds") List<Long> banIds);
+
+  Optional<User> findByPhoneNumber(String phoneNumber);
 }

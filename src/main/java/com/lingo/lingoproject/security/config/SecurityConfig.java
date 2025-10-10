@@ -27,8 +27,8 @@ public class SecurityConfig {
   private final String[] whiteList = {
       "/login/**",
       "/login",
-      "/signUp/**",
-      "/signUp",
+      "/signup/**",
+      "/signup",
       "/google/callback/**",
       "/kakao/callback/**",
       "/image/**",
