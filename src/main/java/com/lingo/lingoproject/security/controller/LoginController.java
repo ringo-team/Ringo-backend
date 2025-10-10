@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.security.controller;
 
+
 import com.lingo.lingoproject.security.response.LoginResponseDto;
 import com.lingo.lingoproject.security.services.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,13 +12,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping("/login")
 @RequiredArgsConstructor
 public class LoginController {
 
@@ -26,6 +26,7 @@ public class LoginController {
   @PostMapping
   public ResponseEntity<?> login(HttpServletRequest request){
     LoginInfoDto info = null;
+    
     try {
       info = (LoginInfoDto) request.getAttribute("requestBody");
     }catch (Exception e){
@@ -55,6 +56,13 @@ public class LoginController {
   public ResponseEntity<?> signup(@RequestBody LoginInfoDto dto){
     log.info(dto.toString());
     loginService.signup(dto);
+    return ResponseEntity.status(HttpStatus.OK).build();
+  }
+
+  @PostMapping("/logout")
+  public ResponseEntity<?> logout(@RequestHeader(value = "token") String token){
+    String accessToken = token.substring(7);
+    loginService.logout(accessToken);
     return ResponseEntity.status(HttpStatus.OK).build();
   }
 }
