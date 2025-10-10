@@ -70,67 +70,47 @@ public class MatchService {
     int setSize = 0;
     User userEntity = userRepository.findById(userId)
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    // block 하거나 된 사람은 추천하지 않도록
+    // 자신의 연락처에 존재하는 유저와 자신을 연락처로 포함하고 있는 유저
     List<Long> blockedFriendIds = blockedFriendRepository.findBlockedFriends(userId)
         .stream()
         .map(User::getId)
         .toList();
+    // 휴면 계정인 유저
     List<Long> dormantUserIds = dormantAccountRepository.findAll()
         .stream()
         .map(DormantAccount::getUser)
         .map(User::getId)
         .toList();
-    // 이성을 추천하도록
-    Gender gender = null;
-    if(userEntity.getGender().equals(Gender.MALE)){
-      gender = Gender.MALE;
-    }else{
-      gender = Gender.FEMALE;
-    }
+
+    List<Long> banIds = new ArrayList<>();
+    banIds.addAll(blockedFriendIds);
+    banIds.addAll(dormantUserIds);
+
+    /**
+     * setSize는 rtnSet의 크기로 추천이성 정보의 개수이다.
+     * setSize의 크기가 10 이상이거나 반복문을 10번 돌면 반복문을 빠져나온다.
+     *
+     * findRandomUsers는 banIds를 제외한 이성친구를 무작위로 추천한다.
+     * setSize가 7이하 일때는 매칭이 가능한 사람을 추가하고 8이상일 때는 매칭이 불가능한 이성을 추천한다.
+     */
     while(setSize < 10 && count < 10){
-      List<User> randUsers = userRepository.findRandomUsers();
-      for(User user : randUsers){
-        // 성별이 같은 유저거나 블락된 유저, 휴면 계정의 경우 pass
-        if(user.getGender().equals(gender)){
-          continue;
-        }
-        if(blockedFriendIds.contains(user.getId())){
-          continue;
-        }
-        if(dormantUserIds.contains(user.getId())){
-          continue;
-        }
+      List<User> randUsers = userRepository.findRandomUsers(userEntity.getGender(), banIds);
+      for(User randUser : randUsers){
+        // setSize가 10 이상일 때는 while & for 반복문이 종료된다.
+        if(setSize >= 10) break;
         // 7명은 매칭이 가능하도록
-        if(setSize <= 6){
-          if (!userId.equals(user.getId()) && isMatch(userId, user.getId())) {
-            Profile profile = profileRepository.findByUser(user);
-            rtnSet.add(
-                GetUserProfileResponseDto.builder()
-                    .userId(user.getId())
-                    .age(user.getAge())
-                    .nickname(user.getNickname())
-                    .profileUrl(profile.getImageUrl())
-                    .build()
-            );
-            setSize++;
-          }
+        if((setSize < 7 && isMatch(userId, randUser.getId())) || (setSize >= 7 && !isMatch(userId, randUser.getId()))){
+          Profile profile = profileRepository.findByUser(randUser);
+          rtnSet.add(
+              GetUserProfileResponseDto.builder()
+                  .userId(randUser.getId())
+                  .age(randUser.getAge())
+                  .nickname(randUser.getNickname())
+                  .profileUrl(profile.getImageUrl())
+                  .build()
+          );
+          setSize++;
         }
-        else if(setSize <= 9){
-          if (!userId.equals(user.getId()) && !isMatch(userId, user.getId())) {
-            Profile profile = profileRepository.findByUser(user);
-            rtnSet.add(
-                GetUserProfileResponseDto.builder()
-                    .userId(user.getId())
-                    .age(user.getAge())
-                    .gender(user.getGender())
-                    .nickname(user.getNickname())
-                    .profileUrl(profile.getImageUrl())
-                    .build()
-            );
-            setSize++;
-          }
-        }
-        else break;
       }
       count++;
     }

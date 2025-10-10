@@ -3,7 +3,7 @@ package com.lingo.lingoproject.security.jwt;
 
 
 import com.lingo.lingoproject.domain.User;
-import com.lingo.lingoproject.repository.JwtTokenRepository;
+import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.TokenType;
 import com.lingo.lingoproject.security.util.RandomUtil;
@@ -37,7 +37,7 @@ public class JwtUtil {
   @Value("${jwt.refresh.expiration}")
   private String refreshTokenExpiration;
 
-  private final JwtTokenRepository jwtTokenRepository;
+  private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
   private final UserRepository userRepository;
   private final RandomUtil randomUtil;
 
@@ -120,11 +120,11 @@ public class JwtUtil {
         if (user.isEmpty()) {
           return false;
         }
-        /*
-         저장된 random 값과 일치하지 않는 경우 유효하지 않는 토큰으로 간주
-        */
+        /**
+         * 저장된 random 값과 일치하지 않는 경우 유효하지 않는 토큰으로 간주
+         */
         int rand = (int) claims.get("rand");
-        int storedRand = jwtTokenRepository.findByUser(user.get()).getRand();
+        int storedRand = jwtRefreshTokenRepository.findByUser(user.get()).getRand();
         if (storedRand != rand) {
           return false;
         }
