@@ -5,6 +5,7 @@ import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.ChatroomParticipant;
 import com.lingo.lingoproject.domain.Message;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.ChatroomRepository;
 import com.lingo.lingoproject.repository.MessageRepository;
@@ -63,7 +64,7 @@ public class ChatService {
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
     Chatroom chatroom = Chatroom.builder()
         .chatroomName(dto.user1Id().toString() +"_" +dto.user2Id().toString())
-        .type(dto.chatType())
+        .type(ChatType.valueOf(dto.chatType()))
         .build();
     Chatroom savedChatroom = chatroomRepository.save(chatroom);
     ChatroomParticipant participant1 = ChatroomParticipant.builder()

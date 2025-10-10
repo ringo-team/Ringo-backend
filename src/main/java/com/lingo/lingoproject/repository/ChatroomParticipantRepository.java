@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ChatroomParticipantRepository extends JpaRepository<ChatroomParticipant, Long> {
 
-  public List<ChatroomParticipant> findAllByChatroom(Chatroom chatroom);
+  List<ChatroomParticipant> findAllByChatroom(Chatroom chatroom);
 
   void deleteAllByChatroom(Chatroom chatroom);
 }

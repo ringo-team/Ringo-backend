@@ -1,20 +1,28 @@
 package com.lingo.lingoproject.match;
 
+import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.Matching;
+import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
+import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.repository.BlockedFriendRepository;
+import com.lingo.lingoproject.repository.DormantAccountRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
+import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MatchService {
@@ -22,6 +30,8 @@ public class MatchService {
   private final UserRepository userRepository;
   private final MatchingRepository matchingRepository;
   private final BlockedFriendRepository blockedFriendRepository;
+  private final DormantAccountRepository dormantAccountRepository;
+  private final ProfileRepository profileRepository;
 
   public Matching matchRequest(MatchingRequestDto dto){
     User requestedUser = userRepository.findById(dto.requestedId())
@@ -54,72 +64,86 @@ public class MatchService {
   }
 
   @Cacheable(key = "#userId", value = "Recommend", cacheManager = "cacheManager")
-  public Set<Long> recommend(Long userId){
-    Set<Long> rtnSet = new HashSet<>();
+  public List<GetUserProfileResponseDto> recommend(Long userId){
+    Set<GetUserProfileResponseDto> rtnSet = new HashSet<>();
     int count =  0;
     int setSize = 0;
     User userEntity = userRepository.findById(userId)
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    // block 하거나 된 사람은 추천하지 않도록
-    List<User> blockedFriends = blockedFriendRepository.findBlockedFriends(userId);
-    // 이성을 추천하도록
-    Gender gender = null;
-    if(userEntity.getGender().equals(Gender.MALE)){
-      gender = Gender.FEMALE;
-    }else{
-      gender = Gender.MALE;
-    }
+    // 자신의 연락처에 존재하는 유저와 자신을 연락처로 포함하고 있는 유저
+    List<Long> blockedFriendIds = blockedFriendRepository.findBlockedFriends(userId)
+        .stream()
+        .map(User::getId)
+        .toList();
+    // 휴면 계정인 유저
+    List<Long> dormantUserIds = dormantAccountRepository.findAll()
+        .stream()
+        .map(DormantAccount::getUser)
+        .map(User::getId)
+        .toList();
+
+    List<Long> banIds = new ArrayList<>();
+    banIds.addAll(blockedFriendIds);
+    banIds.addAll(dormantUserIds);
+
+    /**
+     * setSize는 rtnSet의 크기로 추천이성 정보의 개수이다.
+     * setSize의 크기가 10 이상이거나 반복문을 10번 돌면 반복문을 빠져나온다.
+     *
+     * findRandomUsers는 banIds를 제외한 이성친구를 무작위로 추천한다.
+     * setSize가 7이하 일때는 매칭이 가능한 사람을 추가하고 8이상일 때는 매칭이 불가능한 이성을 추천한다.
+     */
     while(setSize < 10 && count < 10){
-      List<User> randUserId = userRepository.findRandomUsers();
-      for(User user : randUserId){
-        // 성별이 같은 유저거나 블락된 사람의 경우 pass
-        if(user.getGender().equals(gender)){
-          continue;
-        }
-        if(blockedFriends.contains(user)){
-          continue;
-        }
+      List<User> randUsers = userRepository.findRandomUsers(userEntity.getGender(), banIds);
+      for(User randUser : randUsers){
+        // setSize가 10 이상일 때는 while & for 반복문이 종료된다.
+        if(setSize >= 10) break;
         // 7명은 매칭이 가능하도록
-        if(setSize <= 7){
-          if (!userId.equals(user.getId()) && isMatch(userId, user.getId())) {
-            rtnSet.add(user.getId());
-            setSize++;
-          }
+        if((setSize < 7 && isMatch(userId, randUser.getId())) || (setSize >= 7 && !isMatch(userId, randUser.getId()))){
+          Profile profile = profileRepository.findByUser(randUser);
+          rtnSet.add(
+              GetUserProfileResponseDto.builder()
+                  .userId(randUser.getId())
+                  .age(randUser.getAge())
+                  .nickname(randUser.getNickname())
+                  .profileUrl(profile.getImageUrl())
+                  .build()
+          );
+          setSize++;
         }
-        else if(setSize <= 9){
-          if (!userId.equals(user.getId()) && !isMatch(userId, user.getId())) {
-            rtnSet.add(user.getId());
-            setSize++;
-          }
-        }
-        else break;
       }
       count++;
     }
-    return rtnSet;
+    return new ArrayList<>(rtnSet);
   }
 
   public boolean isMatch(Long user1, Long user2){
     return true;
   }
 
-  public List<Long> getUserIdRequested(Long userId){
+  public List<GetUserProfileResponseDto> getUserIdRequested(Long userId){
     User requestUser = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    return matchingRepository.findByRequestUserAndMatchingStatus(requestUser, MatchingStatus.PENDING)
+    List<Long> userIds = matchingRepository.findByRequestUserAndMatchingStatus(requestUser, MatchingStatus.PENDING)
         .stream()
         .map(Matching::getRequestedUser)
         .map(User::getId)
         .toList();
+    /**
+     * userId 기반으로 user의 id, age, gender, nickname, profileUrl
+     * 을 조회하는 함수
+     */
+    return profileRepository.getUserProfilesByUserIds(userIds);
   }
-  public List<Long> getUserIdRequests(Long userId){
+  public List<GetUserProfileResponseDto> getUserIdRequests(Long userId){
     User requestedUser = userRepository.findById(userId)
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    return matchingRepository.findByRequestedUserAndMatchingStatus(requestedUser, MatchingStatus.PENDING)
+    List<Long> userIds = matchingRepository.findByRequestedUserAndMatchingStatus(requestedUser, MatchingStatus.PENDING)
         .stream()
         .map(Matching::getRequestUser)
         .map(User::getId)
         .toList();
+    return profileRepository.getUserProfilesByUserIds(userIds);
   }
 
   public void deleteMatching(Long id){

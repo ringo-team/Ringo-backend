@@ -1,12 +1,8 @@
 package com.lingo.lingoproject.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lingo.lingoproject.repository.JwtTokenRepository;
-import com.lingo.lingoproject.security.form.CustomAuthenticationFilter;
-import com.lingo.lingoproject.security.jwt.JwtAuthenticationFilter;
 import com.lingo.lingoproject.security.response.LogoutResponseDto;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;

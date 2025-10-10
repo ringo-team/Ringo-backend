@@ -1,11 +1,10 @@
 package com.lingo.lingoproject.match;
 
 import com.lingo.lingoproject.domain.Matching;
-import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.match.dto.GetUserProfileListResponseDto;
+import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.match.dto.RequestMatchingResponseDto;
-import com.lingo.lingoproject.match.dto.RequestUserResponseDto;
-import com.lingo.lingoproject.match.dto.RequestedUserResponseDto;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,19 +41,20 @@ public class MatchController {
 
   @GetMapping("/{id}/requested") // 나를 지목한 사람
   public ResponseEntity<?> getUserWhoRequestsToId(@PathVariable("id") Long id){
-    List<Long> requestUserIds = matchService.getUserIdRequests(id);
-    return ResponseEntity.ok().body(new RequestUserResponseDto(requestUserIds));
+    List<GetUserProfileResponseDto> requestUserIds = matchService.getUserIdRequests(id);
+    return ResponseEntity.ok().body(new GetUserProfileListResponseDto(requestUserIds));
   }
 
   @GetMapping("/{id}/requests") // 내가 지목한 사람
   public ResponseEntity<?> getUserRequestedById(@PathVariable("id") Long id){
-    List<Long> requestedUserIds = matchService.getUserIdRequested(id);
-    return ResponseEntity.ok().body(new RequestedUserResponseDto(requestedUserIds));
+    List<GetUserProfileResponseDto> requestedUserIds = matchService.getUserIdRequested(id);
+    return ResponseEntity.ok().body(new GetUserProfileListResponseDto(requestedUserIds));
   }
 
-  @GetMapping("/recommend")
-  public ResponseEntity<?>  recommend(@RequestBody MatchingRequestDto matchingRequestDto) {
-    return ResponseEntity.ok().build();
+  @GetMapping("/{id}/recommend")
+  public ResponseEntity<?>  recommend(@PathVariable Long id) {
+    List<GetUserProfileResponseDto> rtnList = matchService.recommend(id);
+    return ResponseEntity.ok().body(new GetUserProfileListResponseDto(rtnList));
   }
 
   @DeleteMapping("/{id}")

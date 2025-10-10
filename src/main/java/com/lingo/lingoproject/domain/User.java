@@ -87,9 +87,20 @@ public class User extends Timestamp implements UserDetails {
   @Enumerated(EnumType.STRING)
   private Gender gender;
 
-  private Integer height;
+
+  private String height;
+  private Integer age;
+
+  private String residenceFirstPlace;
+  private String residenceSecondPlace;
+
+  private String activityLocFirstsPlace;
+  private String activityLocSecondsPlace;
+
+
   private Boolean isSmoking;
   private Boolean isDrinking;
+
 
   @Enumerated(EnumType.STRING)
   private Role role;
