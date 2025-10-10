@@ -8,7 +8,7 @@ public record GetUserInfoResponseDto(
     Long id,
     String gender,
     String email,
-    Integer height,
+    String height,
     Boolean isDrinking,
     Boolean isSmoking,
     String job,

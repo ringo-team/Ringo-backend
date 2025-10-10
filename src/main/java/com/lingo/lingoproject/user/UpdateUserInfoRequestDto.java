@@ -2,7 +2,7 @@ package com.lingo.lingoproject.user;
 
 
 public record UpdateUserInfoRequestDto(
-    Integer height,
+    String height,
   Boolean isDrinking,
   Boolean isSmoking,
   String job,

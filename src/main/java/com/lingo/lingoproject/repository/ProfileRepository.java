@@ -12,6 +12,8 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
 
   Profile findByUser(User user);
 
+  List<Profile> findAllByUser(User user);
+
   Profile findByUserAndOrder(User user, int order);
 
   @Query("select new com.lingo.lingoproject.match.dto.GetUserProfileResponseDto(u.id, u.age, u.gender, u.nickname, p.imageUrl)"
