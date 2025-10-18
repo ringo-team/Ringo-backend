@@ -23,7 +23,7 @@ public class RedisUtils {
 
   public void saveBlackList(String key, String value){
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.set("blacklist::" + key, value, 2, TimeUnit.DAYS);
+    ops.set("blacklist::" + key, value, 1, TimeUnit.DAYS);
   }
 
   public boolean containsBlackList(String key){
