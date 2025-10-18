@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.domain;
 
 import com.lingo.lingoproject.utils.Timestamp;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -10,9 +11,12 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -22,12 +26,17 @@ public class Message extends Timestamp {
   private String id;
 
   @ManyToOne
-  @JoinColumn(name = "chatroomId")
-  private Chatroom chattingRoom;
+  @JoinColumn(name = "chatroom_id")
+  private Chatroom chatroom;
 
   @ManyToOne
-  @JoinColumn(name = "userId")
+  @JoinColumn(name = "user_id")
   private User user;
 
-  private String message;
+  @ColumnDefault(value = "false")
+  private Boolean isRead;
+
+
+  @Column(columnDefinition = "TEXT")
+  private String content;
 }
