@@ -1,29 +1,28 @@
 package com.lingo.lingoproject.domain;
 
-
+import com.lingo.lingoproject.domain.enums.PaymentMethod;
+import com.lingo.lingoproject.domain.enums.PaymentStatus;
 import com.lingo.lingoproject.utils.Timestamp;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
-import lombok.Getter;
-import org.hibernate.annotations.ColumnDefault;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
-@Getter
-public class ParticipationLogs extends Timestamp {
+@Table(name = "PAYMENTS")
+public class Payment extends Timestamp {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @OneToOne
+  @ManyToOne
   @JoinColumn(name = "user_id")
   private User user;
 
-  @ColumnDefault("0")
-  private int numOfAccess;
-
-  private int continuousAccess;
+  private PaymentMethod method;
+  private PaymentStatus status;
+  private int amount;
 }
