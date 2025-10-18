@@ -13,6 +13,7 @@ import com.lingo.lingoproject.auth.dto.UserInfo;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.Nation;
+import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.RedisUtils;
 import java.io.UnsupportedEncodingException;
@@ -39,11 +40,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 @Slf4j
@@ -88,10 +89,10 @@ public class SelfAuthService {
     try{
       response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, GetAccessTokenResponseDto.class).getBody();
     } catch (Exception e) {
-      throw new RestClientException(e.getMessage());
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if (response == null) {
-      throw new RestClientException("No response from api");
+      throw new RingoException("본인인증 api response의 값이 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     return response.getBody().accessToken();
@@ -142,7 +143,7 @@ public class SelfAuthService {
     try{
       response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, GetCryptoTokenResponseDto.class).getBody();
     }catch (Exception e){
-      throw new RestClientException(e.getMessage());
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if(response == null
         || !response.getHeader().resultCd().equals("1200")
@@ -150,7 +151,7 @@ public class SelfAuthService {
         || response.getBody().responseMsg().startsWith("EAPI")
         || !response.getBody().resultCd().equals("0000")
     ){
-      throw new RestClientException("null 또는 오류 메세지를 받았습니다.");
+      throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     String siteCode = response.getBody().siteCode();
     String tokenVersionId = response.getBody().tokenVersionId();
@@ -259,7 +260,7 @@ public class SelfAuthService {
 
     if(!integrityValue.equals(returnIntegrityValue)){
       log.info("메세지가 위조되었거나 무결성 검증 과정에서 오류가 발생하였습니다.");
-      throw new IllegalArgumentException("잘못된 암호문이 도달했습니다.");
+      throw new RingoException("잘못된 암호문이 도달했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     secretKey = new SecretKeySpec(key.getBytes(), "AES");
@@ -269,7 +270,7 @@ public class SelfAuthService {
     return returnDecryptedData;
   }
 
-  public void deserializeAndSaveData(String data) throws Exception{
+  public void deserializeAndSaveData(String data){
     UserInfo userInfo = null;
     Date birthday = null;
     SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
@@ -277,8 +278,7 @@ public class SelfAuthService {
       userInfo = objectMapper.readValue(data, UserInfo.class);
       birthday = sdf.parse(userInfo.getBirthday());
     } catch (Exception e) {
-      log.info(e.getMessage());
-      throw new Exception(e.getMessage());
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     log.info("gender format : {}", userInfo.getGender());
     Gender gender = null;
