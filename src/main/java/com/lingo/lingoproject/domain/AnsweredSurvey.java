@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.domain;
 
+import com.lingo.lingoproject.domain.enums.SurveyCategory;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,8 +17,12 @@ public class AnsweredSurvey {
   private Long id;
 
   @ManyToOne
-  @JoinColumn
-  private Survey serveryNum;
+  @JoinColumn(name = "user_id")
+  private User user;
 
-  private String answer;
+  @ManyToOne
+  @JoinColumn(name = "survey_id")
+  private Survey survey;
+
+  private Integer answer;
 }
