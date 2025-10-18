@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.user.dto;
 
+import com.lingo.lingoproject.domain.enums.Drinking;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
@@ -18,11 +19,11 @@ public record GetUserInfoResponseDto(
     @Schema(description = "키", example = "177")
     String height,
 
-    @Schema(description = "음주여부", example = "true")
-    Boolean isDrinking,
+    @Schema(description = "음주여부", example = "OFTEN", allowableValues = {"ALWAYS", "OFTEN", "RARELY", "ON_NEED", "NEVER"})
+    String isDrinking,
 
-    @Schema(description = "흡연여부", example = "true")
-    Boolean isSmoking,
+    @Schema(description = "흡연여부", example = "NEVER", allowableValues = {"SMOKING", "ELECTRONIC", "NO_SMOKING", "NEVER"})
+    String isSmoking,
 
     @Schema(description = "직업", example = "개발자")
     String job,

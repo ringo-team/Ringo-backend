@@ -62,7 +62,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       /**
        * 회원가입을 마치치 않은 회원의 경우 접근을 차단함
        */
-      if(user.getStatus().equals(SignupStatus.COMPLETED)){
+      if(!user.getStatus().equals(SignupStatus.COMPLETED)){
         throw new RingoException("회원가입을 마치고 요청 주시길 바랍니다.", HttpStatus.FORBIDDEN);
       }
       SecurityContextHolder.getContext().setAuthentication(

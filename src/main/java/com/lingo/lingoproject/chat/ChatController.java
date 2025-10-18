@@ -11,6 +11,9 @@ import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.security.Principal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +62,7 @@ public class ChatController {
   @GetMapping()
   public ResponseEntity<JsonListWrapper<GetChatResponseDto>> getChattingMessages(
       @Parameter(description = "채팅방 id", example = "4")
-      @RequestParam("roomId") Long roomId,
+      @RequestParam("roomId")@NotNull Long roomId,
 
       @Parameter(description = "페이지 수", example = "2")
       @RequestParam(value = "page", defaultValue = "0") int page,
@@ -77,8 +80,8 @@ public class ChatController {
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
     ops.set("connect::" + user.getId() + "::" + roomId, true);
 
-    List<GetChatResponseDto> response = chatService.getChattingMessages(roomId, page, size);
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<GetChatResponseDto>(response));
+    List<GetChatResponseDto> responses = chatService.getChattingMessages(roomId, page, size);
+    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<GetChatResponseDto>(responses));
   }
   /**
    * 채팅방 생성
@@ -88,7 +91,7 @@ public class ChatController {
       description = "채팅방과 채팅방 참여자 정보를 데이터베이스에 저장"
   )
   @PostMapping
-  public ResponseEntity<CreateChatroomResponseDto> createChatRoom(@RequestBody CreateChatroomDto dto){
+  public ResponseEntity<CreateChatroomResponseDto> createChatRoom(@Valid @RequestBody CreateChatroomDto dto){
     Chatroom chatroom = chatService.createChatroom(dto);
     log.info("채팅방을 생성하였습니다. 채팅방명: {}", chatroom.getChatroomName());
     return ResponseEntity.status(HttpStatus.CREATED).body(new CreateChatroomResponseDto(
@@ -122,7 +125,7 @@ public class ChatController {
   @DeleteMapping()
   public ResponseEntity<String> deleteChatroom(
       @Parameter(description = "채팅방 id", example = "3")
-      @RequestParam("roomId") Long roomId
+      @RequestParam("roomId")@NotNull Long roomId
   ) {
     chatService.deleteChatroom(roomId);
     log.info("채팅방을 삭제했습니다. 삭제한 채팅방 id:  {}", roomId);
@@ -177,10 +180,10 @@ public class ChatController {
   @PatchMapping()
   public void disconnect(
       @Parameter(description = "채팅방 id", example = "5")
-      @RequestParam(value = "roomId") Long roomId,
+      @RequestParam(value = "roomId")@NotNull Long roomId,
 
       @Parameter(description = "유저 id", example = "5")
-      @RequestParam(value = "userId") Long userId,
+      @RequestParam(value = "userId")@NotNull Long userId,
 
       @AuthenticationPrincipal User user
   ){

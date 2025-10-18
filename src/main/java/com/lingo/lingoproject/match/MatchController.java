@@ -10,6 +10,8 @@ import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,8 +55,8 @@ public class MatchController {
           example = "ACCEPTED",
           schema = @Schema(allowableValues = {"ACCEPTED", "REJECTED"})
       )
-      @RequestParam(value = "decision") String decision,
-      @RequestParam(value = "matchingId") Long matchingId) {
+      @NotBlank @RequestParam(value = "decision") String decision,
+      @NotNull @RequestParam(value = "matchingId") Long matchingId) {
     matchService.responseToRequest(decision, matchingId);
     return ResponseEntity.ok().body("매칭 상태가 변경되었습니다.");
   }
@@ -109,7 +111,7 @@ public class MatchController {
 
   @Operation(summary = "매칭 요청 메세지 조회")
   @GetMapping("/message")
-  public ResponseEntity<GetMatchingRequestMessageResponseDto> getMatchingRequestMessage(@RequestParam(value = "matchingId") Long matchingId){
+  public ResponseEntity<GetMatchingRequestMessageResponseDto> getMatchingRequestMessage(@NotNull @RequestParam(value = "matchingId") Long matchingId){
     String message = matchService.getMatchingRequestMessage(matchingId);
     return ResponseEntity.ok().body(new GetMatchingRequestMessageResponseDto(message));
   }

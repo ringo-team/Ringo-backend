@@ -1,4 +1,7 @@
 package com.lingo.lingoproject.survey;
+import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.enums.Role;
+import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -7,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,7 +36,11 @@ public class SurveyController {
 
   @Operation(summary = "설문지 수정")
   @PatchMapping()
-  public ResponseEntity<String> updateSurvey(@RequestBody UpdateSurveyRequestDto dto){
+  public ResponseEntity<String> updateSurvey(@RequestBody UpdateSurveyRequestDto dto, @AuthenticationPrincipal
+      User user){
+    if(!user.getRole().equals(Role.ADMIN)){
+      throw new RingoException("관리자만 설문지를 수정할 수 있습니다.", HttpStatus.BAD_REQUEST);
+    }
     surveyService.updateSurvey(dto);
     return ResponseEntity.status(HttpStatus.OK).body("성공적으로 수정하였습니다.");
   }

@@ -1,5 +1,4 @@
 package com.lingo.lingoproject.exception;
-
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

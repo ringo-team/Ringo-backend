@@ -9,7 +9,7 @@ import java.util.List;
 public record SignupUserInfoDto(
 
     @Schema(description = "유저 id", example = "5")
-    @NotBlank
+    @NotNull
     Long id,
 
     @Schema(description = "닉네임", example = "불타는 망고")
