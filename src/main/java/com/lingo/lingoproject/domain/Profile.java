@@ -12,14 +12,18 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -29,15 +33,15 @@ public class Profile extends Timestamp {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @ManyToOne(fetch = FetchType.LAZY)
+  @OneToOne
   @JoinColumn(name = "user_id")
   private User user;
 
   private String imageUrl;
   private String description;
 
-  @Column(name = "sort_order")
-  private int order;
+  @ColumnDefault(value = "false")
+  private Boolean isAuth;
 
   @Enumerated(EnumType.STRING)
   private InspectStatus status;
