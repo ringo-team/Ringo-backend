@@ -3,6 +3,7 @@ package com.lingo.lingoproject.security.oauth.kakao;
 
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.oauth.OAuthUtils;
 import com.lingo.lingoproject.security.oauth.kakao.dto.KakaoTokenResponseDto;
@@ -13,11 +14,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 @Service
@@ -51,10 +52,10 @@ public class KakaoLoginService {
       response = restTemplate.exchange(KAKAO_TOKEN_URL, HttpMethod.POST,
           request, KakaoTokenResponseDto.class).getBody();
     }catch (Exception e){
-      throw new RestClientException(e.getMessage());
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if(response == null){
-      throw new RestClientException("Kakao token response is null");
+      throw new RingoException("Kakao token response is null", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return response.accessToken();
   }
@@ -70,10 +71,10 @@ public class KakaoLoginService {
       response = restTemplate.exchange(KAKAO_USER_INFO_URL, HttpMethod.GET,
           request, KakaoUserInfoResponseDto.class).getBody();
     }catch (Exception e){
-      throw new RestClientException(e.getMessage());
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if(response == null){
-      throw new RestClientException("Kakao user info response is null");
+      throw new RingoException("Kakao user info response is null", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     Optional<User> user = userRepository.findByEmail(response.id().toString());
     User loginUser = null;

@@ -3,7 +3,7 @@ package com.lingo.lingoproject.security.oauth;
 
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Role;
-import com.lingo.lingoproject.domain.enums.SignUpStatus;
+import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,17 +26,14 @@ public class OAuthUtils {
     User user = User.builder()
         .email(email)
         .role(Role.USER)
-        .status(SignUpStatus.BEFORE)
+        .status(SignupStatus.BEFORE)
         .build();
     User savedUser = userRepository.save(user);
     return savedUser;
   }
   public void login(User user){
-    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-    authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
-    System.out.println("유저가 로그인 되었습니다.");
     SecurityContextHolder.getContext().setAuthentication(
-        new UsernamePasswordAuthenticationToken(user.getEmail(), "password", authorities)
+        new UsernamePasswordAuthenticationToken(user.getEmail(), "password", user.getAuthorities())
     );
   }
 }

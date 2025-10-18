@@ -2,6 +2,7 @@ package com.lingo.lingoproject.security.oauth.google;
 
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.oauth.OAuthUtils;
 import com.lingo.lingoproject.security.oauth.google.dto.GoogleTokenResponseDto;
@@ -13,11 +14,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 @Service
@@ -54,14 +55,14 @@ public class GoogleLoginService {
     try{
       response = restTemplate.exchange(GOOGLE_TOKEN_URL, HttpMethod.POST, request, GoogleTokenResponseDto.class).getBody();
     }catch (Exception e){
-      throw new RestClientException(e.getMessage());
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if (response == null){
-      throw new RestClientException("Invalid Google Access Token");
+      throw new RingoException("Invalid Google Access Token", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return response.accessToken();
   }
-  /*
+  /**
    * 1. code를 이용하여 token을 발급한다.
    * 2. token을 통해 유저 고유 정보를 얻는다. 여기서는 유저의 email 정보를 얻는다.
    * 3. 유저의 email 정보를 통해서 이전 가입여부를 확인한다. 가입한 적이 없으면 자동 회원가입이 진행된다.
@@ -81,10 +82,10 @@ public class GoogleLoginService {
       response = restTemplate.exchange(GOOGLE_GMAIL_URL, HttpMethod.GET,
           request, GoogleUserInfoResponseDto.class).getBody();
     }catch (Exception e){
-      throw new RestClientException(e.getMessage());
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if(response == null){
-      throw new RestClientException("Google user info response is null");
+      throw new RingoException("Google user info response is null", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     // 3

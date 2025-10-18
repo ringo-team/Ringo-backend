@@ -2,11 +2,11 @@ package com.lingo.lingoproject.security.jwt;
 
 
 
+import com.lingo.lingoproject.domain.JwtRefreshToken;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
-import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.TokenType;
-import com.lingo.lingoproject.security.util.RandomUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -15,17 +15,18 @@ import io.jsonwebtoken.security.Keys;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import javax.crypto.SecretKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtUtil {
+
   @Value("${jwt.issuer}")
   private String issuer;
 
@@ -39,32 +40,25 @@ public class JwtUtil {
   private String refreshTokenExpiration;
 
   private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
-  private final UserRepository userRepository;
-  private final RandomUtil randomUtil;
 
-  public String generateToken(TokenType classification, String username){
+  public String generateToken(TokenType tokenType, User user){
     Long expiration = null;
-    if (classification == TokenType.ACCESS) {
+    if (tokenType == TokenType.ACCESS) {
       expiration = Long.parseLong(accessTokenExpiration);
     }
-    else if(classification == TokenType.REFRESH){
+    else if(tokenType == TokenType.REFRESH){
       expiration = Long.parseLong(refreshTokenExpiration);
     }
     else{
-      throw new IllegalArgumentException("Invalid token type.");
-    }
-    log.info(username);
-    Optional<User> user = userRepository.findByEmail(username);
-    if (user.isEmpty()){
-      throw new IllegalArgumentException("Invalid username or password.");
+      throw new RingoException("토큰 타입은 access, refresh 둘 중 하나입니다.", HttpStatus.BAD_REQUEST);
     }
     Map<String, Object> claims = new HashMap<>();
-    claims.put("userId", user.get().getId());
+    claims.put("userId", user.getId());
     return Jwts.builder()
-        .issuer("lingo")
+        .issuer(issuer)
         .claims(claims)
         .issuedAt(new Date())
-        .subject(username)
+        .subject(user.getEmail())
         .expiration(new Date(System.currentTimeMillis() + expiration))
         .signWith(this.getSigningKey())
         .compact();
@@ -95,27 +89,22 @@ public class JwtUtil {
       Jwts.parser().verifyWith(getSigningKey())
           .build()
           .parseSignedClaims(token);
-    }catch (Exception e){
+    }
+    catch (ExpiredJwtException e){
+      throw new RingoException("유효기간이 지난 토큰입니다.", HttpStatus.UNAUTHORIZED);
+    }
+    catch (Exception e){
       return false;
     }
     return true;
   }
 
-  /**
-   * 유효기간이 지난 코드의 경우 true를 반환함
-   * 유효기간이 지나지 않았거나 그 외 오류가 발생할 시 false를 반환함
-   * @param token
-   * @return
-   */
-  public boolean isExpiredToken(String token){
-    try{
-      Claims claims = getClaims(token);
-      return claims.getExpiration().before(new Date());
-    }catch(ExpiredJwtException e){
-      return true;
-    }catch (Exception e){
-      return false;
-    }
+  public void saveRefreshToken(String token, User user){
+    JwtRefreshToken jwtRefreshToken = JwtRefreshToken.builder()
+        .refreshToken(token)
+        .user(user)
+        .build();
+    jwtRefreshTokenRepository.save(jwtRefreshToken);
   }
 
 }

@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.security.response;
+package com.lingo.lingoproject.security.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.HttpStatus;

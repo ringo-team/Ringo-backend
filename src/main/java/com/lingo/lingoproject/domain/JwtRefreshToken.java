@@ -30,11 +30,6 @@ public class JwtRefreshToken {
   @JoinColumn(name = "user_id")
   private User user;
 
-  /*
-   토큰의 유효성을 확인하기 위한 값
-   */
-  private int rand;
-
   @Column(nullable = false)
   private String refreshToken;
 }

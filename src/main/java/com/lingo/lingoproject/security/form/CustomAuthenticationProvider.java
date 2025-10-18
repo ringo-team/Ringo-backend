@@ -1,6 +1,8 @@
 package com.lingo.lingoproject.security.form;
 
+import com.lingo.lingoproject.exception.RingoException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,10 +23,9 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
   public Authentication authenticate(Authentication authentication) throws AuthenticationException {
     UserDetails user = customUserDetailService.loadUserByUsername(authentication.getName());
     if(!passwordEncoder.matches(authentication.getCredentials().toString(), user.getPassword())){
-      authentication.setAuthenticated(false);
-      throw new BadCredentialsException("Bad credentials");
+      throw new RingoException("패스워드가 옳지 않습니다.", HttpStatus.FORBIDDEN);
     }
-    return  new UsernamePasswordAuthenticationToken(user, authentication.getCredentials(), user.getAuthorities());
+    return  new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities());
   }
 
   @Override
