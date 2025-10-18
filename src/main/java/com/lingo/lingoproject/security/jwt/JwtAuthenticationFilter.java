@@ -3,6 +3,7 @@ package com.lingo.lingoproject.security.jwt;
 
 import com.amazonaws.services.kms.model.NotFoundException;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.RedisUtils;
@@ -58,6 +59,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       Claims claims = jwtUtil.getClaims(accessToken);
       User user = userRepository.findByEmail(claims.getSubject())
           .orElseThrow(() -> new RingoException("유효하지 않은 토큰입니다.", HttpStatus.FORBIDDEN));
+      /**
+       * 회원가입을 마치치 않은 회원의 경우 접근을 차단함
+       */
+      if(user.getStatus().equals(SignupStatus.COMPLETED)){
+        throw new RingoException("회원가입을 마치고 요청 주시길 바랍니다.", HttpStatus.FORBIDDEN);
+      }
       SecurityContextHolder.getContext().setAuthentication(
           new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities())
       );

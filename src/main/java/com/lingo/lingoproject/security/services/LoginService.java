@@ -1,21 +1,35 @@
 package com.lingo.lingoproject.security.services;
 
+import com.lingo.lingoproject.domain.BlockedUser;
+import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.JwtRefreshToken;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.enums.Drinking;
+import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
+import com.lingo.lingoproject.domain.enums.Smoking;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.repository.BlockedUserRepository;
+import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.TokenType;
-import com.lingo.lingoproject.security.controller.LoginInfoDto;
+import com.lingo.lingoproject.security.controller.dto.LoginInfoDto;
+import com.lingo.lingoproject.security.controller.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
+import com.lingo.lingoproject.utils.GenericUtils;
 import com.lingo.lingoproject.utils.RedisUtils;
 import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,6 +44,9 @@ public class LoginService {
   private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
   private final PasswordEncoder passwordEncoder;
   private final RedisUtils redisUtils;
+  private final GenericUtils genericUtils;
+  private final HashtagRepository hashtagRepository;
+  private final BlockedUserRepository blockedUserRepository;
 
   public LoginResponseDto login(LoginInfoDto dto){
     if (SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -110,6 +127,54 @@ public class LoginService {
         .build();
     userRepository.save(user);
   }
+
+  @Transactional
+  public void saveUserInfo(SignupUserInfoDto dto){
+    if(!genericUtils.isContains(Smoking.values(), dto.isSmoking())){
+      throw new RingoException("흡연 카테고리에 포함되지 않습니다.", HttpStatus.BAD_REQUEST);
+    }
+    if (!genericUtils.isContains(Drinking.values(), dto.isDrinking())){
+      throw new RingoException("음주 카테고리에 포함되지 않습니다.", HttpStatus.BAD_REQUEST);
+    }
+    if (!genericUtils.isContains(Religion.values(), dto.religion())){
+      throw new RingoException("종교 카테고리에 포함되지 않습니다.",  HttpStatus.BAD_REQUEST);
+    }
+    User user = userRepository.findById(dto.id()).orElseThrow(() -> new RingoException("해당 회원을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    Calendar calendar = Calendar.getInstance();
+    calendar.setTime(user.getBirthday());
+
+    if(calendar.get(Calendar.YEAR) + 19 > LocalDate.now().getYear()){
+      throw new RingoException("미성년자는 회원가입이 불가합니다.",  HttpStatus.FORBIDDEN);
+    }
+
+    if(user.getPhoneNumber() == null || user.getPhoneNumber().isEmpty()){
+      throw new RingoException("본인인증 되지 않은 회원입니다.",  HttpStatus.BAD_REQUEST);
+    }
+    List<String> blockUserPhoneNumberList = blockedUserRepository.findAll()
+        .stream()
+        .map(BlockedUser::getPhoneNumber)
+        .toList();
+    if(blockUserPhoneNumberList.contains(user.getPhoneNumber().trim())){
+      throw new RingoException("블락된 유저 입니다.", HttpStatus.FORBIDDEN);
+    }
+    user.setUserInfo(dto);
+    List<Hashtag> hashtags = new ArrayList<>();
+    for (String tag : dto.hashtags()){
+      hashtags.add(Hashtag.builder()
+              .user(user)
+              .hashtag(tag)
+          .build());
+    }
+    try {
+      userRepository.save(user);
+      hashtagRepository.saveAll(hashtags);
+    } catch (DataIntegrityViolationException e) {
+      throw new RingoException(e.getMessage(), HttpStatus.BAD_REQUEST);
+    } catch (Exception e) {
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
 
   @Transactional
   public void logout(User user, String accessToken){

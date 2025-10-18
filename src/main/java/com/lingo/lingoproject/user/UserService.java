@@ -3,7 +3,9 @@ package com.lingo.lingoproject.user;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.UserAccessLog;
+import com.lingo.lingoproject.domain.enums.Drinking;
 import com.lingo.lingoproject.domain.enums.Religion;
+import com.lingo.lingoproject.domain.enums.Smoking;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.ImageService;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
@@ -113,8 +115,8 @@ public class UserService {
         .id(user.getId())
         .gender(user.getGender().toString())
         .height(user.getHeight())
-        .isDrinking(user.getIsDrinking())
-        .isSmoking(user.getIsSmoking())
+        .isDrinking(user.getIsDrinking().toString())
+        .isSmoking(user.getIsSmoking().toString())
         .religion(user.getReligion().toString())
         .job(user.getJob())
         .nickname(user.getNickname())
@@ -124,12 +126,16 @@ public class UserService {
   public void updateUserInfo(Long userId, UpdateUserInfoRequestDto dto){
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new RingoException("id에 해당하는 유저가 없습니다.", HttpStatus.BAD_REQUEST));
-    if (dto.height() != null && !dto.height().isEmpty()) user.setHeight(dto.height());
-    if (dto.isDrinking() != null) user.setIsDrinking(dto.isDrinking());
-    if (dto.isSmoking() != null) user.setIsSmoking(dto.isSmoking());
+    if (dto.height() != null && !dto.height().isEmpty())
+      user.setHeight(dto.height());
+    if (dto.isDrinking() != null && genericUtils.isContains(Drinking.values(), dto.isDrinking()))
+      user.setIsDrinking(Drinking.valueOf(dto.isDrinking()));
+    if (dto.isSmoking() != null && genericUtils.isContains(Smoking.values(), dto.isSmoking()))
+      user.setIsSmoking(Smoking.valueOf(dto.isSmoking()));
     if (dto.religion() != null && genericUtils.isContains(Religion.values(), dto.religion()))
       user.setReligion(Religion.valueOf(dto.religion()));
-    if (dto.job() != null && !dto.job().isEmpty()) user.setJob(dto.job());
+    if (dto.job() != null && !dto.job().isEmpty())
+      user.setJob(dto.job());
 
     userRepository.save(user);
   }
@@ -145,8 +151,8 @@ public class UserService {
               .id(user.getId())
               .gender(user.getGender().toString())
               .height(user.getHeight())
-              .isDrinking(user.getIsDrinking())
-              .isSmoking(user.getIsSmoking())
+              .isDrinking(user.getIsDrinking().toString())
+              .isSmoking(user.getIsSmoking().toString())
               .religion(user.getReligion().toString())
               .job(user.getJob())
               .nickname(user.getNickname())

@@ -3,6 +3,8 @@ package com.lingo.lingoproject.security.controller;
 
 import com.lingo.lingoproject.access.annotation.AccessLog;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.security.controller.dto.LoginInfoDto;
+import com.lingo.lingoproject.security.controller.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.security.services.LoginService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,13 +15,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -103,9 +106,16 @@ public class LoginController {
 
   @PostMapping("/signup")
   @Operation(summary = "회원 가입", description = "회원 가입에 필요한 정보로 계정을 생성합니다.")
-  public ResponseEntity<String> signup(@RequestBody LoginInfoDto dto) {
+  public ResponseEntity<String> signup(@Valid @RequestBody LoginInfoDto dto) {
     loginService.signup(dto);
     return ResponseEntity.status(HttpStatus.OK).body("회원가입이 완료되었습니다.");
+  }
+
+  @PostMapping("/signup/user-info")
+  @Operation(summary = "회원 정보 입력", description = "회원가입 시 유저 정보 저장")
+  public ResponseEntity<String> signupUserInfo(@Valid @RequestBody SignupUserInfoDto dto){
+    loginService.saveUserInfo(dto);
+    return ResponseEntity.ok().body("유저 정보 저장이 완료되었습니다.");
   }
 
   @GetMapping("/api/logout")

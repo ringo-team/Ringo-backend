@@ -1,10 +1,13 @@
 package com.lingo.lingoproject.domain;
 
+import com.lingo.lingoproject.domain.enums.Drinking;
 import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.Nation;
 import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.SignupStatus;
+import com.lingo.lingoproject.domain.enums.Smoking;
+import com.lingo.lingoproject.security.controller.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.utils.Timestamp;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -100,8 +103,8 @@ public class User extends Timestamp implements UserDetails {
   private String activityLocSecondsPlace;
 
 
-  private Boolean isSmoking;
-  private Boolean isDrinking;
+  private Smoking isSmoking;
+  private Drinking isDrinking;
 
 
   @Enumerated(EnumType.STRING)
@@ -109,6 +112,9 @@ public class User extends Timestamp implements UserDetails {
 
   @Enumerated(EnumType.STRING)
   private Religion religion;
+
+  @Column(length = 5)
+  private String biography;
 
   private String job;
 
@@ -122,4 +128,19 @@ public class User extends Timestamp implements UserDetails {
 
   private Boolean isActive;
   private String etc;
+
+  public void setUserInfo(SignupUserInfoDto dto){
+    this.nickname = dto.nickname();
+    this.residenceFirstPlace = dto.address().city();
+    this.residenceSecondPlace = dto.address().district();
+    this.activityLocFirstsPlace = dto.activeAddress().city();
+    this.activityLocSecondsPlace = dto.activeAddress().district();
+    this.job = dto.job();
+    this.height = dto.height();
+    this.isSmoking = Smoking.valueOf(dto.isSmoking());
+    this.isDrinking = Drinking.valueOf(dto.isDrinking());
+    this.religion = Religion.valueOf(dto.religion());
+    this.biography = dto.biography();
+    this.status = SignupStatus.IN_PROGRESS;
+  }
 }

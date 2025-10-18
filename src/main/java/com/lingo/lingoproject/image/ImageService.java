@@ -7,6 +7,7 @@ import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.SnapImage;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Role;
+import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.repository.ProfileRepository;
@@ -52,6 +53,12 @@ public class ImageService {
         .build();
 
     Profile savedProfile = profileRepository.save(profile);
+
+    /**
+     * 회원가입을 성공적으로 마무리 했으므로 user status를 COMPLETE로 변경한다.
+     */
+    user.setStatus(SignupStatus.COMPLETED);
+    userRepository.save(user);
 
     return new GetImageUrlResponseDto(savedProfile.getImageUrl(), savedProfile.getId());
   }
