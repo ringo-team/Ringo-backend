@@ -1,6 +1,6 @@
 package com.lingo.lingoproject.domain.enums;
 
-public enum SignUpStatus {
+public enum SignupStatus {
   BEFORE,
   IN_PROGRESS,
   COMPLETED

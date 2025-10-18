@@ -4,7 +4,7 @@ import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.Nation;
 import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
-import com.lingo.lingoproject.domain.enums.SignUpStatus;
+import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.utils.Timestamp;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,6 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 @Entity
@@ -36,7 +37,7 @@ public class User extends Timestamp implements UserDetails {
 
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {
-    return List.of();
+    return List.of(new SimpleGrantedAuthority("ROLE_" + this.role));
   }
 
   @Override
@@ -53,6 +54,7 @@ public class User extends Timestamp implements UserDetails {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
+  @Column(unique = true)
   private String nickname;
 
   private String name;
@@ -116,8 +118,8 @@ public class User extends Timestamp implements UserDetails {
    *   진행중
    *   완료
    */
-  private SignUpStatus status;
+  private SignupStatus status;
 
-  private boolean isActive;
+  private Boolean isActive;
   private String etc;
 }

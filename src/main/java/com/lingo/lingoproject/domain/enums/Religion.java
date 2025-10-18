@@ -5,4 +5,5 @@ public enum Religion {
   BUDDHISM,
   CATHOLIC,
   ATHEIST,
+  ETC
 }
