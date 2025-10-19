@@ -2,14 +2,13 @@ package com.lingo.lingoproject.match;
 
 import com.lingo.lingoproject.chat.ChatService;
 import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
-import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.DormantAccount;
+import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
-import com.lingo.lingoproject.domain.enums.SurveyCategory;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
@@ -18,16 +17,19 @@ import com.lingo.lingoproject.match.dto.SaveMatchingRequestMessageRequestDto;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.BlockedFriendRepository;
 import com.lingo.lingoproject.repository.DormantAccountRepository;
+import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.xmlbeans.impl.regex.Match;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -44,6 +46,7 @@ public class MatchService {
   private final ProfileRepository profileRepository;
   private final AnsweredSurveyRepository answeredSurveyRepository;
   private final ChatService chatService;
+  private final HashtagRepository hashtagRepository;
 
   public Matching matchRequest(MatchingRequestDto dto){
     User requestedUser = userRepository.findById(dto.requestedId())
@@ -126,12 +129,17 @@ public class MatchService {
         if((setSize < 7 && isMatch(userId, randUser.getId())) || (setSize >= 7 && !isMatch(userId, randUser.getId()))){
           Profile profile = profileRepository.findByUser(randUser)
               .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
+          List<String> hashtags = hashtagRepository.findAllByUser(randUser)
+              .stream()
+              .map(Hashtag::getHashtag)
+              .toList();
           rtnSet.add(
               GetUserProfileResponseDto.builder()
                   .userId(randUser.getId())
                   .age(randUser.getAge())
                   .nickname(randUser.getNickname())
                   .profileUrl(profile.getImageUrl())
+                  .hashtags(hashtags)
                   .build()
           );
           setSize++;
@@ -172,24 +180,52 @@ public class MatchService {
   public List<GetUserProfileResponseDto> getUserIdRequested(Long userId){
     User requestUser = userRepository.findById(userId)
             .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-    List<Long> matchingIds = matchingRepository.findByRequestUserAndMatchingStatus(requestUser, MatchingStatus.PENDING)
-        .stream()
+    List<Matching> matchings = matchingRepository.findByRequestUserAndMatchingStatus(requestUser, MatchingStatus.PENDING);
+    List<Long> matchingIds = matchings.stream()
         .map(Matching::getId)
         .toList();
     /**
-     * userId 기반으로 user의 id, age, gender, nickname, profileUrl
-     * 을 조회하는 함수
+     * userId 기반으로 user의 id, age, gender, nickname, profileUrl, hashtags
+     * 를 조회하는 함수
      */
-    return profileRepository.getRequestedUserProfilesByUserIds(matchingIds);
+    List<GetUserProfileResponseDto> profiles = profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
+
+    List<User> matchingRequestedUsers = matchings.stream()
+        .map(Matching::getRequestedUser)
+        .toList();
+    Map<Long, List<String>> hashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestedUsers));
+    profiles.forEach(profile -> profile.setHashtags(hashtagMap.get(profile.getUserId())));
+    return profiles;
   }
   public List<GetUserProfileResponseDto> getUserIdRequests(Long userId){
     User requestedUser = userRepository.findById(userId)
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-    List<Long> matchingIds = matchingRepository.findByRequestedUserAndMatchingStatus(requestedUser, MatchingStatus.PENDING)
-        .stream()
+    List<Matching> matchings = matchingRepository.findByRequestedUserAndMatchingStatus(requestedUser, MatchingStatus.PENDING);
+
+    // id, age, gender, nickname, profileUrl 조회
+    List<Long> matchingIds = matchings.stream()
         .map(Matching::getId)
         .toList();
-    return profileRepository.getRequestUserProfilesByUserIds(matchingIds);
+    List<GetUserProfileResponseDto> profiles = profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
+
+    // hashtags 조회
+    List<User> matchingRequestUsers = matchings.stream()
+        .map(Matching::getRequestUser)
+        .toList();
+    Map<Long, List<String>> hashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestUsers));
+    profiles.forEach(profile -> profile.setHashtags(hashtagMap.get(profile.getUserId())));
+
+    return profiles;
+  }
+
+  public Map<Long, List<String>> convertToMapFromHashtags(List<Hashtag> hashtags){
+    Map<Long, List<String>> hashtagMap = new HashMap<>();
+    for(Hashtag hashtag : hashtags){
+      Long userId = hashtag.getUser().getId();
+      hashtagMap.putIfAbsent(userId, new ArrayList<>());
+      hashtagMap.get(userId).add(hashtag.getHashtag());
+    }
+    return hashtagMap;
   }
 
   public void deleteMatching(Long id){
