@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.domain;
 
+import com.lingo.lingoproject.auth.dto.UserSelfAuthInfo;
 import com.lingo.lingoproject.domain.enums.Drinking;
 import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.Nation;
@@ -7,6 +8,7 @@ import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.domain.enums.Smoking;
+import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.security.controller.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.utils.Timestamp;
 import jakarta.persistence.Column;
@@ -17,6 +19,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -25,6 +29,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -113,7 +118,7 @@ public class User extends Timestamp implements UserDetails {
   @Enumerated(EnumType.STRING)
   private Religion religion;
 
-  @Column(length = 5)
+  @Column(length = 100)
   private String biography;
 
   private String job;
@@ -126,8 +131,6 @@ public class User extends Timestamp implements UserDetails {
    */
   private SignupStatus status;
 
-  private Boolean isActive;
-  private String etc;
 
   public void setUserInfo(SignupUserInfoDto dto){
     this.nickname = dto.nickname();
@@ -142,5 +145,20 @@ public class User extends Timestamp implements UserDetails {
     this.religion = Religion.valueOf(dto.religion());
     this.biography = dto.biography();
     this.status = SignupStatus.IN_PROGRESS;
+  }
+
+  public void setUserSelfAuthInfo(UserSelfAuthInfo dto){
+
+    DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
+    try {
+      this.mobileCarrier = dto.getMobileCarrier();
+      this.phoneNumber = dto.getPhoneNumber();
+      this.name = dto.getName();
+      this.nationalInfo = Nation.valueOf(dto.getNationalInfo());
+      this.birthday = dateFormat.parse(dto.getBirthday());
+      this.gender = Gender.valueOf(dto.getGender());
+    } catch (Exception e) {
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }

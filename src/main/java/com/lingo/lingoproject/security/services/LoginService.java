@@ -120,6 +120,12 @@ public class LoginService {
   }
 
   public void signup(LoginInfoDto dto){
+    if(!dto.email().matches("^(?=.*[A-Za-z])(?=.*\\d).+$")){
+      throw new RingoException("적절하지 않은 입력값입니다.", HttpStatus.NOT_ACCEPTABLE);
+    }
+    if(!dto.password().matches("^(?=.*[A-Za-z])(?=.*\\d).+$")){
+      throw new RingoException("적절하지 않은 입력값입니다.", HttpStatus.NOT_ACCEPTABLE);
+    }
     User user = User.builder()
         .email(dto.email())
         .password(passwordEncoder.encode(dto.password()))

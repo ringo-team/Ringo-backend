@@ -138,10 +138,10 @@ public class ChatController {
    */
   @MessageMapping("/{roomId}")
   public void sendMessage(@DestinationVariable Long roomId, GetChatResponseDto message){
-    List<String> username = chatService.getUsernamesInChatroom(roomId);
+    List<String> usernames = chatService.getUsernamesInChatroom(roomId);
     // 메세지 저장
 
-    List<User> roomMember = userRepository.findAllByEmailIn(username);
+    List<User> roomMember = userRepository.findAllByEmailIn(usernames);
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
 
     // 상대방이 채팅방에 존재하는지 확인
@@ -162,7 +162,7 @@ public class ChatController {
       simpMessagingTemplate.convertAndSendToUser(user.getEmail(), "/topic/" + roomId, message);
     }
     // 채팅 미리보기 기능
-    for (String user : username){
+    for (String user : usernames){
       simpMessagingTemplate.convertAndSendToUser(user, "/room-list", message);
     }
 
