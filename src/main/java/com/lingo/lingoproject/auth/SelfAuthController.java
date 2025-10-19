@@ -19,8 +19,8 @@ public class SelfAuthController {
       @RequestParam(value = "enc_data") String encryptedData,
       @RequestParam(value = "integrity_value") String integrityValue
   ) throws Exception {
-    String decryptedData = selfAuthService.integrityCheckAndDecryptData(tokenVersionId, encryptedData, integrityValue);
-    selfAuthService.deserializeAndSaveData(decryptedData);
+    String decryptedData = selfAuthService.validateIntegrityAndDecryptData(tokenVersionId, encryptedData, integrityValue);
+    selfAuthService.deserializeAndSaveUserInfo(decryptedData);
     return ResponseEntity.ok().build();
   }
 }

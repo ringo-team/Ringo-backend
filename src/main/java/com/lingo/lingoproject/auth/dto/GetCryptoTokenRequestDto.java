@@ -8,16 +8,16 @@ import lombok.Data;
 @Builder
 public class GetCryptoTokenRequestDto {
 
-  private dataHeader header;
-  private dataBody body;
+  private DataHeader dataHeader;
+  private DataBody dataBody;
 
   @Builder
-  public record dataHeader(
+  public record DataHeader(
       @JsonProperty("CNTY_CD") String lang
   ){}
 
   @Builder
-  public record dataBody(
+  public record DataBody(
       @JsonProperty("req_dtim") String requestDateTime,
       @JsonProperty("req_no") String requestNum,
       @JsonProperty("enc_mode") String encryptMode

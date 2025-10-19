@@ -8,8 +8,8 @@ import com.lingo.lingoproject.auth.dto.GetAccessTokenResponseDto;
 import com.lingo.lingoproject.auth.dto.GetCryptoTokenRequestDto;
 import com.lingo.lingoproject.auth.dto.GetCryptoTokenResponseDto;
 import com.lingo.lingoproject.auth.dto.PlainRequestData;
-import com.lingo.lingoproject.auth.dto.PopUpCompositionDto;
-import com.lingo.lingoproject.auth.dto.UserInfo;
+import com.lingo.lingoproject.auth.dto.AuthWindowRequestDto;
+import com.lingo.lingoproject.auth.dto.UserSelfAuthInfo;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Gender;
 import com.lingo.lingoproject.domain.enums.Nation;
@@ -22,7 +22,6 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Date;
@@ -74,7 +73,7 @@ public class SelfAuthService {
 
   public String getAccessToken(){
     apiUrl += "/digital/niceid/oauth/oauth/token";
-    String auth = "Basic " + Base64.getEncoder().encodeToString(clientId.getBytes());
+    String auth = "Basic " + Base64.getEncoder().encodeToString((clientId+":"+clientSecret).getBytes());
 
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -85,6 +84,10 @@ public class SelfAuthService {
     params.add("scope", "default");
     HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(params, headers);
 
+    /**
+     *  Authorization : Basic + Base64(clientId:clientSecret)
+     *  URL?grant_type=client_credentials&scope=default
+     */
     GetAccessTokenResponseDto response = null;
     try{
       response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, GetAccessTokenResponseDto.class).getBody();
@@ -94,12 +97,15 @@ public class SelfAuthService {
     if (response == null) {
       throw new RingoException("본인인증 api response의 값이 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
+    else if(!response.getDataHeader().resultCd().equals("1200")){
+      throw new RingoException("정상 토큰을 얻지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
-    return response.getBody().accessToken();
+    return response.getDataBody().accessToken();
   }
 
   /**
-   * access token으로 암호화하는데 필요한 토큰을 얻는다.
+   * access token으로 메세지를 암호화하는데 필요한 토큰을 얻는다.
    * @param accessToken
    * @return
    * @throws NoSuchAlgorithmException
@@ -107,9 +113,8 @@ public class SelfAuthService {
   public CryptoTokenInfo getCryptoTokenInfo(String accessToken) throws NoSuchAlgorithmException {
     apiUrl += "digital/niceid/api/v1.0/common/crypto/token";
 
-    Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-    String auth = "bearer " + accessToken +":" + timestamp + ":" + clientId;
-    SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+    long timestamp = System.currentTimeMillis()/1000;
+    String auth = "bearer " + Base64.getEncoder().encodeToString((accessToken +":" + timestamp + ":" + clientId).getBytes());
 
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -117,19 +122,34 @@ public class SelfAuthService {
     headers.add("ProductId", productId);
 
     String trId = UUID.randomUUID().toString();
+
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
     String dateTime = sdf.format(timestamp);
+
+    /**
+     *  Authorization : bearer + Base64(accessToken:timestamp:clientId)
+     *  ProductId
+     *  {
+     *    dataHeader: {
+     *         CNTY_CD : ko
+     *    },
+     *    dataBody: {
+     *         req_dtim : dateTime (yyyyMMddHHmmss),
+     *         req_no : trId,
+     *         enc_mode : 1
+     *    }
+     *  }
+     */
     GetCryptoTokenRequestDto requestDto = GetCryptoTokenRequestDto
         .builder()
-        .header(
-            GetCryptoTokenRequestDto
-                .dataHeader
+        .dataHeader(
+            GetCryptoTokenRequestDto.DataHeader
                 .builder()
                 .lang("ko")
                 .build()
         )
-        .body(
-            GetCryptoTokenRequestDto
-                .dataBody
+        .dataBody(
+            GetCryptoTokenRequestDto.DataBody
                 .builder()
                 .requestDateTime(dateTime)
                 .requestNum(trId)
@@ -139,6 +159,9 @@ public class SelfAuthService {
         .build();
     HttpEntity<GetCryptoTokenRequestDto> request = new HttpEntity<>(requestDto, headers);
 
+    /**
+     *  암호화 토큰 요청
+     */
     GetCryptoTokenResponseDto response = null;
     try{
       response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, GetCryptoTokenResponseDto.class).getBody();
@@ -153,6 +176,9 @@ public class SelfAuthService {
     ){
       throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
+    /**
+     *  응답으로부터 토큰을 생성
+     */
     String siteCode = response.getBody().siteCode();
     String tokenVersionId = response.getBody().tokenVersionId();
 
@@ -172,15 +198,22 @@ public class SelfAuthService {
 
 
   /**
-   * nice pass에 본인인증을 요청할 때 필요한 값들을 전달한다.
+   * 클라이언트에서 호출창 호출을 위한 3가지 데이터를 생성 및 전달하는 함수
+   *  - token_version_id
+   *  - enc_data = encrypt( sitecode, requestno, returnurl,authtype, methodtype )
+   *  - integrity_value
    * @return
    */
-  public PopUpCompositionDto makeAndReturnEncryptedDataAndIntegrityValueAndTokenVersionId ()
+  public AuthWindowRequestDto getAuthWindowRequestData (Long userId)
       throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, JsonProcessingException, IllegalBlockSizeException, BadPaddingException {
-    CryptoTokenInfo tokenInfo = getCryptoTokenInfo(getAccessToken());
 
+    CryptoTokenInfo tokenInfo = getCryptoTokenInfo(getAccessToken());
     String token = tokenInfo.getToken();
 
+    /**
+     *  요청데이터(plainRequestData)를 암호화 및 복호화하기 위한 키 생성
+     *  이전에 생성했던 암호화 토큰으로 키를 생성한다.
+     */
     String key = token.substring(0, 16);
     String iv = token.substring(token.length() - 16);
     String hmacKey = token.substring(0, 32);
@@ -197,12 +230,17 @@ public class SelfAuthService {
     redisUtils.saveDecryptKeyObject(tokenInfo.getTokenVersionId(), object);
 
     /**
-     * 데이터를 암호화하기 위해 객체를 string 으로 변환한다. (객체를 직렬화한다.)
+     * 요청 데이터(plainRequestData)에는 다음과 같은 정보가 포함된다.
+     *  - requestno : ringo에서 생성한 임의의 값
+     *  - returnurl : 사용자 본인인증 정보를 받을 콜백 주소
+     *  - sitecode : 암호화된 토큰
+     *  - authtype : 인증수단인데 핸드폰(M)으로 고정
+     *  - methodtype : GET 고정
      */
     PlainRequestData plainRequestData = null;
     if(tokenInfo.getSiteCode() != null) {
       plainRequestData = PlainRequestData.builder()
-          .requestno(UUID.randomUUID().toString())
+          .requestno(userId.toString())
           .returnurl(returnUrl)
           .sitecode(tokenInfo.getSiteCode())
           .authtype("M")
@@ -213,12 +251,13 @@ public class SelfAuthService {
 
     /**
      * plainRequestData를 암호화하는 로직이다.
+     * plainRequestData -> encryptedRequestData
      */
     SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "AES");
     Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
     cipher.init(Cipher.ENCRYPT_MODE, secretKey, new IvParameterSpec(iv.getBytes(StandardCharsets.UTF_8)));
-    byte[] encryptedByte = cipher.doFinal(dataStringValue.trim().getBytes(StandardCharsets.UTF_8));
-    String encryptedData = Base64.getEncoder().encodeToString(encryptedByte);
+    byte[] encryptedRequestByte = cipher.doFinal(dataStringValue.trim().getBytes(StandardCharsets.UTF_8));
+    String encryptedRequestData = Base64.getEncoder().encodeToString(encryptedRequestByte);
 
     /**
      * 암호화 후 무결성을 확인하기 위해 integrityValue를 추가적으로 생성하여 전달한다.
@@ -226,13 +265,13 @@ public class SelfAuthService {
     Mac mac = Mac.getInstance("HmacSHA256");
     secretKey = new SecretKeySpec(hmacKey.getBytes(), "HmacSHA256");
     mac.init(secretKey);
-    byte[] integrityByte = mac.doFinal(encryptedByte);
+    byte[] integrityByte = mac.doFinal(encryptedRequestByte);
     String integrityValue = Base64.getEncoder().encodeToString(integrityByte);
 
-    return PopUpCompositionDto.builder()
+    return AuthWindowRequestDto.builder()
         .m("m")
         .tokenVersionId(tokenInfo.getTokenVersionId())
-        .encryptedData(encryptedData)
+        .encryptedData(encryptedRequestData)
         .integrityValue(integrityValue)
         .build();
   }
@@ -240,11 +279,11 @@ public class SelfAuthService {
   /**
    * 데이터의 무결성을 확인하고 데이터를 복호화한다.
    * @param tokenVersionId
-   * @param returnEncryptedData
-   * @param returnIntegrityValue
+   * @param encryptedData
+   * @param originalIntegrityValue
    * @return
    */
-  public String integrityCheckAndDecryptData(String tokenVersionId, String returnEncryptedData, String returnIntegrityValue)
+  public String validateIntegrityAndDecryptData(String tokenVersionId, String encryptedData, String originalIntegrityValue)
       throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException {
 
     DecryptKeyObject object = (DecryptKeyObject) redisUtils.getDecryptKeyObject(tokenVersionId);
@@ -252,57 +291,56 @@ public class SelfAuthService {
     String iv = object.getIv();
     String hmacKey = object.getHmacKey();
 
+    /** encryptedData로부터 integrityValue를 생성 */
     Mac mac = Mac.getInstance("HmacSHA256");
     SecretKeySpec secretKey = new SecretKeySpec(hmacKey.getBytes(), "HmacSHA256");
     mac.init(secretKey);
-    byte[] integrityByte = mac.doFinal(returnEncryptedData.getBytes());
+    byte[] integrityByte = mac.doFinal(encryptedData.getBytes());
     String integrityValue = Base64.getEncoder().encodeToString(integrityByte);
 
-    if(!integrityValue.equals(returnIntegrityValue)){
+    /** pass 서버로부터 받은 originalIntegrityValue와 방금 생성한 integrityValue가 동일한지 확인 */
+    if(!integrityValue.equals(originalIntegrityValue)){
       log.info("메세지가 위조되었거나 무결성 검증 과정에서 오류가 발생하였습니다.");
       throw new RingoException("잘못된 암호문이 도달했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    /** 데이터를 복호화하여 리턴함 */
     secretKey = new SecretKeySpec(key.getBytes(), "AES");
     Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
     cipher.init(Cipher.DECRYPT_MODE, secretKey, new IvParameterSpec(iv.getBytes()));
-    String returnDecryptedData = new String(cipher.doFinal(Base64.getDecoder().decode(returnEncryptedData)), "EUC-KR");
-    return returnDecryptedData;
+    String decryptedData = new String(cipher.doFinal(Base64.getDecoder().decode(encryptedData)), "EUC-KR");
+    return decryptedData;
   }
 
-  public void deserializeAndSaveData(String data){
-    UserInfo userInfo = null;
-    Date birthday = null;
-    SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
+  public void deserializeAndSaveUserInfo(String data){
+    UserSelfAuthInfo userSelfAuthInfo = null;
     try {
-      userInfo = objectMapper.readValue(data, UserInfo.class);
-      birthday = sdf.parse(userInfo.getBirthday());
+      userSelfAuthInfo = objectMapper.readValue(data, UserSelfAuthInfo.class);
     } catch (Exception e) {
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    log.info("gender format : {}", userInfo.getGender());
-    Gender gender = null;
-    if (userInfo.getGender().equals("1")) {
-      gender = Gender.MALE;
+
+    /** 유저를 찾아서 유저 정보를 저장함*/
+    User user = userRepository.findById(Long.parseLong(userSelfAuthInfo.getUserId()))
+        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+    if (userSelfAuthInfo.getGender().equals("1")) {
+      userSelfAuthInfo.setGender("MALE");
     }else{
-      gender = Gender.FEMALE;
+      userSelfAuthInfo.setGender("FEMALE");
     }
-    Nation nation = null;
-    if (userInfo.getNationalInfo().equals("0")){
-      nation = Nation.DOMESTIC;
+    if (userSelfAuthInfo.getNationalInfo().equals("0")){
+      userSelfAuthInfo.setNationalInfo("DOMESTIC");
     }else{
-      nation = Nation.FOREIGN;
+      userSelfAuthInfo.setNationalInfo("FOREIGN");
     }
-    User user = User.builder()
-        .name(userInfo.getName())
-        .phoneNumber(userInfo.getPhoneNumber())
-        .mobileCarrier(userInfo.getMobileCarrier())
-        .nationalInfo(nation)
-        .birthday(birthday)
-        .gender(gender)
-        .build();
+
+    user.setUserSelfAuthInfo(userSelfAuthInfo);
     userRepository.save(user);
 
+    /**
+     * 본인인증에 성공했다는 사실을 레디스에 저장함
+     */
     String id = "self-auth" + user.getId();
     redisUtils.saveDecryptKeyObject(id, true);
   }

@@ -3,7 +3,7 @@ package com.lingo.lingoproject.auth.dto;
 import lombok.Builder;
 
 @Builder
-public record PopUpCompositionDto(
+public record AuthWindowRequestDto(
     String m,
     String tokenVersionId,
     String encryptedData,
