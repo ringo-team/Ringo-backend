@@ -7,6 +7,7 @@ import com.lingo.lingoproject.user.dto.ResetPasswordRequestDto;
 import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -35,12 +37,16 @@ public class UserController {
       @Parameter(description = "유저id", example = "4")
       @PathVariable Long id,
 
+      @Parameter(description = "유저 탈퇴 사유", example = "좋은 인연을 만날 수 없어서")
+      @NotBlank
+      @RequestParam(value = "reason") String reason,
+
       @AuthenticationPrincipal User user){
     Long userId = user.getId();
     if(!userId.equals(id)){
       throw new RingoException("쟐못된 접근입니다.", HttpStatus.FORBIDDEN);
     }
-    userService.deleteUser(id);
+    userService.deleteUser(id, reason);
     return ResponseEntity.ok().body("유저를 성공적으로 삭제하였습니다.");
   }
 

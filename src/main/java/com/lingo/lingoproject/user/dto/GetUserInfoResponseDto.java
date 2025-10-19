@@ -30,7 +30,10 @@ public record GetUserInfoResponseDto(
 
     @Schema(description = "종교", example = "CHRISTIANITY",
         allowableValues = {"CHRISTIANITY", "BUDDHISM", "CATHOLIC", "ATHEIST", "ETC"})
-    String religion
+    String religion,
+
+    @Schema(description = "소개문구", example = "안녕하세요")
+    String biography
 ) {
 
 }

@@ -3,6 +3,7 @@ package com.lingo.lingoproject.user;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.UserAccessLog;
+import com.lingo.lingoproject.domain.Withdrawer;
 import com.lingo.lingoproject.domain.enums.Drinking;
 import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Smoking;
@@ -18,6 +19,7 @@ import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.MessageRepository;
 import com.lingo.lingoproject.repository.UserAccessLogRepository;
 import com.lingo.lingoproject.repository.UserRepository;
+import com.lingo.lingoproject.repository.WithdrawerRepository;
 import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
 import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
 import com.lingo.lingoproject.utils.GenericUtils;
@@ -49,9 +51,10 @@ public class UserService {
   private final ChatroomParticipantRepository chatroomParticipantRepository;
   private final UserAccessLogRepository userAccessLogRepository;
   private final GenericUtils genericUtils;
+  private final WithdrawerRepository withdrawerRepository;
 
   @Transactional
-  public void deleteUser(Long userId){
+  public void deleteUser(Long userId, String reason){
     /**
      * - answeredSurvey 삭제
      * - blockedFriend 삭제
@@ -64,8 +67,15 @@ public class UserService {
      * - refresh token 삭제
      */
 
+
     User user = userRepository.findById(userId)
             .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
+    withdrawerRepository.save(Withdrawer
+        .builder()
+        .joinPeriod(user.getCreatedAt())
+        .reason(reason)
+        .build());
+
     try {
       answeredSurveyRepository.deleteAllByUser(user);
       blockedFriendRepository.deleteByUser(user);
@@ -120,6 +130,7 @@ public class UserService {
         .religion(user.getReligion().toString())
         .job(user.getJob())
         .nickname(user.getNickname())
+        .biography(user.getBiography())
         .build();
   }
 
@@ -148,15 +159,16 @@ public class UserService {
     return users.stream()
         .map(user -> {
             return GetUserInfoResponseDto.builder()
-              .id(user.getId())
-              .gender(user.getGender().toString())
-              .height(user.getHeight())
-              .isDrinking(user.getIsDrinking().toString())
-              .isSmoking(user.getIsSmoking().toString())
-              .religion(user.getReligion().toString())
-              .job(user.getJob())
-              .nickname(user.getNickname())
-              .build();
+                .id(user.getId())
+                .gender(user.getGender().toString())
+                .height(user.getHeight())
+                .isDrinking(user.getIsDrinking().toString())
+                .isSmoking(user.getIsSmoking().toString())
+                .religion(user.getReligion().toString())
+                .job(user.getJob())
+                .nickname(user.getNickname())
+                .biography(user.getBiography())
+                .build();
         })
         .toList();
   }

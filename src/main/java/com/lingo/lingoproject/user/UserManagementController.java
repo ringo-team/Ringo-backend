@@ -61,7 +61,7 @@ public class UserManagementController {
   public ResponseEntity<?> deleteUser(
       @Parameter(description = "삭제하고자 하는 유저id")
       @PathVariable Long id){
-    userService.deleteUser(id);
+    userService.deleteUser(id, "관리자 삭제");
     return ResponseEntity.ok().build();
   }
 }
