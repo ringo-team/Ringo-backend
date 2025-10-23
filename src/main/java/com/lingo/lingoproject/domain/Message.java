@@ -1,42 +1,33 @@
 package com.lingo.lingoproject.domain;
 
-import com.lingo.lingoproject.utils.Timestamp;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-@Entity
+
+@Document(collection = "messages")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "MESSAGES")
-public class Message extends Timestamp {
+public class Message  {
   @Id
   private String id;
 
-  @ManyToOne
-  @JoinColumn(name = "chatroom_id")
-  private Chatroom chatroom;
+  private Long chatroomId;
 
-  @ManyToOne
-  @JoinColumn(name = "user_id")
-  private User user;
+  private Long senderId;
 
-  @ColumnDefault(value = "false")
-  private Boolean isRead;
+  private List<Long> readerIds;
 
-
-  @Column(columnDefinition = "TEXT")
   private String content;
+
+  private LocalDateTime createdAt;
 }

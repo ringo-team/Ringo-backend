@@ -4,6 +4,7 @@ import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.JwtRefreshToken;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.UserPoint;
 import com.lingo.lingoproject.domain.enums.Drinking;
 import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
@@ -12,6 +13,7 @@ import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
+import com.lingo.lingoproject.repository.UserPointRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.TokenType;
 import com.lingo.lingoproject.security.controller.dto.LoginInfoDto;
@@ -24,10 +26,11 @@ import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -47,6 +50,7 @@ public class LoginService {
   private final GenericUtils genericUtils;
   private final HashtagRepository hashtagRepository;
   private final BlockedUserRepository blockedUserRepository;
+  private final UserPointRepository userPointRepository;
 
   public LoginResponseDto login(LoginInfoDto dto){
     if (SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -164,6 +168,7 @@ public class LoginService {
       throw new RingoException("블락된 유저 입니다.", HttpStatus.FORBIDDEN);
     }
     user.setUserInfo(dto);
+    user.setFriendInvitationCode(generateFriendInvitationCode());
     List<Hashtag> hashtags = new ArrayList<>();
     for (String tag : dto.hashtags()){
       hashtags.add(Hashtag.builder()
@@ -174,11 +179,16 @@ public class LoginService {
     try {
       userRepository.save(user);
       hashtagRepository.saveAll(hashtags);
+      userPointRepository.save(UserPoint.builder().user(user).build());
     } catch (DataIntegrityViolationException e) {
       throw new RingoException(e.getMessage(), HttpStatus.BAD_REQUEST);
     } catch (Exception e) {
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  public String generateFriendInvitationCode(){
+    return Base64.getEncoder().encodeToString(UUID.randomUUID().toString().getBytes()).substring(0, 8);
   }
 
 

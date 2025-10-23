@@ -131,6 +131,7 @@ public class User extends Timestamp implements UserDetails {
    */
   private SignupStatus status;
 
+  private String friendInvitationCode;
 
   public void setUserInfo(SignupUserInfoDto dto){
     this.nickname = dto.nickname();

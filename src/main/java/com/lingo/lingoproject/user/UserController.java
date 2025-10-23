@@ -2,6 +2,7 @@ package com.lingo.lingoproject.user;
 
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.user.dto.GetFriendInvitationCodeRequestDto;
 import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
 import com.lingo.lingoproject.user.dto.ResetPasswordRequestDto;
 import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -89,4 +91,18 @@ public class UserController {
     userService.updateUserInfo(user.getId(), dto);
     return ResponseEntity.ok().body("정상적으로 수정되었습니다.");
   }
+
+  @Operation(summary = "친구초대코드 조회")
+  @GetMapping("invitation-code")
+  public ResponseEntity<GetFriendInvitationCodeRequestDto> getInvitationCode(@AuthenticationPrincipal User user){
+    return ResponseEntity.ok().body(new GetFriendInvitationCodeRequestDto(user.getFriendInvitationCode()));
+  }
+
+  @Operation(summary = "친구초대코드 입력", description = "친구초대코드 입력 및 보상 받기")
+  @PostMapping("invitation-code")
+  public ResponseEntity<String> inputInvitationCodeAndGetReward(@AuthenticationPrincipal User user, @RequestParam String code){
+    userService.checkFriendInvitationCodeAndProvideReward(user, code);
+    return ResponseEntity.ok().body("친구와 본인 모두 보상을 획득하였습니다.");
+  }
+
 }
