@@ -15,9 +15,8 @@ public interface ChatroomParticipantRepository extends JpaRepository<ChatroomPar
 
   void deleteAllByChatroom(Chatroom chatroom);
 
-  ChatroomParticipant findByParticipantNotAndChatroom(User participant, Chatroom chatroom);
 
   @Modifying
-  @Query("update ChatroomParticipant cp set cp.participant = null where cp.participant = :user")
+  @Query("update ChatroomParticipant cp set cp.participant = null, cp.isWithdrawn = true where cp.participant = :user")
   void disconnectChatroomParticipantWithUser(@Param("user") User user);
 }

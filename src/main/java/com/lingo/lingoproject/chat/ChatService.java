@@ -11,11 +11,11 @@ import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.ChatroomRepository;
-import com.lingo.lingoproject.repository.MessageRepository;
+import com.lingo.lingoproject.mongo_repository.MessageRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.GenericUtils;
 import jakarta.transaction.Transactional;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,41 +40,34 @@ public class ChatService {
   private final ChatroomParticipantRepository chatroomParticipantRepository;
   private final GenericUtils genericUtils;
 
-  public List<GetChatResponseDto> getChattingMessages(Long roomId, int page, int size){
-    Chatroom chatroom = chatroomRepository.findById(roomId)
-        .orElseThrow(() -> new RingoException("id에 해당하는 채팅방이 존재하지 않습니다.", HttpStatus.BAD_REQUEST));
-
+  public List<GetChatResponseDto> getChatMessages(Long chatroomId, int page, int size){
     Pageable pageable = PageRequest.of(page, size);
 
-    Page<Message> messages = messageRepository.findAllByChatroomOrderByCreatedAtDesc(chatroom, pageable);
-    List<GetChatResponseDto> messageResponses = messages.stream()
+    Page<Message> messages = messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable);
+    return messages.stream()
         .map(m -> {
-          User user = m.getUser();
           log.info(m.getCreatedAt().toString());
           return GetChatResponseDto.builder()
-              .userId(user.getId())
+              .chatroomId(chatroomId)
+              .senderId(m.getSenderId())
               .content(m.getContent())
               .createdAt(m.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
-              .isRead(true)
+              .readerIds(m.getReaderIds())
               .build();
         })
         .toList();
-    return messageResponses;
   }
 
-  public void saveMessage(GetChatResponseDto message, Long roomId){
-    Chatroom chatroom = chatroomRepository.findById(roomId)
-        .orElseThrow(() -> new RingoException("id에 해당하는 채팅방을 찾을 수 없습니다..", HttpStatus.BAD_REQUEST));
-    User user = userRepository.findById(message.getUserId())
-        .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
-    Message messages = Message.builder()
+  public void saveMessage(GetChatResponseDto message, Long chatroomId){
+    Message messageEntity = Message.builder()
         .id(UUID.randomUUID().toString())
-        .chatroom(chatroom)
-        .user(user)
+        .chatroomId(chatroomId)
+        .senderId(message.getSenderId())
         .content(message.getContent())
-        .isRead(message.getIsRead())
+        .readerIds(message.getReaderIds())
+        .createdAt(LocalDateTime.now())
         .build();
-    messageRepository.save(messages);
+    messageRepository.save(messageEntity);
   }
 
   public Chatroom createChatroom(CreateChatroomDto dto){
@@ -86,7 +79,7 @@ public class ChatService {
     User user2 = userRepository.findById(dto.user2Id())
         .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
     Chatroom chatroom = Chatroom.builder()
-        .chatroomName(dto.user1Id().toString() +"_" +dto.user2Id().toString())
+        .chatroomName(dto.user1Id().toString() + "_" +dto.user2Id().toString())
         .type(ChatType.valueOf(dto.chatType()))
         .build();
     Chatroom savedChatroom = chatroomRepository.save(chatroom);
@@ -108,36 +101,37 @@ public class ChatService {
     List<Chatroom> chatrooms = chatroomRepository.findAllByUser(user);
     List<GetChatroomResponseDto> list = new ArrayList<>();
     for(Chatroom chatroom : chatrooms){
-      // 채팅 상대방을 찾는다.
-      ChatroomParticipant participant = chatroomParticipantRepository.findByParticipantNotAndChatroom(user, chatroom);
-      /**
-       * 회원 탈퇴의 경우 participant.getParticipant가 null일 수 있다.
-       */
-      String nickname = null;
-      if (participant == null){
-        nickname = "알 수 없음";
-      }else{
-        nickname = participant.getParticipant().getNickname();
-      }
+      List<String> participants = chatroomParticipantRepository
+          .findAllByChatroom(chatroom)
+          .stream()
+          .map(p -> {
+            if(p.getIsWithdrawn()) return "알 수 없음";
+            else return p.getParticipant().getNickname();
+          })
+          .toList();
+
       // 읽지 않은 대화 개수를 찾는다.
-      int numOfNonReadMessages = messageRepository.findNumOfNonReadMessages(chatroom.getId(), user.getId());
-      Optional<Message> lastMessage = messageRepository.findFirstByChatroomOrderByCreatedAtDesc(chatroom);
+      int numberOfNotReadMessages = messageRepository.findNumberOfNotReadMessages(chatroom.getId(),
+          user.getId());
+      Optional<Message> lastMessage = messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(
+          chatroom.getId());
       list.add(GetChatroomResponseDto.builder()
-              .chatroomId(chatroom.getId())
-              .chatroomName(nickname)
-              .lastChatMessage(lastMessage.map(Message::getContent).orElse(null))
-              .NumOfNonReadMessages(numOfNonReadMessages)
+          .chatroomId(chatroom.getId())
+          .participants(participants)
+          .lastChatMessage(lastMessage.map(Message::getContent).orElse(null))
+          .NumberOfNotReadMessages(numberOfNotReadMessages)
+          .chatroomSize(participants.size())
           .build());
     }
     return list;
   }
 
   @Transactional
-  public void deleteChatroom(Long id){
-    Chatroom chatroom = chatroomRepository.findById(id)
+  public void deleteChatroom(Long chatroomId){
+    Chatroom chatroom = chatroomRepository.findById(chatroomId)
         .orElseThrow(() -> new RingoException("chatroom not found", HttpStatus.BAD_REQUEST));
     chatroomParticipantRepository.deleteAllByChatroom(chatroom);
-    messageRepository.deleteAllByChatroom(chatroom);
+    messageRepository.deleteAllByChatroomId(chatroomId);
     chatroomRepository.delete(chatroom);
   }
 
@@ -146,6 +140,7 @@ public class ChatService {
         .orElseThrow(() -> new RingoException("Room not found", HttpStatus.BAD_REQUEST));
     List<Long> userIds = chatroomParticipantRepository.findAllByChatroom(chatroom)
         .stream()
+        .filter(cp -> !cp.getIsWithdrawn())
         .map(ChatroomParticipant::getParticipant)
         .map(User::getId)
         .toList();
@@ -165,9 +160,14 @@ public class ChatService {
   /**
    * 안읽은 메세지를 읽은 메세지로 전부 변환하는 함수
    */
-  public void changeNonReadTpReadMessages(Long roomId, Long userId){
-    List<Message> messages = messageRepository.findNonReadMessages(roomId, userId);
-    messages.forEach( message -> message.setIsRead(true));
+  public void changeNotReadToReadMessages(Long roomId, Long userId){
+    List<Message> messages = messageRepository.findNotReadMessages(roomId, userId);
+    messages.forEach( message -> {
+      List<Long> readerIds = message.getReaderIds();
+      if(!readerIds.contains(userId)){
+        readerIds.add(userId);
+      }
+    });
     messageRepository.saveAll(messages);
   }
 }

@@ -11,6 +11,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.DynamicInsert;
 
 @Entity
 @Builder
@@ -18,6 +20,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Getter
 @Table(name = "CHATROOM_PARTICIPANTS")
+@DynamicInsert
 public class ChatroomParticipant {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,4 +33,7 @@ public class ChatroomParticipant {
   @ManyToOne
   @JoinColumn(name = "participant_user_id")
   private User participant;
+
+  @ColumnDefault(value = "false")
+  private Boolean isWithdrawn;
 }

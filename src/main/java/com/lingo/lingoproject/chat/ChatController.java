@@ -12,9 +12,7 @@ import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.security.Principal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +24,6 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -75,12 +72,12 @@ public class ChatController {
       throw new RingoException("잘못된 접근입니다.", HttpStatus.FORBIDDEN);
     }
 
-    chatService.changeNonReadTpReadMessages(roomId, user.getId());
+    chatService.changeNotReadToReadMessages(roomId, user.getId());
 
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
     ops.set("connect::" + user.getId() + "::" + roomId, true);
 
-    List<GetChatResponseDto> responses = chatService.getChattingMessages(roomId, page, size);
+    List<GetChatResponseDto> responses = chatService.getChatMessages(roomId, page, size);
     return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<GetChatResponseDto>(responses));
   }
   /**
@@ -138,31 +135,31 @@ public class ChatController {
    */
   @MessageMapping("/{roomId}")
   public void sendMessage(@DestinationVariable Long roomId, GetChatResponseDto message){
-    List<String> usernames = chatService.getUsernamesInChatroom(roomId);
-    // 메세지 저장
 
-    List<User> roomMember = userRepository.findAllByEmailIn(usernames);
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
+
+    List<String> usernames = chatService.getUsernamesInChatroom(roomId);
+    List<User> roomMember = userRepository.findAllByEmailIn(usernames);
 
     // 상대방이 채팅방에 존재하는지 확인
     for (User user : roomMember) {
-      if(!user.getId().equals(message.getUserId())) continue;
 
       if (ops.get("connect::" + user.getId() + "::" + roomId) != null) {
-        message.setIsRead(true);
-      } else {
-        message.setIsRead(false);
+        List<Long> readerIds = message.getReaderIds();
+        if (!readerIds.contains(user.getId())){
+          readerIds.add(user.getId());
+        }
       }
     }
     // 메세지 저장
     chatService.saveMessage(message, roomId);
 
-    // 메세지 전송
-    for (User user : roomMember){
-      simpMessagingTemplate.convertAndSendToUser(user.getEmail(), "/topic/" + roomId, message);
-    }
-    // 채팅 미리보기 기능
+
     for (String user : usernames){
+      // 해당 방에 메세지 전송
+      simpMessagingTemplate.convertAndSendToUser(user, "/topic/" + roomId, message);
+
+      // 채팅 미리보기 기능
       simpMessagingTemplate.convertAndSendToUser(user, "/room-list", message);
     }
 
