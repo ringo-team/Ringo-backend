@@ -2,6 +2,7 @@ package com.lingo.lingoproject.match;
 
 import com.lingo.lingoproject.chat.ChatService;
 import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
+import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
@@ -16,11 +17,14 @@ import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.match.dto.SaveMatchingRequestMessageRequestDto;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.BlockedFriendRepository;
+import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.DormantAccountRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
+import com.lingo.lingoproject.utils.RedisUtils;
+import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,7 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.xmlbeans.impl.regex.Match;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -47,6 +51,21 @@ public class MatchService {
   private final AnsweredSurveyRepository answeredSurveyRepository;
   private final ChatService chatService;
   private final HashtagRepository hashtagRepository;
+  private final BlockedUserRepository blockedUserRepository;
+  private final RedisUtils redisUtils;
+
+  private final int MAX_RECOMMEND_PROFILE_SIZE = 10;
+  private final int MAX_NUMBER_OF_FOR_LOOP = 10;
+  private final int NUMBER_OF_ENABLE_MATCHING = 7;
+
+  @Value("${ringo.config.survey.space_weight}")
+  private float SURVEY_SPACE_WEIGHT;
+  @Value("${ringo.config.survey.self_representation_weight}")
+  private float SURVEY_SELF_REPRESENTATION_WEIGHT;
+  @Value("${ringo.config.survey.content_weight}")
+  private float SURVEY_CONTENT_WEIGHT;
+  @Value("${ringo.config.survey.sharing_weight}")
+  private float SURVEY_SHARING_WEIGHT;
 
   public Matching matchRequest(MatchingRequestDto dto){
     User requestedUser = userRepository.findById(dto.requestedId())
@@ -91,6 +110,7 @@ public class MatchService {
   }
 
   @Cacheable(key = "#userId", value = "recommend", cacheManager = "cacheManager")
+  @Transactional
   public List<GetUserProfileResponseDto> recommend(Long userId){
     Set<GetUserProfileResponseDto> rtnSet = new HashSet<>();
     int count =  0;
@@ -108,10 +128,23 @@ public class MatchService {
         .map(DormantAccount::getUser)
         .map(User::getId)
         .toList();
+    // block되거나 정지된 유저
+    List<Long> blockedUserIds = blockedUserRepository.findAll()
+        .stream()
+        .map(BlockedUser::getBlockedUserId)
+        .toList();
+    List<Long> suspendedUserId = redisUtils.getSuspendedUser()
+        .stream()
+        .map(s -> s.replace("suspension::", ""))
+        .map(Long::parseLong)
+        .toList();
 
-    List<Long> banIds = new ArrayList<>();
-    banIds.addAll(blockedFriendIds);
-    banIds.addAll(dormantUserIds);
+    List<Long> banUserId = new ArrayList<>();
+    banUserId.addAll(blockedFriendIds);
+    banUserId.addAll(dormantUserIds);
+    banUserId.addAll(blockedUserIds);
+    banUserId.addAll(suspendedUserId);
+
 
     /**
      * setSize는 rtnSet의 크기로 추천이성 정보의 개수이다.
@@ -120,13 +153,14 @@ public class MatchService {
      * findRandomUsers는 banIds를 제외한 이성친구를 무작위로 추천한다.
      * setSize가 7이하 일때는 매칭이 가능한 사람을 추가하고 8이상일 때는 매칭이 불가능한 이성을 추천한다.
      */
-    while(setSize < 10 && count < 10){
-      List<User> randUsers = userRepository.findRandomUsers(userEntity.getGender(), banIds);
+    while(setSize < MAX_RECOMMEND_PROFILE_SIZE && count < MAX_NUMBER_OF_FOR_LOOP){
+      List<User> randUsers = userRepository.findRandomUsers(userEntity.getGender(), banUserId);
       for(User randUser : randUsers){
         // setSize가 10 이상일 때는 while & for 반복문이 종료된다.
-        if(setSize >= 10) break;
+        if(setSize >= MAX_RECOMMEND_PROFILE_SIZE) break;
         // 7명은 매칭이 가능하도록
-        if((setSize < 7 && isMatch(userId, randUser.getId())) || (setSize >= 7 && !isMatch(userId, randUser.getId()))){
+        if((setSize < NUMBER_OF_ENABLE_MATCHING && isMatch(userId, randUser.getId())) ||
+            (setSize >= NUMBER_OF_ENABLE_MATCHING && !isMatch(userId, randUser.getId()))){
           Profile profile = profileRepository.findByUser(randUser)
               .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
           List<String> hashtags = hashtagRepository.findAllByUser(randUser)
@@ -160,14 +194,16 @@ public class MatchService {
     for(MatchScoreResultInterface result : list){
       switch(result.getCategory()){
         case "SPACE":
-          score += result.getAvgAnswer() * 0.2f;
+          score += result.getAvgAnswer() * SURVEY_SPACE_WEIGHT;
           break;
         case "SELF_REPRESENTATION":
-          score += result.getAvgAnswer() * 0.3f;
+          score += result.getAvgAnswer() * SURVEY_SELF_REPRESENTATION_WEIGHT;
           break;
         case "SHARING":
+          score += result.getAvgAnswer() * SURVEY_SHARING_WEIGHT;
+          break;
         case "CONTENT":
-          score += result.getAvgAnswer() * 0.25f;
+          score += result.getAvgAnswer() * SURVEY_CONTENT_WEIGHT;
           break;
       }
     }

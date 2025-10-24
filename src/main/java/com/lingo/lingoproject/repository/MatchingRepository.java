@@ -15,11 +15,8 @@ public interface MatchingRepository extends JpaRepository<Matching, Long> {
 
   List<Matching> findByRequestedUserAndMatchingStatus(User requestedUser, MatchingStatus matchingStatus);
 
-  @Modifying
-  @Query("update Matching m set m.requestedUser = null where m.requestedUser = :user")
-  void disconnectRelationWithUserByInitRequestedUser(@Param("user") User user);
 
-  @Modifying
-  @Query("update Matching m set m.requestUser = null where m.requestUser = :user")
-  void disconnectRelationWithUserByInitRequestUser(@Param("user") User user);
+  void deleteAllByRequestedUser(User requestedUser);
+
+  void deleteAllByRequestUser(User requestUser);
 }
