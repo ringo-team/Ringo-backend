@@ -14,6 +14,7 @@ public record SaveReportRequestDto(
     Long reportedUserId,
 
     @NotBlank
+    @Schema(description = "신고한 원인", example = "욕설 사용")
     String reason
 ) {
 

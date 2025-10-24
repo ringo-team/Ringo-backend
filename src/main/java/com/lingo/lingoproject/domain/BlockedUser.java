@@ -25,6 +25,8 @@ public class BlockedUser {
 
   private String phoneNumber;
 
+  private Long blockedUserId;
+
   @ManyToOne
   @JoinColumn(name = "admin_id")
   private User admin;

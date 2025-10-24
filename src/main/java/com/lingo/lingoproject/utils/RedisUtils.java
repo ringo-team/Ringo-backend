@@ -1,5 +1,7 @@
 package com.lingo.lingoproject.utils;
 
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -28,6 +30,19 @@ public class RedisUtils {
 
   public boolean containsBlackList(String key){
     return redisTemplate.hasKey("blacklist::" + key);
+  }
+
+  public void suspendUser(Long userId, int day){
+    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
+    ops.set("suspension::" + userId, true, day, TimeUnit.DAYS);
+  }
+
+  public boolean isSuspendedUser(Long userId){
+    return redisTemplate.hasKey("suspension::" + userId);
+  }
+
+  public Set<String> getSuspendedUser(){
+    return redisTemplate.keys("suspension::*");
   }
 }
 

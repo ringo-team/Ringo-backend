@@ -186,6 +186,7 @@ public class UserService {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new RingoException("id에 해당하는 유저가 없습니다.", HttpStatus.BAD_REQUEST));
     BlockedUser blockedUser = BlockedUser.builder()
+        .blockedUserId(user.getId())
         .phoneNumber(user.getPhoneNumber())
         .admin(admin)
         .build();

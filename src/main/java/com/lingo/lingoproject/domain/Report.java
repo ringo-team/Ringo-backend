@@ -1,27 +1,41 @@
 package com.lingo.lingoproject.domain;
 
+import com.lingo.lingoproject.domain.enums.ReportIntensity;
+import com.lingo.lingoproject.domain.enums.ReportStatus;
+import com.lingo.lingoproject.utils.Timestamp;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "REPORTS")
-public class Report {
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Setter
+@Getter
+public class Report extends Timestamp {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @ManyToOne
-  @JoinColumn(name = "report_user_id")
-  private User reportUser;
+  private Long reportUserId;
 
-  @ManyToOne
-  @JoinColumn(name = "reported_user_id")
-  private User reportedUser;
+  private Long reportedUserId;
 
+  private String reason;
+
+  private ReportStatus reportedUserStatus;
+
+  private ReportIntensity reportIntensity;
+
+  private Long adminId;
 
 }
