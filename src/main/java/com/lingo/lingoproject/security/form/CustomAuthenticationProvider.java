@@ -13,7 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @RequiredArgsConstructor
-@Component
 public class CustomAuthenticationProvider implements AuthenticationProvider {
 
   private final CustomUserDetailService customUserDetailService;

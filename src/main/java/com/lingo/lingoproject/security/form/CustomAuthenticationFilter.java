@@ -21,18 +21,29 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.AuthenticationConverter;
+import org.springframework.security.web.authentication.AuthenticationFilter;
+import org.springframework.security.web.authentication.www.BasicAuthenticationConverter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-@Order(2)
-@RequiredArgsConstructor
-@Component
+
+
 @Slf4j
-public class CustomAuthenticationFilter extends OncePerRequestFilter {
+public class CustomAuthenticationFilter extends AuthenticationFilter {
 
   private final CustomAuthenticationManager customAuthenticationManager;
   private final ObjectMapper objectMapper;
   private final String[] whiteList = {"/signup", "/swagger", "/v3/api-docs", "/swagger-resources", "/ws", "/stomp"};
+
+  public CustomAuthenticationFilter(CustomAuthenticationManager customAuthenticationManager,
+      ObjectMapper objectMapper,
+      AuthenticationConverter authenticationConverter) {
+    super(customAuthenticationManager, authenticationConverter);
+
+    this.customAuthenticationManager = customAuthenticationManager;
+    this.objectMapper = objectMapper;
+  }
 
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,

@@ -120,8 +120,9 @@ public class LoginController {
 
   @GetMapping("/api/logout")
   @Operation(summary = "로그아웃", description = "헤더의 액세스 토큰을 무효화합니다.")
-  public ResponseEntity<String> logout(@AuthenticationPrincipal User user, @RequestHeader(value = "Authorization") String token) {
+  public ResponseEntity<String> logout(HttpServletRequest request, @AuthenticationPrincipal User user, @RequestHeader(value = "Authorization") String token) {
     log.info(user.getId().toString());
+    request.getSession().invalidate();
     loginService.logout(user, token);
     return ResponseEntity.status(HttpStatus.OK).body("로그아웃이 완료되었습니다.");
   }
