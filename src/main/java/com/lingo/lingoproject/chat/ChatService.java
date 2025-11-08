@@ -152,6 +152,7 @@ public class ChatService {
         .orElseThrow(() -> new RingoException("Room not found", HttpStatus.BAD_REQUEST));
     return chatroomParticipantRepository.findAllByChatroom(chatroom)
         .stream()
+        .filter(participant -> !participant.getIsWithdrawn())
         .map(ChatroomParticipant::getParticipant)
         .map(User::getUsername)
         .toList();

@@ -27,7 +27,7 @@ public class GetUserProfileResponseDto {
   private Long userId;
 
   @Schema(description = "유저 나이", example = "23")
-  private int age;
+  private Integer age;
 
   @Schema(description = "유저 성별", example = "MALE")
   private Gender gender;
@@ -44,7 +44,7 @@ public class GetUserProfileResponseDto {
   @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
   private List<String> hashtags;
 
-  public GetUserProfileResponseDto(Long userId, int age, Gender gender, String nickname, String profileUrl, Float matchingScore) {
+  public GetUserProfileResponseDto(Long userId, Integer age, Gender gender, String nickname, String profileUrl, Float matchingScore) {
     this.userId = userId;
     this.age = age;
     this.gender = gender;

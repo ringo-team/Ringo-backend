@@ -2,6 +2,7 @@ package com.lingo.lingoproject.image;
 
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
+import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -50,9 +52,7 @@ public class ImageController {
     return ResponseEntity.status(HttpStatus.CREATED).body(dto);
   }
 
-  @Operation(
-      summary = "스냅 사진 일괄 업로드"
-  )
+  @Operation(summary = "스냅 사진 일괄 업로드")
   @PostMapping(value = "/snaps/{userId}", consumes =  MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadSnapImages(
       @Parameter(description = "이미지 파일들 업로드")
@@ -140,7 +140,7 @@ public class ImageController {
 
   @Operation(
       summary = "스냅 사진 삭제",
-      description = "스냅 사진 id에 해당하는 이미지르 삭제합니다."
+      description = "스냅 사진 id에 해당하는 이미지를 삭제합니다."
   )
   @DeleteMapping("/snaps/{snapImageId}")
   public ResponseEntity<String> deleteSnapImage(
@@ -151,5 +151,14 @@ public class ImageController {
   ){
     imageService.deleteSnapImage(snapImageId, user.getId());
     return ResponseEntity.status(HttpStatus.OK).body("성공적으로 스냅 사진을 삭제하였습니다.");
+  }
+
+  @Operation(summary = "스냅 사진 내용 저장")
+  @PatchMapping("/snaps")
+  public ResponseEntity<String> updateSnapImageDescription(
+      @RequestBody UpdateSnapImageDescriptionRequestDto dto
+  ){
+    imageService.updateSnapImageDescription(dto);
+    return ResponseEntity.status(HttpStatus.OK).body("성공적으로 스냅 사진 설명을 성공적으로 저장하였습니다.");
   }
 }

@@ -169,20 +169,20 @@ public class SelfAuthService {
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if(response == null
-        || !response.getHeader().resultCd().equals("1200")
-        || !response.getBody().responseCD().equals("P000")
-        || response.getBody().responseMsg().startsWith("EAPI")
-        || !response.getBody().resultCd().equals("0000")
+        || !response.getDataHeader().resultCd().equals("1200")
+        || !response.getDataBody().responseCD().equals("P000")
+        || response.getDataBody().responseMsg().startsWith("EAPI")
+        || !response.getDataBody().resultCd().equals("0000")
     ){
       throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     /**
      *  응답으로부터 토큰을 생성
      */
-    String siteCode = response.getBody().siteCode();
-    String tokenVersionId = response.getBody().tokenVersionId();
+    String siteCode = response.getDataBody().siteCode();
+    String tokenVersionId = response.getDataBody().tokenVersionId();
 
-    String token = dateTime.trim() + trId.trim() + response.getBody().tokenVal().trim();
+    String token = dateTime.trim() + trId.trim() + response.getDataBody().tokenVal().trim();
     MessageDigest md = MessageDigest.getInstance("SHA-256");
     md.update(token.getBytes());
     String encodedToken = Base64.getEncoder().encodeToString(md.digest());

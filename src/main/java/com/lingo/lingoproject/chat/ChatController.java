@@ -1,18 +1,28 @@
 package com.lingo.lingoproject.chat;
 
+import com.google.firebase.messaging.BatchResponse;
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.MulticastMessage;
+import com.google.firebase.messaging.Notification;
+import com.google.firebase.messaging.SendResponse;
 import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
+import com.lingo.lingoproject.domain.ExceptionMessage;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.repository.ExceptionMessageRepository;
+import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +54,8 @@ public class ChatController {
   private final SimpMessagingTemplate simpMessagingTemplate;
   private final RedisTemplate<String, Object> redisTemplate;
   private final UserRepository userRepository;
+  private final FcmTokenRepository fcmTokenRepository;
+  private final ExceptionMessageRepository exceptionMessageRepository;
 
   /**
    * 메세지 내용 불러오는 api
@@ -134,17 +146,25 @@ public class ChatController {
    * 상대방이 접속해있으면 readCount 값을 1에서 0으로 바꾸어 전달한다.
    */
   @MessageMapping("/{roomId}")
-  public void sendMessage(@DestinationVariable Long roomId, GetChatResponseDto message){
+  public void sendMessage(@DestinationVariable Long roomId, GetChatResponseDto message)
+      throws FirebaseMessagingException {
 
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
 
     List<String> usernames = chatService.getUsernamesInChatroom(roomId);
     List<User> roomMember = userRepository.findAllByEmailIn(usernames);
+    List<Long> existMember = new ArrayList<>();
 
     // 상대방이 채팅방에 존재하는지 확인
     for (User user : roomMember) {
 
       if (ops.get("connect::" + user.getId() + "::" + roomId) != null) {
+
+        // 채팅방에 존재하는 사람들을 리스트에 추가한다.
+        existMember.add(user.getId());
+
+        // 채팅방에 존재하는 멤버는 무조건 메세지 읽음으로 처리되므로
+        // 메세지 읽음 리스트에 추가한다.
         List<Long> readerIds = message.getReaderIds();
         if (!readerIds.contains(user.getId())){
           readerIds.add(user.getId());
@@ -161,6 +181,46 @@ public class ChatController {
 
       // 채팅 미리보기 기능
       simpMessagingTemplate.convertAndSendToUser(user, "/room-list", message);
+    }
+
+    // 채팅방에 존재하지 않는 사람들은 fcm으로 알림을 보낸다.
+    List<User> notExistMember = roomMember.stream()
+        .filter(u -> !existMember.contains(u.getId()))
+        .toList();
+    List<String> fcmTokens = fcmTokenRepository.findByUserIn(notExistMember);
+    if(!fcmTokens.isEmpty()) {
+      /*
+       * {
+       *    "message":{
+       *      "notification":{
+       *        "title": "title",
+       *        "body": "message"
+       *        "image": "imageUrl"
+       *      }
+       *    }
+       * }
+       */
+      MulticastMessage multicastMessage = MulticastMessage.builder()
+          .addAllTokens(fcmTokens)
+          .setNotification(Notification.builder()
+              .setTitle("메세지가 도착했습니다.")
+              .setBody(message.getContent())
+              .setImage("imageUrl")
+              .build())
+        .build();
+      BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(multicastMessage);
+      // 이미지가 전송되지 않으면 몇개의 이미지가 전송되지 않았는데 데이터베이스에 저장
+      if(response.getFailureCount() > 0){
+        List<SendResponse> responses = response.getResponses();
+        int count = 0;
+        for (SendResponse sendResponse : responses) {
+          if (!sendResponse.isSuccessful()){
+            count++;
+          }
+        }
+        ExceptionMessage exceptionMessage = new ExceptionMessage(roomId + "에 " + count + "개의 메세지가 보내지지 않았습니다.");
+        exceptionMessageRepository.save(exceptionMessage);
+      }
     }
 
   }

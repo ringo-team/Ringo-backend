@@ -27,9 +27,14 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
 
   @Override
   public Message<?> preSend(Message<?> message, MessageChannel channel) {
+
     StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
     if (accessor == null) return message;
+
+    if(StompCommand.CONNECT.equals(accessor.getCommand()) || StompCommand.DISCONNECT.equals(accessor.getCommand())){
+      return message;
+    }
 
     String token = accessor.getFirstNativeHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -45,19 +50,15 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
 
     Authentication authentication = new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities());
     SecurityContextHolder.getContext().setAuthentication(authentication);
+
     accessor.setUser(authentication);
 
     String destination = accessor.getDestination();
     Long roomId = extractRoomId(destination);
 
-    if(StompCommand.CONNECT.equals(accessor.getCommand()) || StompCommand.DISCONNECT.equals(accessor.getCommand())){
-      return message;
-    }
-
     if (roomId == null) {
       throw new RingoException("채팅방에 관한 정보가 없습니다.", HttpStatus.BAD_REQUEST);
     }
-
     if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())){
       if(!chatService.isMemberInChatroom(roomId, user.getId())){
         throw new RingoException("구독 권한이 없습니다.", HttpStatus.FORBIDDEN);

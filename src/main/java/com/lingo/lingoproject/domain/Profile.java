@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.DynamicInsert;
 
 @Entity
 @Getter
@@ -28,6 +29,7 @@ import org.hibernate.annotations.ColumnDefault;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "PROFILES")
+@DynamicInsert
 public class Profile extends Timestamp {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

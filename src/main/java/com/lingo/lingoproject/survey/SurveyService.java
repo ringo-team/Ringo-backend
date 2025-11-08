@@ -1,11 +1,17 @@
 package com.lingo.lingoproject.survey;
 
+import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.Survey;
+import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.SurveyCategory;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.SurveyRepository;
+import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
+import com.lingo.lingoproject.survey.dto.UploadSurveyRequestDto;
 import com.lingo.lingoproject.utils.GenericUtils;
+import com.lingo.lingoproject.utils.JsonListWrapper;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +30,7 @@ public class SurveyService {
 
   private final SurveyRepository surveyRepository;
   private final GenericUtils genericUtils;
+  private final AnsweredSurveyRepository answeredSurveyRepository;
 
   public void uploadSurveyExcel(MultipartFile file){
     List<Survey> surveyList = new ArrayList<>();
@@ -35,7 +42,10 @@ public class SurveyService {
       for(Row row : sheet){
         String categoryValue = row.getCell(2).getStringCellValue();
         if (categoryValue.isEmpty()) break;
-        SurveyCategory category = getSurveyCategory(categoryValue);
+        if(!genericUtils.isContains(SurveyCategory.values(), categoryValue)){
+          throw new RingoException("적절하지 않은 카테고리가 입력되었습니다.", HttpStatus.BAD_REQUEST);
+        }
+        SurveyCategory category = SurveyCategory.valueOf(categoryValue);
         Survey survey = Survey.builder()
             .surveyNum((int) (row.getCell(0).getNumericCellValue()))
             .confrontSurveyNum((int) (row.getCell(1).getNumericCellValue()))
@@ -55,27 +65,6 @@ public class SurveyService {
     surveyRepository.saveAll(surveyList);
   }
 
-  private static SurveyCategory getSurveyCategory(String categoryValue) {
-    System.out.println(categoryValue);
-    SurveyCategory category = null;
-    if (categoryValue.contains("공간 취향")){
-      category = SurveyCategory.SPACE;
-    }
-    else if (categoryValue.contains("자기 표현")){{
-      category = SurveyCategory.SELF_REPRESENTATION;
-    }}
-    else if (categoryValue.contains("취향 공유")){
-      category = SurveyCategory.SHARING;
-    }
-    else if (categoryValue.contains("컨텐츠 취향")){
-      category = SurveyCategory.CONTENT;
-    }
-    else{
-      throw new RingoException("적절하지 않은 카테고리가 입력되었습니다.", HttpStatus.BAD_REQUEST);
-    }
-    return category;
-  }
-
   public void updateSurvey(UpdateSurveyRequestDto dto){
     Survey survey = surveyRepository.findById(dto.surveyId())
         .orElseThrow(() -> new RingoException("해당 설문을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
@@ -86,10 +75,33 @@ public class SurveyService {
     surveyRepository.save(survey);
   }
 
-  public List<String> getSurveys(){
+  public List<GetSurveyResponseDto> getSurveys(){
     return surveyRepository.findAll()
         .stream()
-        .map(Survey::getContent)
+        .map(s -> {
+              return GetSurveyResponseDto.builder()
+                  .surveyNum(s.getSurveyNum())
+                  .confrontSurveyNum(s.getConfrontSurveyNum())
+                  .content(s.getContent())
+                  .category(s.getCategory().toString())
+                  .purpose(s.getPurpose())
+                  .build();
+            }
+        )
         .toList();
+  }
+
+  public void saveSurveyResponse(JsonListWrapper<UploadSurveyRequestDto> responses, User user){
+    List<AnsweredSurvey> list = new ArrayList<>();
+    responses.getList().forEach(r -> {
+      AnsweredSurvey answeredSurvey = AnsweredSurvey.builder()
+          .user(user)
+          .surveyNum(r.surveyNum())
+          .answer(r.answer())
+          .build();
+      list.add(answeredSurvey);
+    });
+    answeredSurveyRepository.saveAll(list);
+
   }
 }

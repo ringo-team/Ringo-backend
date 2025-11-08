@@ -72,6 +72,9 @@ dependencies {
     // aws secret-manager
     implementation("io.awspring.cloud:spring-cloud-aws-starter-secrets-manager:3.4.0")
 
+    // fcm
+    implementation 'com.google.firebase:firebase-admin:9.7.0'
+
 }
 dependencyManagement {
     imports {

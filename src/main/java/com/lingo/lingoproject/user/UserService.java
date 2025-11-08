@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.user;
 
 import com.lingo.lingoproject.domain.BlockedUser;
+import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.FriendInvitationLog;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.UserAccessLog;
@@ -15,6 +16,7 @@ import com.lingo.lingoproject.repository.BlockedFriendRepository;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.DormantAccountRepository;
+import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.FriendInvitationLogRepository;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
@@ -51,7 +53,6 @@ public class UserService {
   private final BlockedFriendRepository blockedFriendRepository;
   private final DormantAccountRepository dormantAccountRepository;
   private final ImageService imageService;
-  private final MessageRepository messageRepository;
   private final MatchingRepository matchingRepository;
   private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
   private final ChatroomParticipantRepository chatroomParticipantRepository;
@@ -60,20 +61,10 @@ public class UserService {
   private final WithdrawerRepository withdrawerRepository;
   private final FriendInvitationLogRepository friendInvitationLogRepository;
   private final UserPointRepository userPointRepository;
+  private final FcmTokenRepository fcmTokenRepository;
 
   @Transactional
   public void deleteUser(Long userId, String reason) {
-    /**
-     * - answeredSurvey 삭제
-     * - blockedFriend 삭제
-     * - dormantAccount 삭제
-     * - 유저 스냅 사진 삭제
-     * - 유저 프로필 삭제
-     * - 메세지 연관 끊기
-     * - 매칭 연관 끊기
-     * - chatroomParticipant 연관 끊기
-     * - refresh token 삭제
-     */
 
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
@@ -91,6 +82,7 @@ public class UserService {
       imageService.deleteAllSnapImagesByUser(user);
       matchingRepository.deleteAllByRequestedUser(user);
       matchingRepository.deleteAllByRequestUser(user);
+      fcmTokenRepository.deleteByUser(user);
       chatroomParticipantRepository.disconnectChatroomParticipantWithUser(user);
       userPointRepository.deleteAllByUser(user);
       jwtRefreshTokenRepository.deleteByUser(user);
@@ -237,6 +229,21 @@ public class UserService {
           .build());
       userPointRepository.updateUserPoint(FRIEND_INVITATION_REWARD, user);
       userPointRepository.updateUserPoint(FRIEND_INVITATION_REWARD, host.get());
+    }
+  }
+
+  public void updateDormantAccount(User user, String request){
+    if(request.equals("DORMANT")){
+      if(dormantAccountRepository.existsByUser(user)){
+        throw new RingoException("이미 휴면 중인 계정입니다.", HttpStatus.BAD_REQUEST);
+      }
+      DormantAccount dormantAccount = DormantAccount.builder()
+          .user(user)
+          .build();
+      dormantAccountRepository.save(dormantAccount);
+    }
+    else{
+      dormantAccountRepository.deleteByUser(user);
     }
   }
 }

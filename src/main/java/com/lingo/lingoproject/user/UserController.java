@@ -4,10 +4,12 @@ import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.user.dto.GetFriendInvitationCodeRequestDto;
 import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
+import com.lingo.lingoproject.user.dto.GetUserLoginIdResponseDto;
 import com.lingo.lingoproject.user.dto.ResetPasswordRequestDto;
 import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,7 +37,7 @@ public class UserController {
       description = "탈퇴 원인 저장과 유저 정보 삭제"
   )
   @DeleteMapping("/{id}")
-  public ResponseEntity<?> deleteUser(
+  public ResponseEntity<String> deleteUser(
       @Parameter(description = "유저id", example = "4")
       @PathVariable Long id,
 
@@ -59,7 +61,7 @@ public class UserController {
   @GetMapping("/find-id")
   public ResponseEntity<?> findUserId(@AuthenticationPrincipal User user){
     String username = userService.findUserId(user.getId());
-    return ResponseEntity.ok().body(username);
+    return ResponseEntity.ok().body(new GetUserLoginIdResponseDto(username));
   }
 
   @Operation(
@@ -67,7 +69,7 @@ public class UserController {
       description = "본인인증 성공한 유저 password 재설정"
   )
   @PatchMapping("reset-password")
-  public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequestDto dto, @AuthenticationPrincipal User user) throws Exception{
+  public ResponseEntity<String> resetPassword(@RequestBody ResetPasswordRequestDto dto, @AuthenticationPrincipal User user){
     userService.resetPassword(dto.password(), user.getId());
     return ResponseEntity.ok().body("password를 성공적으로 변경하였습니다.");
   }
@@ -77,7 +79,7 @@ public class UserController {
       description = "프로필에 존재하는 유저 정보를 조회하는 api"
   )
   @GetMapping()
-  public ResponseEntity<?> getUserInfo(@AuthenticationPrincipal User user){
+  public ResponseEntity<GetUserInfoResponseDto> getUserInfo(@AuthenticationPrincipal User user){
     GetUserInfoResponseDto dto = userService.getUserInfo(user.getId());
     return ResponseEntity.ok().body(dto);
   }
@@ -87,7 +89,7 @@ public class UserController {
       description = "수정할 수 있는 유저 정보를 업데이트 하는 api"
   )
   @PatchMapping()
-  public ResponseEntity<?> updateUserInfo(@RequestBody UpdateUserInfoRequestDto dto, @AuthenticationPrincipal User user){
+  public ResponseEntity<String> updateUserInfo(@RequestBody UpdateUserInfoRequestDto dto, @AuthenticationPrincipal User user){
     userService.updateUserInfo(user.getId(), dto);
     return ResponseEntity.ok().body("정상적으로 수정되었습니다.");
   }
@@ -103,6 +105,19 @@ public class UserController {
   public ResponseEntity<String> inputInvitationCodeAndGetReward(@AuthenticationPrincipal User user, @RequestParam String code){
     userService.checkFriendInvitationCodeAndProvideReward(user, code);
     return ResponseEntity.ok().body("친구와 본인 모두 보상을 획득하였습니다.");
+  }
+
+  @Operation(summary = "휴면 계정을 업데이트합니다.", description = "계정을 휴면시키거나 해제시킵니다.")
+  @PostMapping("dormant")
+  public ResponseEntity<String> updateDormantAccount(
+      @Parameter(description = "계정 휴면 혹은 휴면 해제",
+        schema = @Schema(example = "DORMANT", allowableValues = {"DORMANT", "CANCEL"})
+      )@RequestParam(value = "request") String request,
+
+      @AuthenticationPrincipal User user){
+
+    userService.updateDormantAccount(user, request);
+    return ResponseEntity.ok().body("휴면 계정 정보를 업데이트 하였습니다.");
   }
 
 }

@@ -74,9 +74,6 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
       SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(new User(), "password",
           List.of(new SimpleGrantedAuthority("ROLE_USER"))));
     }
-    else{
-      log.info(request.getRequestURI());
-    }
     filterChain.doFilter(request, response);
   }
 

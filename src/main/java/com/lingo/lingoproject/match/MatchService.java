@@ -1,9 +1,14 @@
 package com.lingo.lingoproject.match;
 
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.Notification;
 import com.lingo.lingoproject.chat.ChatService;
 import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
+import com.lingo.lingoproject.domain.FcmToken;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
@@ -19,10 +24,12 @@ import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.BlockedFriendRepository;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.DormantAccountRepository;
+import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
+import com.lingo.lingoproject.repository.impl.UserRepositoryImpl;
 import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
@@ -53,6 +60,8 @@ public class MatchService {
   private final HashtagRepository hashtagRepository;
   private final BlockedUserRepository blockedUserRepository;
   private final RedisUtils redisUtils;
+  private final FcmTokenRepository fcmTokenRepository;
+  private final UserRepositoryImpl userRepositoryImpl;
 
   private final int MAX_RECOMMEND_PROFILE_SIZE = 10;
   private final int MAX_NUMBER_OF_FOR_LOOP = 10;
@@ -72,7 +81,7 @@ public class MatchService {
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
     User requestUser = userRepository.findById(dto.requestId())
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-    if(!isMatch(requestedUser.getId(), requestUser.getId())){
+    if(!isMatch(calcMatchScore(requestedUser.getId(), requestUser.getId()))){
       throw new RingoException("연결 적합도가 기준 미만입니다.", HttpStatus.NOT_ACCEPTABLE);
     }
     Matching matching = Matching.builder()
@@ -90,7 +99,8 @@ public class MatchService {
    * @param decision
    * @param matchingId
    */
-  public void responseToRequest(String decision, Long matchingId){
+  public void responseToRequest(String decision, Long matchingId)
+      throws FirebaseMessagingException {
     Matching matching = matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException("적절하지 않은 매칭 id 입니다.", HttpStatus.BAD_REQUEST));
     MatchingStatus status = null;
@@ -107,6 +117,21 @@ public class MatchService {
     }
     matching.setMatchingStatus(status);
     matchingRepository.save(matching);
+
+    if (status == MatchingStatus.ACCEPTED) {
+      // 매칭 수락을 하면 fcm 알림 전송
+      User user = matching.getRequestUser();
+      FcmToken token = fcmTokenRepository.findByUser(user).orElse(null);
+      if (token != null){
+        Message message = Message.builder()
+            .setNotification(Notification.builder()
+                .setTitle("누군가 요청을 수락했어요")
+                .setImage("ImageUrl")
+                .build())
+            .build();
+        FirebaseMessaging.getInstance().send(message);
+      }
+    }
   }
 
   @Cacheable(key = "#userId", value = "recommend", cacheManager = "cacheManager")
@@ -154,13 +179,14 @@ public class MatchService {
      * setSize가 7이하 일때는 매칭이 가능한 사람을 추가하고 8이상일 때는 매칭이 불가능한 이성을 추천한다.
      */
     while(setSize < MAX_RECOMMEND_PROFILE_SIZE && count < MAX_NUMBER_OF_FOR_LOOP){
-      List<User> randUsers = userRepository.findRandomUsers(userEntity.getGender(), banUserId);
+      List<User> randUsers = userRepositoryImpl.findRandomOppositeGenderFriend(userEntity.getGender(), banUserId);
       for(User randUser : randUsers){
         // setSize가 10 이상일 때는 while & for 반복문이 종료된다.
         if(setSize >= MAX_RECOMMEND_PROFILE_SIZE) break;
+        Float matchingScore = calcMatchScore(userId, randUser.getId());
         // 7명은 매칭이 가능하도록
-        if((setSize < NUMBER_OF_ENABLE_MATCHING && isMatch(userId, randUser.getId())) ||
-            (setSize >= NUMBER_OF_ENABLE_MATCHING && !isMatch(userId, randUser.getId()))){
+        if((setSize < NUMBER_OF_ENABLE_MATCHING && isMatch(matchingScore)) ||
+            (setSize >= NUMBER_OF_ENABLE_MATCHING && !isMatch(matchingScore))){
           Profile profile = profileRepository.findByUser(randUser)
               .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
           List<String> hashtags = hashtagRepository.findAllByUser(randUser)
@@ -174,6 +200,7 @@ public class MatchService {
                   .nickname(randUser.getNickname())
                   .profileUrl(profile.getImageUrl())
                   .hashtags(hashtags)
+                  .matchingScore(matchingScore)
                   .build()
           );
           setSize++;
@@ -184,8 +211,8 @@ public class MatchService {
     return new ArrayList<>(rtnSet);
   }
 
-  public boolean isMatch(Long user1Id, Long user2Id){
-    return calcMatchScore(user1Id, user2Id) > 0.75;
+  public boolean isMatch(Float matchingScore){
+    return matchingScore > 0.60;
   }
 
   public float calcMatchScore(Long user1Id, Long user2Id){

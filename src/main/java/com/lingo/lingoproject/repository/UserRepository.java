@@ -13,14 +13,9 @@ import org.springframework.data.repository.query.Param;
 public interface UserRepository extends JpaRepository<User, Long> {
   Optional<User> findByEmail(String email);
 
-  @Query(value = "select * from users u "
-      + "where u.gender <> :gender and u.id not in :banIds "
-      + "order by RAND() limit 100", nativeQuery = true)
-  List<User> findRandomUsers(@Param("gender") Gender gender, @Param("banIds") List<Long> banIds);
-
-  Optional<User> findByPhoneNumber(String phoneNumber);
-
   List<User> findAllByEmailIn(Collection<String> emails);
 
   Optional<User> findByFriendInvitationCode(String friendInvitationCode);
+
+  List<User> findAllByEmailIsContaining(String email);
 }

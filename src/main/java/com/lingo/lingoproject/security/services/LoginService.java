@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.security.services;
 
 import com.lingo.lingoproject.domain.BlockedUser;
+import com.lingo.lingoproject.domain.FcmToken;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.JwtRefreshToken;
 import com.lingo.lingoproject.domain.User;
@@ -10,7 +11,9 @@ import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.Smoking;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.fcm.FcmService;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
+import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.UserPointRepository;
@@ -51,6 +54,7 @@ public class LoginService {
   private final HashtagRepository hashtagRepository;
   private final BlockedUserRepository blockedUserRepository;
   private final UserPointRepository userPointRepository;
+  private final FcmTokenRepository fcmTokenRepository;
 
   public LoginResponseDto login(LoginInfoDto dto){
     if (SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -180,6 +184,7 @@ public class LoginService {
       userRepository.save(user);
       hashtagRepository.saveAll(hashtags);
       userPointRepository.save(UserPoint.builder().user(user).build());
+      fcmTokenRepository.save(FcmToken.builder().user(user).build());
     } catch (DataIntegrityViolationException e) {
       throw new RingoException(e.getMessage(), HttpStatus.BAD_REQUEST);
     } catch (Exception e) {

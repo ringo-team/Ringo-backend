@@ -3,6 +3,7 @@ package com.lingo.lingoproject.image;
 
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.lingo.lingoproject.domain.PhotographerImage;
 import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.SnapImage;
 import com.lingo.lingoproject.domain.User;
@@ -10,6 +11,8 @@ import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
+import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
+import com.lingo.lingoproject.repository.PhotographerImageRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.SnapImageRepository;
 import com.lingo.lingoproject.repository.UserRepository;
@@ -33,7 +36,8 @@ public class ImageService {
 
   private final UserRepository userRepository;
   private final SnapImageRepository snapImageRepository;
-  private final JwtUtil jwtUtil;
+  private final PhotographerImageRepository photographerImageRepository;
+
   @Value("${aws.s3.bucket}")
   private String bucket;
 
@@ -65,7 +69,7 @@ public class ImageService {
 
   @Transactional
   public List<GetImageUrlResponseDto> uploadSnapImages(List<MultipartFile> images, Long userId) {
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
+    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
 
     List<SnapImage> snapImages = new ArrayList<>();
 
@@ -80,6 +84,28 @@ public class ImageService {
     List<SnapImage> savedSnapImages = snapImageRepository.saveAll(snapImages);
 
     return savedSnapImages.stream()
+        .map(image -> {
+          return new GetImageUrlResponseDto(image.getImageUrl(), image.getId());
+        })
+        .toList();
+  }
+
+  @Transactional
+  public List<GetImageUrlResponseDto> uploadPhotographerExampleImages(List<MultipartFile> images, Long photographerId){
+    User photographer = userRepository.findById(photographerId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
+    List<PhotographerImage> photographerImages = new ArrayList<>();
+
+    for (MultipartFile file : images){
+      String imageUrl = uploadImageToS3(file);
+      PhotographerImage photographerImage = PhotographerImage.builder()
+          .imageUrl(imageUrl)
+          .photographer(photographer)
+          .build();
+      photographerImages.add(photographerImage);
+    }
+    List<PhotographerImage> savedPhotographerImages = photographerImageRepository.saveAll(photographerImages);
+    return savedPhotographerImages.stream()
         .map(image -> {
           return new GetImageUrlResponseDto(image.getImageUrl(), image.getId());
         })
@@ -229,5 +255,13 @@ public class ImageService {
 
   private String getOriginalFilename(String ImageUrl){
     return  ImageUrl.substring(ImageUrl.lastIndexOf("/") + 1);
+  }
+
+  public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto){
+    SnapImage image = snapImageRepository.findById(dto.snapImageId())
+        .orElseThrow(() -> new RingoException("스냅 이미지를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
+    image.setDescription(dto.description());
+    snapImageRepository.save(image);
   }
 }

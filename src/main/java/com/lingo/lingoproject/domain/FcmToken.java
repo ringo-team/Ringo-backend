@@ -1,24 +1,32 @@
 package com.lingo.lingoproject.domain;
 
-import com.lingo.lingoproject.utils.Timestamp;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-@Table(name = "EXCEPTION_MESSAGES")
 @Entity
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor
-public class ExceptionMessage extends Timestamp {
+@Getter@Setter
+@Table(name = "FCM_TOKENS")
+public class FcmToken {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  private String message;
+  @OneToOne
+  @JoinColumn(name = "user_id")
+  private User user;
 
-  public ExceptionMessage(String message){
-    this.message = message;
-  }
+  private String token;
 }

@@ -47,16 +47,6 @@ public class LoginController {
       summary = "로그인",
       description = "커스텀 인증 필터에서 처리한 로그인 정보를 사용해 토큰을 발급합니다."
   )
-  @ApiResponses({
-      @ApiResponse(
-          responseCode = "401 (UNAUTHORIZED)",
-          description = "토큰 재발급을 요청합니다."
-      ),
-      @ApiResponse(
-          responseCode = "403 (FORBIDDEN)",
-          description = "자격 증명이 올바르지 않아 접근을 차단합니다."
-      )
-  })
   public ResponseEntity<LoginResponseDto> login(
       /**
        * swagger용 requestBody입니다.
@@ -82,10 +72,6 @@ public class LoginController {
   @GetMapping("/refresh")
   @AccessLog
   @Operation(summary = "토큰 재발급", description = "리프레시 토큰을 사용해 새로운 액세스/리프레시 토큰을 발급합니다.")
-  @ApiResponse(
-      responseCode = "500",
-      description = "토큰 재발급 처리 중 서버 오류가 발생했습니다."
-  )
   public ResponseEntity<LoginResponseDto> refresh(
       @Parameter(
           description = "리프레시 토큰 값",

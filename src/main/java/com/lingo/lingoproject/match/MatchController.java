@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.match;
 
+import com.google.firebase.messaging.FirebaseMessagingException;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.match.dto.GetMatchingRequestMessageResponseDto;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
@@ -10,6 +11,7 @@ import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -39,7 +41,7 @@ public class MatchController {
       description = "유저가 매칭 요청을 할 때 사용하는 api"
   )
   @PostMapping()
-  public ResponseEntity<RequestMatchingResponseDto> requestMatching(@RequestBody MatchingRequestDto matchingRequestDto) {
+  public ResponseEntity<RequestMatchingResponseDto> requestMatching(@Valid @RequestBody MatchingRequestDto matchingRequestDto) {
     Matching matching = matchService.matchRequest(matchingRequestDto);
     return ResponseEntity.ok().body(new RequestMatchingResponseDto(matching.getId()));
   }
@@ -56,7 +58,8 @@ public class MatchController {
           schema = @Schema(allowableValues = {"ACCEPTED", "REJECTED"})
       )
       @NotBlank @RequestParam(value = "decision") String decision,
-      @NotNull @RequestParam(value = "matchingId") Long matchingId) {
+      @NotNull @RequestParam(value = "matchingId") Long matchingId)
+      throws FirebaseMessagingException {
     matchService.responseToRequest(decision, matchingId);
     return ResponseEntity.ok().body("매칭 상태가 변경되었습니다.");
   }
@@ -103,7 +106,7 @@ public class MatchController {
 
   @Operation(summary = "매칭 요청 매세지 저장")
   @PostMapping("/message")
-  public ResponseEntity<String> saveMatchingRequestMessage(@RequestBody
+  public ResponseEntity<String> saveMatchingRequestMessage(@Valid @RequestBody
       SaveMatchingRequestMessageRequestDto dto){
     matchService.saveMatchingRequestMessage(dto);
     return ResponseEntity.ok().body("매칭 메세지가 성공적으로 저장되었습니다.");

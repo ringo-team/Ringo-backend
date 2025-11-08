@@ -6,15 +6,15 @@ import lombok.Data;
 @Data
 public class GetCryptoTokenResponseDto {
 
-  private dataHeader header;
-  private dataBody body;
+  private DataHeader dataHeader;
+  private DataBody dataBody;
 
-  public record dataHeader(
+  public record DataHeader(
       @JsonProperty("GW_RSLT_CD") String resultCd,
       @JsonProperty("GW_RSLT_MSG") String resultMsg
   ){}
 
-  public record dataBody(
+  public record DataBody(
       @JsonProperty("rep_cd") String responseCD,
       @JsonProperty("res_msg") String responseMsg,
       @JsonProperty("result_cd") String resultCd,

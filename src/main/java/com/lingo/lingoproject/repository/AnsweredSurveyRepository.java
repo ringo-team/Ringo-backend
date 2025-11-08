@@ -17,9 +17,9 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
   @Query(value = "select s.category, avg(1 - abs(A.answer-B.answer)/4.0) as avgAnswer "
       + "from surveys s "
       + "join (select * from answered_surveys s1 where s1.user_id = :user1) A "
-      + "on s.id = A.survey_id "
+      + "on s.survey_num = A.survey_num "
       + "join (select * from answered_surveys s2 where s2.user_id = :user2) B "
-      + "on B.survey_id = (select id from surveys where s.confront_survey_num = confront_survey_num) "
+      + "on s.confront_survey_num = B.survey_num "
       + "group by s.category", nativeQuery = true)
   List<MatchScoreResultInterface> calcMatchScore(@Param("user1") Long user1, @Param("user2") Long user2);
 }

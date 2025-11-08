@@ -16,8 +16,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,18 +43,18 @@ public class UserManagementController {
     return ResponseEntity.ok().body(dtos);
   }
 
-  @Operation(
-      summary = "유저 블락 기능"
-  )
-  @PostMapping("users/{id}/blocks")
-  public ResponseEntity<?> blockUser(
-      @Parameter(description = "블락시키고자 하는 유저 id", example = "5")
-      @PathVariable Long id,
-
-      @AuthenticationPrincipal User admin){
-    userService.blockUser(id, admin.getId());
-    return ResponseEntity.ok().build();
-  }
+//  @Operation(
+//      summary = "유저 블락 기능"
+//  )
+//  @PostMapping("users/{id}/blocks")
+//  public ResponseEntity<?> blockUser(
+//      @Parameter(description = "블락시키고자 하는 유저 id", example = "5")
+//      @PathVariable Long id,
+//
+//      @AuthenticationPrincipal User admin){
+//    userService.blockUser(id, admin.getId());
+//    return ResponseEntity.ok().build();
+//  }
 
   /* 관리자더라도 유저삭제를 불가능하게 함
 
@@ -119,6 +117,7 @@ public class UserManagementController {
     ));
     return ResponseEntity.ok().body(new JsonListWrapper<>(list));
   }
+
 
   @Operation(summary = "신고된 유저 상태 변경", description = "신고된 유저 상태변경 및 조치")
   @PatchMapping("/reports")

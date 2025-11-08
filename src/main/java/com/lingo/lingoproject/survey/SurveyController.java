@@ -2,7 +2,9 @@ package com.lingo.lingoproject.survey;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
+import com.lingo.lingoproject.survey.dto.UploadSurveyRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.List;
@@ -47,8 +49,16 @@ public class SurveyController {
 
   @Operation(summary = "설문지 조회")
   @GetMapping()
-  public ResponseEntity<JsonListWrapper<String>> getSurveys(){
-    List<String> list = surveyService.getSurveys();
+  public ResponseEntity<JsonListWrapper<GetSurveyResponseDto>> getSurveys(){
+    List<GetSurveyResponseDto> list = surveyService.getSurveys();
     return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(list));
+  }
+
+  @Operation(summary = "설문지 응답 저장", description = "유저가 진행한 설문지 응답 저장")
+  @PostMapping("/answer")
+  public ResponseEntity<String> saveSurveyResponse(@RequestBody JsonListWrapper<UploadSurveyRequestDto> responses,
+      @AuthenticationPrincipal User user){
+    surveyService.saveSurveyResponse(responses, user);
+    return ResponseEntity.ok().body("정상적으로 설문지 응답이 저장되었습니다.");
   }
 }
