@@ -32,7 +32,7 @@ public class ImageController {
   private final ImageService imageService;
 
   @Operation(
-      summary = "이미지 업로드",
+      summary = "프로필 이미지 업로드",
       description = "s3에 이미지를 업로드합니다"
   )
   @ApiResponse(

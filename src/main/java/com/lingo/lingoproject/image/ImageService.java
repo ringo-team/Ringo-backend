@@ -1,6 +1,14 @@
 package com.lingo.lingoproject.image;
 
 
+import com.amazonaws.services.rekognition.AmazonRekognition;
+import com.amazonaws.services.rekognition.model.DetectFacesRequest;
+import com.amazonaws.services.rekognition.model.DetectFacesResult;
+import com.amazonaws.services.rekognition.model.DetectModerationLabelsRequest;
+import com.amazonaws.services.rekognition.model.DetectModerationLabelsResult;
+import com.amazonaws.services.rekognition.model.FaceDetail;
+import com.amazonaws.services.rekognition.model.Image;
+import com.amazonaws.services.rekognition.model.ModerationLabel;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.lingo.lingoproject.domain.PhotographerImage;
@@ -16,8 +24,8 @@ import com.lingo.lingoproject.repository.PhotographerImageRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.SnapImageRepository;
 import com.lingo.lingoproject.repository.UserRepository;
-import com.lingo.lingoproject.security.jwt.JwtUtil;
 import jakarta.transaction.Transactional;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,15 +45,30 @@ public class ImageService {
   private final UserRepository userRepository;
   private final SnapImageRepository snapImageRepository;
   private final PhotographerImageRepository photographerImageRepository;
+  private final AmazonS3Client amazonS3Client;
+  private final ProfileRepository profileRepository;
+  private final AmazonRekognition amazonRekognition;
 
   @Value("${aws.s3.bucket}")
   private String bucket;
 
-  private final AmazonS3Client amazonS3Client;
-  private final ProfileRepository profileRepository;
+  private final Float MIN_CONFIDENCE = 70f;
+
+
+  /**
+   * profile 이미지 crud
+   */
 
   @Transactional
   public GetImageUrlResponseDto uploadProfileImage(MultipartFile file, Long userId) {
+
+    if (!isFaceImageExists(file)){
+      return null;
+    }
+
+    if (isNonModerateImages(file)){
+      return null;
+    }
 
     User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
 
@@ -58,13 +81,48 @@ public class ImageService {
 
     Profile savedProfile = profileRepository.save(profile);
 
-    /**
+    /*
      * 회원가입을 성공적으로 마무리 했으므로 user status를 COMPLETE로 변경한다.
      */
     user.setStatus(SignupStatus.COMPLETED);
     userRepository.save(user);
 
     return new GetImageUrlResponseDto(savedProfile.getImageUrl(), savedProfile.getId());
+  }
+
+  public GetImageUrlResponseDto getProfileImageUrl(Long userId){
+    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
+    Profile profile = profileRepository.findByUser(user)
+        .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
+    return new GetImageUrlResponseDto(profile.getImageUrl(), profile.getId());
+  }
+
+  @Transactional
+  public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long profileId, Long tokenUserId){
+
+    if (!isFaceImageExists(file)){
+      return null;
+    }
+
+    if (isNonModerateImages(file)){
+      return null;
+    }
+
+    Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException("Profile not found", HttpStatus.BAD_REQUEST));
+    if(!isOwnerImage(profile.getUser(), tokenUserId)){
+      throw new RingoException("삭제할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+    }
+    String imageUrl = getOriginalFilename(profile.getImageUrl());
+    // s3에 이미지 삭제
+    deleteImageInS3(imageUrl);
+
+    // s3에 새로운 이미지 파일 업로드
+    imageUrl = uploadImageToS3(file);
+
+    // profiles 테이블에 변경된 이미지 url 저장
+    profile.setImageUrl(imageUrl);
+    profileRepository.save(profile);
+    return new GetImageUrlResponseDto(imageUrl, profileId);
   }
 
   @Transactional
@@ -74,6 +132,11 @@ public class ImageService {
     List<SnapImage> snapImages = new ArrayList<>();
 
     for(MultipartFile file : images){
+
+      if (isNonModerateImages(file)){
+        continue;
+      }
+
       String imageUrl = uploadImageToS3(file);
       SnapImage snapImage = SnapImage.builder()
           .imageUrl(imageUrl)
@@ -89,6 +152,93 @@ public class ImageService {
         })
         .toList();
   }
+
+  @Transactional
+  public void deleteProfile(Long profileId, Long tokenUserId){
+    Profile profile = profileRepository.findById(profileId)
+        .orElseThrow(() -> new RingoException("Profile not found", HttpStatus.BAD_REQUEST));
+    if(!isOwnerImage(profile.getUser(), tokenUserId)){
+      return;
+    }
+    profileRepository.delete(profile);
+    String imageUrl = getOriginalFilename(profile.getImageUrl());
+    deleteImageInS3(imageUrl);
+    log.info("{} 이미지가 삭제되었습니다.", imageUrl);
+  }
+
+  @Transactional
+  public void deleteProfileImagesByUser(User user){
+    List<Profile> profiles = profileRepository.findAllByUser(user);
+    profileRepository.deleteAllByUser(user);
+
+    for(Profile profile : profiles){
+      deleteImageInS3(profile.getImageUrl());
+    }
+  }
+
+  /**
+   * snap 이미지 crud
+   */
+
+  public List<GetImageUrlResponseDto> getAllSnapImageUrls(Long userId){
+    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
+    List<SnapImage> images = snapImageRepository.findAllByUser(user);
+    return images.stream()
+        .map(image -> new GetImageUrlResponseDto(image.getImageUrl(), image.getId()))
+        .toList();
+  }
+
+  @Transactional
+  public GetImageUrlResponseDto updateSnapImage(MultipartFile file, Long snapImageId, String description, Long tokenUserId){
+
+    if (isNonModerateImages(file)){
+      return null;
+    }
+
+    SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException("Snap image not found", HttpStatus.BAD_REQUEST));
+    if(!isOwnerImage(snapImage.getUser(), tokenUserId)){
+      throw new RingoException("업데이트 할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+    }
+    String imageUrl = getOriginalFilename(snapImage.getImageUrl());
+
+    //s3에 이미지 삭제
+    deleteImageInS3(imageUrl);
+
+    // s3에 새로운 이미지 업로드
+    imageUrl = uploadImageToS3(file);
+
+    // snap_images 테이블에 변경된 사진 url 저장
+    snapImage.setImageUrl(imageUrl);
+    snapImage.setDescription(description);
+    snapImageRepository.save(snapImage);
+    return new GetImageUrlResponseDto(imageUrl, snapImage.getId());
+  }
+
+  @Transactional
+  public void deleteSnapImage(Long snapImageId, Long tokenUserId){
+    SnapImage snapImage = snapImageRepository.findById(snapImageId)
+        .orElseThrow(() -> new RingoException("Snap image not found", HttpStatus.BAD_REQUEST));
+    if (!isOwnerImage(snapImage.getUser(), tokenUserId)){
+      return;
+    }
+    snapImageRepository.delete(snapImage);
+    String imageUrl = getOriginalFilename(snapImage.getImageUrl());
+    deleteImageInS3(imageUrl);
+  }
+
+  @Transactional
+  public void deleteAllSnapImagesByUser(User user){
+    List<SnapImage> images = snapImageRepository.findAllByUser(user);
+    snapImageRepository.deleteAllByUser(user);
+
+    for(SnapImage snapImage : images){
+      deleteImageInS3(snapImage.getImageUrl());
+    }
+  }
+
+  /**
+   * photographer 이미지 crud
+   */
 
   @Transactional
   public List<GetImageUrlResponseDto> uploadPhotographerExampleImages(List<MultipartFile> images, Long photographerId){
@@ -135,106 +285,6 @@ public class ImageService {
     return imageUrl;
   }
 
-  public GetImageUrlResponseDto getProfileImageUrl(Long userId){
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-    Profile profile = profileRepository.findByUser(user)
-        .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
-    return new GetImageUrlResponseDto(profile.getImageUrl(), profile.getId());
-  }
-
-  @Transactional
-  public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long profileId, Long tokenUserId){
-    Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException("Profile not found", HttpStatus.BAD_REQUEST));
-    if(!isOwnerImage(profile.getUser(), tokenUserId)){
-      throw new RingoException("삭제할 권한이 없습니다.", HttpStatus.FORBIDDEN);
-    }
-    String imageUrl = getOriginalFilename(profile.getImageUrl());
-    // s3에 이미지 삭제
-    deleteImageInS3(imageUrl);
-
-    // s3에 새로운 이미지 파일 업로드
-    imageUrl = uploadImageToS3(file);
-
-    // profiles 테이블에 변경된 이미지 url 저장
-    profile.setImageUrl(imageUrl);
-    profileRepository.save(profile);
-    return new GetImageUrlResponseDto(imageUrl, profileId);
-  }
-
-  public List<GetImageUrlResponseDto> getAllSnapImageUrls(Long userId){
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-    List<SnapImage> images = snapImageRepository.findAllByUser(user);
-    return images.stream()
-        .map(image -> new GetImageUrlResponseDto(image.getImageUrl(), image.getId()))
-        .toList();
-  }
-
-  @Transactional
-  public GetImageUrlResponseDto updateSnapImage(MultipartFile file, Long snapImageId, String description, Long tokenUserId){
-    SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException("Snap image not found", HttpStatus.BAD_REQUEST));
-    if(!isOwnerImage(snapImage.getUser(), tokenUserId)){
-      throw new RingoException("업데이트 할 권한이 없습니다.", HttpStatus.FORBIDDEN);
-    }
-    String imageUrl = getOriginalFilename(snapImage.getImageUrl());
-
-    //s3에 이미지 삭제
-    deleteImageInS3(imageUrl);
-
-    // s3에 새로운 이미지 업로드
-    imageUrl = uploadImageToS3(file);
-
-    // snap_images 테이블에 변경된 사진 url 저장
-    snapImage.setImageUrl(imageUrl);
-    snapImage.setDescription(description);
-    snapImageRepository.save(snapImage);
-    return new GetImageUrlResponseDto(imageUrl, snapImage.getId());
-  }
-
-  @Transactional
-  public void deleteSnapImage(Long snapImageId, Long tokenUserId){
-    SnapImage snapImage = snapImageRepository.findById(snapImageId)
-        .orElseThrow(() -> new RingoException("Snap image not found", HttpStatus.BAD_REQUEST));
-    if (!isOwnerImage(snapImage.getUser(), tokenUserId)){
-      return;
-    }
-    snapImageRepository.delete(snapImage);
-    String imageUrl = getOriginalFilename(snapImage.getImageUrl());
-    deleteImageInS3(imageUrl);
-  }
-
-  @Transactional
-  public void deleteAllSnapImagesByUser(User user){
-    List<SnapImage> images = snapImageRepository.findAllByUser(user);
-    snapImageRepository.deleteAllByUser(user);
-
-    for(SnapImage snapImage : images){
-      deleteImageInS3(snapImage.getImageUrl());
-    }
-  }
-
-  @Transactional
-  public void deleteProfile(Long profileId, Long tokenUserId){
-    Profile profile = profileRepository.findById(profileId)
-        .orElseThrow(() -> new RingoException("Profile not found", HttpStatus.BAD_REQUEST));
-    if(!isOwnerImage(profile.getUser(), tokenUserId)){
-      return;
-    }
-    profileRepository.delete(profile);
-    String imageUrl = getOriginalFilename(profile.getImageUrl());
-    deleteImageInS3(imageUrl);
-    log.info("{} 이미지가 삭제되었습니다.", imageUrl);
-  }
-
-  @Transactional
-  public void deleteAllProfileImagesByUser(User user){
-    List<Profile> profiles = profileRepository.findAllByUser(user);
-    profileRepository.deleteAllByUser(user);
-
-    for(Profile profile : profiles){
-      deleteImageInS3(profile.getImageUrl());
-    }
-  }
-
   public boolean isOwnerImage(User user, Long tokenUserId){
     Long userId = user.getId();
     User tokenUser = userRepository.findById(tokenUserId).orElseThrow(() -> new RingoException("Token not found", HttpStatus.BAD_REQUEST));
@@ -263,5 +313,55 @@ public class ImageService {
 
     image.setDescription(dto.description());
     snapImageRepository.save(image);
+  }
+
+  public boolean isNonModerateImages(MultipartFile file) {
+    byte[] imageBytes = null;
+    try {
+      imageBytes = file.getBytes();
+    }catch (Exception e){
+      throw new RingoException("파일을 바이트로 변환하지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    try {
+      DetectModerationLabelsRequest request = new DetectModerationLabelsRequest()
+          .withImage(new Image().withBytes(ByteBuffer.wrap(imageBytes)))
+          .withMinConfidence(MIN_CONFIDENCE);
+
+      DetectModerationLabelsResult result = amazonRekognition.detectModerationLabels(request);
+      List<ModerationLabel> labels = result.getModerationLabels();
+
+      return labels.stream().anyMatch(label -> {
+        String name = label.getName();
+        String parent = label.getParentName();
+
+        if (label.getConfidence() < MIN_CONFIDENCE)
+          return false;
+        return
+            (name != null && (name.contains("Nudity") || name.contains("Sexual") || name.contains(
+                "Suggestive"))) ||
+                (parent != null && (parent.contains("Nudity") || parent.contains("Sexual")
+                    || parent.contains("Suggestive")));
+      });
+    }catch (Exception e){
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  public boolean isFaceImageExists(MultipartFile file){
+    byte[] imageBytes = null;
+    try {
+      imageBytes = file.getBytes();
+    }catch (Exception e){
+      throw new RingoException("파일을 바이트로 변환하지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    try {
+      DetectFacesRequest request = new DetectFacesRequest()
+          .withImage(new Image().withBytes(ByteBuffer.wrap(imageBytes)));
+      DetectFacesResult result = amazonRekognition.detectFaces(request);
+      List<FaceDetail> faceDetails = result.getFaceDetails();
+      return !faceDetails.isEmpty();
+    }catch (Exception e){
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }

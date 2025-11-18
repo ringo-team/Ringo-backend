@@ -75,6 +75,9 @@ dependencies {
     // fcm
     implementation 'com.google.firebase:firebase-admin:9.7.0'
 
+    // aws rekognition
+    implementation("com.amazonaws:aws-java-sdk-rekognition:1.12.789")
+
 }
 dependencyManagement {
     imports {
