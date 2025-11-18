@@ -6,6 +6,7 @@ import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
 import com.lingo.lingoproject.chat.ChatService;
 import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
+import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.FcmToken;
@@ -32,16 +33,18 @@ import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.repository.impl.UserRepositoryImpl;
 import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -64,8 +67,9 @@ public class MatchService {
   private final UserRepositoryImpl userRepositoryImpl;
 
   private final int MAX_RECOMMEND_PROFILE_SIZE = 10;
-  private final int MAX_NUMBER_OF_FOR_LOOP = 10;
+  private final int MAX_NUMBER_OF_LOOP = 10;
   private final int NUMBER_OF_ENABLE_MATCHING = 7;
+  private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
 
   @Value("${ringo.config.survey.space_weight}")
   private float SURVEY_SPACE_WEIGHT;
@@ -134,15 +138,115 @@ public class MatchService {
     }
   }
 
-  @Cacheable(key = "#userId", value = "recommend", cacheManager = "cacheManager")
   @Transactional
   public List<GetUserProfileResponseDto> recommend(Long userId){
+
+    if(redisUtils.containsRecommendUser(userId.toString())){
+      return redisUtils.getRecommendUser(userId.toString());
+    }
+
     Set<GetUserProfileResponseDto> rtnSet = new HashSet<>();
     int count =  0;
     int setSize = 0;
     User userEntity = userRepository.findById(userId)
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-    // 자신의 연락처에 존재하는 유저와 자신을 연락처로 포함하고 있는 유저
+    List<Long> banUserId = getBannedRecommendedUserList(userEntity.getId());
+
+    /**
+     * setSize는 rtnSet의 크기로 추천이성 정보의 개수이다.
+     * setSize의 크기가 10 이상이거나 반복문을 10번 돌면 반복문을 빠져나온다.
+     *
+     * findRandomUsers는 banIds를 제외한 이성친구를 무작위로 추천한다.
+     * setSize가 7이하 일때는 매칭이 가능한 사람을 추가하고 8이상일 때는 매칭이 불가능한 이성을 추천한다.
+     */
+    while(setSize < MAX_RECOMMEND_PROFILE_SIZE && count < MAX_NUMBER_OF_LOOP){
+      List<User> randUsers = userRepositoryImpl.findRandomOppositeGenderAndNotBannedFriend(userEntity.getGender(), banUserId);
+      for(User randUser : randUsers){
+        // setSize가 10 이상일 때는 while & for 반복문이 종료된다.
+        if(setSize >= MAX_RECOMMEND_PROFILE_SIZE) break;
+        Float matchingScore = calcMatchScore(userId, randUser.getId());
+        /*
+        // 7명은 매칭이 가능하도록
+        if((setSize < NUMBER_OF_ENABLE_MATCHING && isMatch(matchingScore)) ||
+            (setSize >= NUMBER_OF_ENABLE_MATCHING && !isMatch(matchingScore))){
+         */
+        if(isMatch(matchingScore)){
+          Profile profile = profileRepository.findByUser(randUser)
+              .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
+          List<String> hashtags = hashtagRepository.findAllByUser(randUser)
+              .stream()
+              .map(Hashtag::getHashtag)
+              .toList();
+          rtnSet.add(
+              GetUserProfileResponseDto.builder()
+                  .userId(randUser.getId())
+                  .age(randUser.getAge())
+                  .nickname(randUser.getNickname())
+                  .profileUrl(profile.getImageUrl())
+                  .hashtags(hashtags)
+                  .build()
+          );
+          setSize++;
+        }
+      }
+      count++;
+    }
+
+    List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>(rtnSet);
+    redisUtils.saveRecommendUser(userId.toString(), recommendUserList);
+    return recommendUserList;
+  }
+
+  public List<GetUserProfileResponseDto> recommendUserForDailySurvey(Long userId){
+    if (redisUtils.containsRecommendUserForDailySurvey(userId.toString())){
+      return redisUtils.getRecommendUserForDailySurvey(userId.toString());
+    }
+    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    if (!isCompleteTodaySurvey(user)){
+      return null;
+    }
+    List<AnsweredSurvey> answeredSurveys = answeredSurveyRepository.findAllByUserAndCreatedAtBetween(
+        user,
+        LocalDate.now().atStartOfDay(),
+        LocalDateTime.now()
+    );
+    Random random = new Random(System.currentTimeMillis());
+
+    // 4명만 추천해줌
+    while(answeredSurveys.size() > 4){
+      int index = random.nextInt(answeredSurveys.size());
+      answeredSurveys.remove(index);
+    }
+    List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>();
+    for (AnsweredSurvey answeredSurvey : answeredSurveys) {
+      List<User> bannedUsers = convertIdListToUserList(getBannedRecommendedUserList(user.getId()));
+      List<AnsweredSurvey> sameAnsweredSurveyList = answeredSurveyRepository.findAllByUserNotInAndAnswerAndSurveyNum(
+          bannedUsers,
+          answeredSurvey.getAnswer(),
+          answeredSurvey.getSurveyNum()
+      );
+      AnsweredSurvey sameAnsweredSurvey = sameAnsweredSurveyList.get(random.nextInt(sameAnsweredSurveyList.size()));
+      User recommendedUser = sameAnsweredSurvey.getUser();
+      Profile profile = profileRepository.findByUser(recommendedUser)
+          .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
+      List<String> hashtags = hashtagRepository.findAllByUser(recommendedUser)
+          .stream()
+          .map(Hashtag::getHashtag)
+          .toList();
+      recommendUserList.add(
+          GetUserProfileResponseDto.builder()
+              .userId(recommendedUser.getId())
+              .age(recommendedUser.getAge())
+              .nickname(recommendedUser.getNickname())
+              .profileUrl(profile.getImageUrl())
+              .hashtags(hashtags)
+              .build()
+      );
+    }
+    return recommendUserList;
+  }
+  
+  public List<Long> getBannedRecommendedUserList(Long userId){
     List<Long> blockedFriendIds = blockedFriendRepository.findBlockedFriends(userId)
         .stream()
         .map(User::getId)
@@ -169,50 +273,25 @@ public class MatchService {
     banUserId.addAll(dormantUserIds);
     banUserId.addAll(blockedUserIds);
     banUserId.addAll(suspendedUserId);
+    
+    return banUserId;
+  }
+  
+  public List<User> convertIdListToUserList(List<Long> idList){
+    return userRepository.findAllByIdIn(idList);
+  }
 
-
-    /**
-     * setSize는 rtnSet의 크기로 추천이성 정보의 개수이다.
-     * setSize의 크기가 10 이상이거나 반복문을 10번 돌면 반복문을 빠져나온다.
-     *
-     * findRandomUsers는 banIds를 제외한 이성친구를 무작위로 추천한다.
-     * setSize가 7이하 일때는 매칭이 가능한 사람을 추가하고 8이상일 때는 매칭이 불가능한 이성을 추천한다.
-     */
-    while(setSize < MAX_RECOMMEND_PROFILE_SIZE && count < MAX_NUMBER_OF_FOR_LOOP){
-      List<User> randUsers = userRepositoryImpl.findRandomOppositeGenderFriend(userEntity.getGender(), banUserId);
-      for(User randUser : randUsers){
-        // setSize가 10 이상일 때는 while & for 반복문이 종료된다.
-        if(setSize >= MAX_RECOMMEND_PROFILE_SIZE) break;
-        Float matchingScore = calcMatchScore(userId, randUser.getId());
-        // 7명은 매칭이 가능하도록
-        if((setSize < NUMBER_OF_ENABLE_MATCHING && isMatch(matchingScore)) ||
-            (setSize >= NUMBER_OF_ENABLE_MATCHING && !isMatch(matchingScore))){
-          Profile profile = profileRepository.findByUser(randUser)
-              .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
-          List<String> hashtags = hashtagRepository.findAllByUser(randUser)
-              .stream()
-              .map(Hashtag::getHashtag)
-              .toList();
-          rtnSet.add(
-              GetUserProfileResponseDto.builder()
-                  .userId(randUser.getId())
-                  .age(randUser.getAge())
-                  .nickname(randUser.getNickname())
-                  .profileUrl(profile.getImageUrl())
-                  .hashtags(hashtags)
-                  .matchingScore(matchingScore)
-                  .build()
-          );
-          setSize++;
-        }
-      }
-      count++;
-    }
-    return new ArrayList<>(rtnSet);
+  public boolean isCompleteTodaySurvey(User user){
+    boolean isComplete = answeredSurveyRepository.existsByUserAndCreatedAtBetween(
+        user,
+        LocalDate.now().atStartOfDay(),
+        LocalDateTime.now()
+    );
+    return isComplete;
   }
 
   public boolean isMatch(Float matchingScore){
-    return matchingScore > 0.60;
+    return matchingScore > LIMIT_OF_MATCHING_SCORE;
   }
 
   public float calcMatchScore(Long user1Id, Long user2Id){
