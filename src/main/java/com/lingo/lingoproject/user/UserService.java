@@ -78,7 +78,7 @@ public class UserService {
       answeredSurveyRepository.deleteAllByUser(user);
       blockedFriendRepository.deleteByUser(user);
       dormantAccountRepository.deleteByUser(user);
-      imageService.deleteAllProfileImagesByUser(user);
+      imageService.deleteProfileImagesByUser(user);
       imageService.deleteAllSnapImagesByUser(user);
       matchingRepository.deleteAllByRequestedUser(user);
       matchingRepository.deleteAllByRequestUser(user);

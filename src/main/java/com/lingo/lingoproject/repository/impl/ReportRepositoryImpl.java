@@ -39,7 +39,6 @@ public class ReportRepositoryImpl{
 
     if(dto.startedAt() != null && !dto.startedAt().isBlank()
         && dto.finishedAt() != null && !dto.finishedAt().isBlank() ){
-      DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
       try {
         LocalDateTime startedAt = LocalDate.parse(dto.startedAt().trim()).atStartOfDay();
         LocalDateTime finishedAt = LocalDate.parse(dto.finishedAt().trim()).atTime(23, 59, 59);
