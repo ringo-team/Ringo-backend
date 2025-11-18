@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
 @Builder
-public record GetSurveyResponseDto(
+public record GetSurveyRequestDto(
     @Schema(description = "설문 번호", example = "3")
     Integer surveyNum,
     @Schema(description = "대치 질문 번호", example = "5")

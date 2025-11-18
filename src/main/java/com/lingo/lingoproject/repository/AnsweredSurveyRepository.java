@@ -3,6 +3,8 @@ package com.lingo.lingoproject.repository;
 import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -22,4 +24,16 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
       + "on s.confront_survey_num = B.survey_num "
       + "group by s.category", nativeQuery = true)
   List<MatchScoreResultInterface> calcMatchScore(@Param("user1") Long user1, @Param("user2") Long user2);
+
+  boolean existsByUserAndCreatedAtAfter(User user, LocalDateTime createdAtAfter);
+
+  long countByUser(User user);
+
+  boolean existsByUserAndCreatedAtBetween(User user, LocalDateTime createdAtAfter, LocalDateTime createdAtBefore);
+
+  List<AnsweredSurvey> findAllByUserAndCreatedAtBetween(User user, LocalDateTime createdAtAfter, LocalDateTime createdAtBefore);
+
+  List<AnsweredSurvey> findAllByUserNotAndAnswerAndSurveyNum(User user, Integer answer, Integer surveyNum);
+
+  List<AnsweredSurvey> findAllByUserNotInAndAnswerAndSurveyNum(Collection<User> users, Integer answer, Integer surveyNum);
 }

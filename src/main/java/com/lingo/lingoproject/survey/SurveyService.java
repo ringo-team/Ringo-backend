@@ -7,14 +7,19 @@ import com.lingo.lingoproject.domain.enums.SurveyCategory;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.SurveyRepository;
-import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
+import com.lingo.lingoproject.repository.UserRepository;
+import com.lingo.lingoproject.survey.dto.GetSurveyRequestDto;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
 import com.lingo.lingoproject.survey.dto.UploadSurveyRequestDto;
 import com.lingo.lingoproject.utils.GenericUtils;
 import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.RedisUtils;
 import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -31,6 +36,12 @@ public class SurveyService {
   private final SurveyRepository surveyRepository;
   private final GenericUtils genericUtils;
   private final AnsweredSurveyRepository answeredSurveyRepository;
+  private final UserRepository userRepository;
+  private final RedisUtils redisUtils;
+
+  private final int SIGNUP_NUMBER_OF_SURVEYS = 12;
+  private final int MAX_SURVEY_STARTER_DAYS = 10;
+  private final int NUMBER_OF_DAILY_SURVEYS = 5;
 
   public void uploadSurveyExcel(MultipartFile file){
     List<Survey> surveyList = new ArrayList<>();
@@ -75,11 +86,11 @@ public class SurveyService {
     surveyRepository.save(survey);
   }
 
-  public List<GetSurveyResponseDto> getSurveys(){
+  public List<GetSurveyRequestDto> getSurveys(){
     return surveyRepository.findAll()
         .stream()
         .map(s -> {
-              return GetSurveyResponseDto.builder()
+              return GetSurveyRequestDto.builder()
                   .surveyNum(s.getSurveyNum())
                   .confrontSurveyNum(s.getConfrontSurveyNum())
                   .content(s.getContent())
@@ -101,7 +112,63 @@ public class SurveyService {
           .build();
       list.add(answeredSurvey);
     });
-    answeredSurveyRepository.saveAll(list);
+    List<AnsweredSurvey> alreadyAnsweredSurveys = answeredSurveyRepository.findAllByUser(user);
 
+    for (AnsweredSurvey answeredSurvey : list){
+      for (AnsweredSurvey alreadyAnsweredSurvey : alreadyAnsweredSurveys){
+        if (answeredSurvey.getSurveyNum().equals(alreadyAnsweredSurvey.getSurveyNum())){
+          answeredSurvey.setId(alreadyAnsweredSurvey.getId());
+        }
+      }
+    }
+
+    answeredSurveyRepository.saveAll(list);
   }
+  
+  public List<GetSurveyRequestDto> getDailySurveys(Long userId){
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new RingoException("해당 요청의 유저가 존재하지 않습니다.", HttpStatus.BAD_REQUEST));
+    LocalDateTime now = LocalDate.now().atStartOfDay();
+    boolean isExists = answeredSurveyRepository.existsByUserAndCreatedAtAfter(user, now);
+    if (isExists) {
+      return null;
+    }
+    if (redisUtils.containsUserDailySurvey(userId.toString())){
+      return redisUtils.getUserDailySurvey(userId.toString());
+    }
+    int numberOfAnswerSurveys = (int) answeredSurveyRepository.countByUser(user);
+    if (numberOfAnswerSurveys < SIGNUP_NUMBER_OF_SURVEYS + NUMBER_OF_DAILY_SURVEYS * MAX_SURVEY_STARTER_DAYS){
+      List<Survey> surveys = surveyRepository.findAllBySurveyNumBetween(numberOfAnswerSurveys + 1, numberOfAnswerSurveys + NUMBER_OF_DAILY_SURVEYS);
+      List<GetSurveyRequestDto> results = surveys.stream().map(
+          e -> GetSurveyRequestDto.builder()
+              .surveyNum(e.getSurveyNum())
+              .confrontSurveyNum(e.getConfrontSurveyNum())
+              .category(e.getCategory().toString())
+              .content(e.getContent())
+              .purpose(e.getPurpose())
+              .build()
+      ).toList();
+      redisUtils.saveUserDailySurvey(userId.toString(), results);
+      return results;
+    }
+    int numberOfSurveys = (int) surveyRepository.count();
+    Random random = new Random(System.currentTimeMillis());
+    List<Integer> randomSelectedSurveyNums = new ArrayList<>();
+    for (int i = 0; i < NUMBER_OF_DAILY_SURVEYS; i++){
+      randomSelectedSurveyNums.add(random.nextInt(numberOfSurveys) + 1);
+    }
+    List<Survey> randomSurveys = surveyRepository.findAllBySurveyNumIn(randomSelectedSurveyNums);
+    List<GetSurveyRequestDto> results = randomSurveys.stream().map(
+        e -> GetSurveyRequestDto.builder()
+            .surveyNum(e.getSurveyNum())
+            .confrontSurveyNum(e.getConfrontSurveyNum())
+            .category(e.getCategory().toString())
+            .content(e.getContent())
+            .purpose(e.getPurpose())
+            .build()
+    ).toList();
+    redisUtils.saveUserDailySurvey(userId.toString(), results);
+    return results;
+  }
+
 }

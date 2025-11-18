@@ -2,7 +2,7 @@ package com.lingo.lingoproject.survey;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
+import com.lingo.lingoproject.survey.dto.GetSurveyRequestDto;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
 import com.lingo.lingoproject.survey.dto.UploadSurveyRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
@@ -49,8 +49,8 @@ public class SurveyController {
 
   @Operation(summary = "설문지 조회")
   @GetMapping()
-  public ResponseEntity<JsonListWrapper<GetSurveyResponseDto>> getSurveys(){
-    List<GetSurveyResponseDto> list = surveyService.getSurveys();
+  public ResponseEntity<JsonListWrapper<GetSurveyRequestDto>> getSurveys(){
+    List<GetSurveyRequestDto> list = surveyService.getSurveys();
     return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(list));
   }
 
@@ -60,5 +60,12 @@ public class SurveyController {
       @AuthenticationPrincipal User user){
     surveyService.saveSurveyResponse(responses, user);
     return ResponseEntity.ok().body("정상적으로 설문지 응답이 저장되었습니다.");
+  }
+
+  @Operation(summary = "일일 설문 조회", description = "날마다 진행하는 설문 문항들 조회, 만약 설문을 진행했으면 null 반환")
+  @GetMapping("/daily")
+  public ResponseEntity<JsonListWrapper<GetSurveyRequestDto>> getDailySurveys(@RequestParam Long userId){
+    List<GetSurveyRequestDto> dto = surveyService.getDailySurveys(userId);
+    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(dto));
   }
 }
