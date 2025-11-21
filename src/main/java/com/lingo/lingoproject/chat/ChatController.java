@@ -209,7 +209,7 @@ public class ChatController {
               .build())
         .build();
       BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(multicastMessage);
-      // 이미지가 전송되지 않으면 몇개의 이미지가 전송되지 않았는데 데이터베이스에 저장
+      // 이미지가 전송되지 않으면 몇개의 이미지가 전송되지 않았는지 데이터베이스에 저장
       if(response.getFailureCount() > 0){
         List<SendResponse> responses = response.getResponses();
         int count = 0;
