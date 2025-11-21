@@ -8,6 +8,7 @@ import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.match.dto.RequestMatchingResponseDto;
 import com.lingo.lingoproject.match.dto.SaveMatchingRequestMessageRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -51,7 +52,7 @@ public class MatchController {
       description = "매칭 요청에 대한 응답(승낙, 거부)을 하는 api"
   )
   @PatchMapping()
-  public ResponseEntity<String>  responseToMatching(
+  public ResponseEntity<ResultMessageResponseDto>  responseToMatching(
       @Parameter(
           description = "매칭 승낙 여부",
           example = "ACCEPTED",
@@ -61,7 +62,7 @@ public class MatchController {
       @NotNull @RequestParam(value = "matchingId") Long matchingId)
       throws FirebaseMessagingException {
     matchService.responseToRequest(decision, matchingId);
-    return ResponseEntity.ok().body("매칭 상태가 변경되었습니다.");
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("매칭 상태가 변경되었습니다."));
   }
 
   @Operation(summary = "나에게 매칭 요청한 사람 확인")
@@ -96,20 +97,20 @@ public class MatchController {
 
   @Operation(summary = "매칭 삭제")
   @DeleteMapping("/{id}")
-  public ResponseEntity<String> deleteMatching(
+  public ResponseEntity<ResultMessageResponseDto> deleteMatching(
       @Parameter(description = "매칭 id", example = "5")
       @PathVariable("id") Long id){
     matchService.deleteMatching(id);
     log.info("성공적으로 매칭 삭제");
-    return ResponseEntity.ok().body("성공적으로 매칭을 삭제하였습니다.");
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("성공적으로 매칭을 삭제하였습니다."));
   }
 
   @Operation(summary = "매칭 요청 매세지 저장")
   @PostMapping("/message")
-  public ResponseEntity<String> saveMatchingRequestMessage(@Valid @RequestBody
+  public ResponseEntity<ResultMessageResponseDto> saveMatchingRequestMessage(@Valid @RequestBody
       SaveMatchingRequestMessageRequestDto dto){
     matchService.saveMatchingRequestMessage(dto);
-    return ResponseEntity.ok().body("매칭 메세지가 성공적으로 저장되었습니다.");
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("매칭 메세지가 성공적으로 저장되었습니다."));
   }
 
   @Operation(summary = "매칭 요청 메세지 조회")

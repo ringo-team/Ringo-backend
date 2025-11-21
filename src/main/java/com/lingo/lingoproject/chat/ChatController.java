@@ -18,6 +18,7 @@ import com.lingo.lingoproject.repository.ExceptionMessageRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
@@ -132,13 +133,13 @@ public class ChatController {
       description = "채팅방, 채팅방 참여자 정보, 메세지 등을 삭제하는 api"
   )
   @DeleteMapping()
-  public ResponseEntity<String> deleteChatroom(
+  public ResponseEntity<ResultMessageResponseDto> deleteChatroom(
       @Parameter(description = "채팅방 id", example = "3")
       @RequestParam("roomId")@NotNull Long roomId
   ) {
     chatService.deleteChatroom(roomId);
     log.info("채팅방을 삭제했습니다. 삭제한 채팅방 id:  {}", roomId);
-    return ResponseEntity.status(HttpStatus.OK).body("채팅방을 성공적으로 삭제했습니다.");
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("채팅방을 성공적으로 삭제했습니다."));
   }
   /**
    * 클라이언트가 메세지를 보낼 경로(/app/{roomId})를 적는다.
@@ -235,7 +236,7 @@ public class ChatController {
       description = "유저가 채팅방을 나갈 때 호출하는 api"
   )
   @PatchMapping()
-  public void disconnect(
+  public ResponseEntity<ResultMessageResponseDto> disconnect(
       @Parameter(description = "채팅방 id", example = "5")
       @RequestParam(value = "roomId")@NotNull Long roomId,
 
@@ -249,6 +250,8 @@ public class ChatController {
     }
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
     ops.getAndDelete("connect::" + userId + "::" + roomId);
+
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("유저가 채팅방을 나갔습니다."));
   }
 
 }

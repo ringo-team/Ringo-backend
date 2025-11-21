@@ -4,6 +4,7 @@ import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -128,14 +129,14 @@ public class ImageController {
       description = "프로필 id에 해당하는 이미지를 삭제합니다."
   )
   @DeleteMapping("/profiles/{profileId}")
-  public ResponseEntity<String> deleteProfileImage(
+  public ResponseEntity<ResultMessageResponseDto> deleteProfileImage(
       @Parameter(description = "프로필 id", example = "12")
       @PathVariable(value = "profileId") Long profileId,
 
       @AuthenticationPrincipal User user
   ){
     imageService.deleteProfile(profileId, user.getId());
-    return ResponseEntity.ok().body("이미지를 성공적으로 삭제했습니다.");
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("이미지를 성공적으로 삭제했습니다."));
   }
 
   @Operation(
@@ -143,22 +144,22 @@ public class ImageController {
       description = "스냅 사진 id에 해당하는 이미지를 삭제합니다."
   )
   @DeleteMapping("/snaps/{snapImageId}")
-  public ResponseEntity<String> deleteSnapImage(
+  public ResponseEntity<ResultMessageResponseDto> deleteSnapImage(
     @Parameter(description = "스냅 사진 id", example = "11")
       @PathVariable(value = "snapImageId") Long snapImageId,
 
       @AuthenticationPrincipal User user
   ){
     imageService.deleteSnapImage(snapImageId, user.getId());
-    return ResponseEntity.status(HttpStatus.OK).body("성공적으로 스냅 사진을 삭제하였습니다.");
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("성공적으로 스냅 사진을 삭제하였습니다."));
   }
 
   @Operation(summary = "스냅 사진 내용 저장")
   @PatchMapping("/snaps")
-  public ResponseEntity<String> updateSnapImageDescription(
+  public ResponseEntity<ResultMessageResponseDto> updateSnapImageDescription(
       @RequestBody UpdateSnapImageDescriptionRequestDto dto
   ){
     imageService.updateSnapImageDescription(dto);
-    return ResponseEntity.status(HttpStatus.OK).body("성공적으로 스냅 사진 설명을 성공적으로 저장하였습니다.");
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("성공적으로 스냅 사진 설명을 성공적으로 저장하였습니다."));
   }
 }

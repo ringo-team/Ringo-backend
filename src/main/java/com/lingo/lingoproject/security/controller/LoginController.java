@@ -2,10 +2,12 @@ package com.lingo.lingoproject.security.controller;
 
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.security.controller.dto.LoginInfoDto;
 import com.lingo.lingoproject.security.controller.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.security.services.LoginService;
+import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -44,7 +46,7 @@ public class LoginController {
       description = "커스텀 인증 필터에서 처리한 로그인 정보를 사용해 토큰을 발급합니다."
   )
   public ResponseEntity<LoginResponseDto> login(
-      /**
+      /*
        * swagger용 requestBody입니다.
        */
       @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -58,7 +60,7 @@ public class LoginController {
     try {
       info = (LoginInfoDto) request.getAttribute("requestBody");
     } catch (Exception e) {
-      e.printStackTrace();
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     LoginResponseDto response = loginService.login(info);
     return ResponseEntity.status(HttpStatus.OK)
@@ -87,24 +89,24 @@ public class LoginController {
 
   @PostMapping("/signup")
   @Operation(summary = "회원 가입", description = "회원 가입에 필요한 정보로 계정을 생성합니다.")
-  public ResponseEntity<String> signup(@Valid @RequestBody LoginInfoDto dto) {
+  public ResponseEntity<ResultMessageResponseDto> signup(@Valid @RequestBody LoginInfoDto dto) {
     loginService.signup(dto);
-    return ResponseEntity.status(HttpStatus.OK).body("회원가입이 완료되었습니다.");
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("회원가입이 완료되었습니다."));
   }
 
   @PostMapping("/signup/user-info")
   @Operation(summary = "회원 정보 입력", description = "회원가입 시 유저 정보 저장")
-  public ResponseEntity<String> signupUserInfo(@Valid @RequestBody SignupUserInfoDto dto){
+  public ResponseEntity<ResultMessageResponseDto> signupUserInfo(@Valid @RequestBody SignupUserInfoDto dto){
     loginService.saveUserInfo(dto);
-    return ResponseEntity.ok().body("유저 정보 저장이 완료되었습니다.");
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("유저 정보 저장이 완료되었습니다."));
   }
 
   @GetMapping("/api/logout")
   @Operation(summary = "로그아웃", description = "헤더의 액세스 토큰을 무효화합니다.")
-  public ResponseEntity<String> logout(HttpServletRequest request, @AuthenticationPrincipal User user, @RequestHeader(value = "Authorization") String token) {
+  public ResponseEntity<ResultMessageResponseDto> logout(HttpServletRequest request, @AuthenticationPrincipal User user, @RequestHeader(value = "Authorization") String token) {
     log.info(user.getId().toString());
     request.getSession().invalidate();
     loginService.logout(user, token);
-    return ResponseEntity.status(HttpStatus.OK).body("로그아웃이 완료되었습니다.");
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("로그아웃이 완료되었습니다."));
   }
 }

@@ -84,7 +84,7 @@ public class SelfAuthService {
     params.add("scope", "default");
     HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(params, headers);
 
-    /**
+    /*
      *  Authorization : Basic + Base64(clientId:clientSecret)
      *  URL?grant_type=client_credentials&scope=default
      */
@@ -126,7 +126,7 @@ public class SelfAuthService {
     SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
     String dateTime = sdf.format(timestamp);
 
-    /**
+    /*
      *  Authorization : bearer + Base64(accessToken:timestamp:clientId)
      *  ProductId
      *  {
@@ -159,7 +159,7 @@ public class SelfAuthService {
         .build();
     HttpEntity<GetCryptoTokenRequestDto> request = new HttpEntity<>(requestDto, headers);
 
-    /**
+    /*
      *  암호화 토큰 요청
      */
     GetCryptoTokenResponseDto response = null;
@@ -176,7 +176,7 @@ public class SelfAuthService {
     ){
       throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    /**
+    /*
      *  응답으로부터 토큰을 생성
      */
     String siteCode = response.getDataBody().siteCode();
@@ -202,7 +202,6 @@ public class SelfAuthService {
    *  - token_version_id
    *  - enc_data = encrypt( sitecode, requestno, returnurl,authtype, methodtype )
    *  - integrity_value
-   * @return
    */
   public AuthWindowRequestDto getAuthWindowRequestData (Long userId)
       throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, JsonProcessingException, IllegalBlockSizeException, BadPaddingException {
@@ -210,7 +209,7 @@ public class SelfAuthService {
     CryptoTokenInfo tokenInfo = getCryptoTokenInfo(getAccessToken());
     String token = tokenInfo.getToken();
 
-    /**
+    /*
      *  요청데이터(plainRequestData)를 암호화 및 복호화하기 위한 키 생성
      *  이전에 생성했던 암호화 토큰으로 키를 생성한다.
      */
@@ -218,7 +217,7 @@ public class SelfAuthService {
     String iv = token.substring(token.length() - 16);
     String hmacKey = token.substring(0, 32);
 
-    /**
+    /*
      * 나중에 복호화할 때 쓰기 위해
      * redis에 key 정보를 보관해놓는다.
      */
@@ -229,7 +228,7 @@ public class SelfAuthService {
         .build();
     redisUtils.saveDecryptKeyObject(tokenInfo.getTokenVersionId(), object);
 
-    /**
+    /*
      * 요청 데이터(plainRequestData)에는 다음과 같은 정보가 포함된다.
      *  - requestno : ringo에서 생성한 임의의 값
      *  - returnurl : 사용자 본인인증 정보를 받을 콜백 주소
@@ -249,7 +248,7 @@ public class SelfAuthService {
     }
     String dataStringValue = objectMapper.writeValueAsString(plainRequestData);
 
-    /**
+    /*
      * plainRequestData를 암호화하는 로직이다.
      * plainRequestData -> encryptedRequestData
      */
@@ -291,20 +290,20 @@ public class SelfAuthService {
     String iv = object.getIv();
     String hmacKey = object.getHmacKey();
 
-    /** encryptedData로부터 integrityValue를 생성 */
+    /* encryptedData로부터 integrityValue를 생성 */
     Mac mac = Mac.getInstance("HmacSHA256");
     SecretKeySpec secretKey = new SecretKeySpec(hmacKey.getBytes(), "HmacSHA256");
     mac.init(secretKey);
     byte[] integrityByte = mac.doFinal(encryptedData.getBytes());
     String integrityValue = Base64.getEncoder().encodeToString(integrityByte);
 
-    /** pass 서버로부터 받은 originalIntegrityValue와 방금 생성한 integrityValue가 동일한지 확인 */
+    /* pass 서버로부터 받은 originalIntegrityValue와 방금 생성한 integrityValue가 동일한지 확인 */
     if(!integrityValue.equals(originalIntegrityValue)){
       log.info("메세지가 위조되었거나 무결성 검증 과정에서 오류가 발생하였습니다.");
       throw new RingoException("잘못된 암호문이 도달했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    /** 데이터를 복호화하여 리턴함 */
+    /* 데이터를 복호화하여 리턴함 */
     secretKey = new SecretKeySpec(key.getBytes(), "AES");
     Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
     cipher.init(Cipher.DECRYPT_MODE, secretKey, new IvParameterSpec(iv.getBytes()));
@@ -320,7 +319,7 @@ public class SelfAuthService {
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    /** 유저를 찾아서 유저 정보를 저장함*/
+    /* 유저를 찾아서 유저 정보를 저장함*/
     User user = userRepository.findById(Long.parseLong(userSelfAuthInfo.getUserId()))
         .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
@@ -338,7 +337,7 @@ public class SelfAuthService {
     user.setUserSelfAuthInfo(userSelfAuthInfo);
     userRepository.save(user);
 
-    /**
+    /*
      * 본인인증에 성공했다는 사실을 레디스에 저장함
      */
     String id = "self-auth" + user.getId();

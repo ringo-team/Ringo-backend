@@ -7,6 +7,7 @@ import com.lingo.lingoproject.snap.dto.GetPhotographerInfosRequestDto;
 import com.lingo.lingoproject.snap.dto.UpdatePhotographerExampleImagesInfoRequestDto;
 import com.lingo.lingoproject.snap.dto.SavePhotographerInfoRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
@@ -33,16 +34,16 @@ public class SnapController {
 
   @Operation(summary = "스냅 사진 신청")
   @PostMapping("/snaps")
-  public ResponseEntity<String> applySnapShooting(@Valid @RequestBody ApplySnapShootingRequestDto dto){
+  public ResponseEntity<ResultMessageResponseDto> applySnapShooting(@Valid @RequestBody ApplySnapShootingRequestDto dto){
     snapService.applySnapShooting(dto);
-    return ResponseEntity.ok().body("성공적으로 촬영 날짜가 저장되었습니다.");
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("성공적으로 촬영 날짜가 저장되었습니다."));
   }
 
   @Operation(summary = "사진 작가 정보 저장")
   @PostMapping("/photo/snaps")
-  public ResponseEntity<String> savePhotographerInfo(@Valid @RequestBody SavePhotographerInfoRequestDto dto){
+  public ResponseEntity<ResultMessageResponseDto> savePhotographerInfo(@Valid @RequestBody SavePhotographerInfoRequestDto dto){
     snapService.savePhotographerInfo(dto);
-    return ResponseEntity.ok().body("성공적으로 작가 정보가 저장되었습니다.");
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("성공적으로 작가 정보가 저장되었습니다."));
   }
 
   @Operation(summary = "촬영 예시 사진 업로드")
@@ -60,11 +61,11 @@ public class SnapController {
 
   @Operation(summary = "촬영 예시 사진 정보 저장")
   @PatchMapping(value = "/photo/snaps")
-  public ResponseEntity<String> updatePhotographerExampleImagesInfo(
+  public ResponseEntity<ResultMessageResponseDto> updatePhotographerExampleImagesInfo(
     @Valid @RequestBody UpdatePhotographerExampleImagesInfoRequestDto dto
   ){
     snapService.updatePhotographerExampleImagesInfo(dto);
-    return ResponseEntity.ok().body("정상적으로 사진 정보가 저장되었습니다.");
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("정상적으로 사진 정보가 저장되었습니다."));
   }
 
   @Operation(summary = "작가 정보 가져오기")
