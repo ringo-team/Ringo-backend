@@ -25,7 +25,7 @@ public class Withdrawer{
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  private LocalDateTime joinPeriod;
+  private Long joinPeriod;
   private String reason;
 
   @CreationTimestamp
