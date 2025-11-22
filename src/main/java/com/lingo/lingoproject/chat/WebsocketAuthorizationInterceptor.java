@@ -32,11 +32,13 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
 
     if (accessor == null) return message;
 
-    if(StompCommand.CONNECT.equals(accessor.getCommand()) || StompCommand.DISCONNECT.equals(accessor.getCommand())){
+    if (StompCommand.DISCONNECT.equals(accessor.getCommand())){
       return message;
     }
 
     String token = accessor.getFirstNativeHeader("Authorization");
+
+    /*------------------------------------토큰 검증-----------------------------------------*/
     if (token == null || !token.startsWith("Bearer ")) {
       throw new RingoException("토큰이 없습니다.", HttpStatus.FORBIDDEN);
     }
@@ -47,11 +49,18 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     Claims claims = jwtUtil.getClaims(token);
     User user = userRepository.findByEmail(claims.getSubject())
             .orElseThrow(() -> new RingoException("유효한 토큰이 아닙니다.", HttpStatus.FORBIDDEN));
+    /*-------------------------------------------------------------------------------------*/
 
+    /*------------------------------------토큰으로 인증----------------------------------------*/
     Authentication authentication = new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities());
     SecurityContextHolder.getContext().setAuthentication(authentication);
 
     accessor.setUser(authentication);
+    /*--------------------------------------------------------------------------------------*/
+
+    if (StompCommand.CONNECT.equals(accessor.getCommand())){
+      return message;
+    }
 
     String destination = accessor.getDestination();
     Long roomId = extractRoomId(destination);
