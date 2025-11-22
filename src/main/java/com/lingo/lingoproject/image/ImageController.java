@@ -53,19 +53,6 @@ public class ImageController {
     return ResponseEntity.status(HttpStatus.CREATED).body(dto);
   }
 
-  @Operation(summary = "스냅 사진 일괄 업로드")
-  @PostMapping(value = "/snaps/{userId}", consumes =  MediaType.MULTIPART_FORM_DATA_VALUE)
-  public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadSnapImages(
-      @Parameter(description = "이미지 파일들 업로드")
-      @RequestParam(value = "images") List<MultipartFile> images,
-
-      @Parameter(description = "유저 id", example = "5")
-      @PathVariable("userId") Long userId
-  ){
-    List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images, userId);
-    return ResponseEntity.status(HttpStatus.CREATED).body(new JsonListWrapper<>(dtos));
-  }
-
   @Operation(
       summary = "프로필 조회.",
       description = "프로필 URL과 이미지 id를 반환합니다."
@@ -91,6 +78,34 @@ public class ImageController {
   ){
     GetImageUrlResponseDto dto = imageService.updateProfileImage(image, profileId, user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(dto);
+  }
+
+  @Operation(
+      summary = "프로필 사진 삭제",
+      description = "프로필 id에 해당하는 이미지를 삭제합니다."
+  )
+  @DeleteMapping("/profiles/{profileId}")
+  public ResponseEntity<ResultMessageResponseDto> deleteProfileImage(
+      @Parameter(description = "프로필 id", example = "12")
+      @PathVariable(value = "profileId") Long profileId,
+
+      @AuthenticationPrincipal User user
+  ){
+    imageService.deleteProfile(profileId, user.getId());
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("이미지를 성공적으로 삭제했습니다."));
+  }
+
+  @Operation(summary = "스냅 사진 일괄 업로드")
+  @PostMapping(value = "/snaps/{userId}", consumes =  MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadSnapImages(
+      @Parameter(description = "이미지 파일들 업로드")
+      @RequestParam(value = "images") List<MultipartFile> images,
+
+      @Parameter(description = "유저 id", example = "5")
+      @PathVariable("userId") Long userId
+  ){
+    List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images, userId);
+    return ResponseEntity.status(HttpStatus.CREATED).body(new JsonListWrapper<>(dtos));
   }
 
   @Operation(
@@ -125,21 +140,6 @@ public class ImageController {
   }
 
   @Operation(
-      summary = "프로필 사진 삭제",
-      description = "프로필 id에 해당하는 이미지를 삭제합니다."
-  )
-  @DeleteMapping("/profiles/{profileId}")
-  public ResponseEntity<ResultMessageResponseDto> deleteProfileImage(
-      @Parameter(description = "프로필 id", example = "12")
-      @PathVariable(value = "profileId") Long profileId,
-
-      @AuthenticationPrincipal User user
-  ){
-    imageService.deleteProfile(profileId, user.getId());
-    return ResponseEntity.ok().body(new ResultMessageResponseDto("이미지를 성공적으로 삭제했습니다."));
-  }
-
-  @Operation(
       summary = "스냅 사진 삭제",
       description = "스냅 사진 id에 해당하는 이미지를 삭제합니다."
   )
@@ -157,9 +157,10 @@ public class ImageController {
   @Operation(summary = "스냅 사진 내용 저장")
   @PatchMapping("/snaps")
   public ResponseEntity<ResultMessageResponseDto> updateSnapImageDescription(
-      @RequestBody UpdateSnapImageDescriptionRequestDto dto
+      @RequestBody UpdateSnapImageDescriptionRequestDto dto,
+      @AuthenticationPrincipal User user
   ){
-    imageService.updateSnapImageDescription(dto);
+    imageService.updateSnapImageDescription(dto, user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("성공적으로 스냅 사진 설명을 성공적으로 저장하였습니다."));
   }
 }

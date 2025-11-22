@@ -62,11 +62,11 @@ public class ImageService {
   @Transactional
   public GetImageUrlResponseDto uploadProfileImage(MultipartFile file, Long userId) {
 
-    if (!isFaceImageExists(file)){
+    if (!existsFaceInImage(file)){
       return null;
     }
 
-    if (isNonModerateImages(file)){
+    if (isUnmoderateImage(file)){
       return null;
     }
 
@@ -98,18 +98,18 @@ public class ImageService {
   }
 
   @Transactional
-  public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long profileId, Long tokenUserId){
+  public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long profileId, Long userId){
 
-    if (!isFaceImageExists(file)){
+    if (!existsFaceInImage(file)){
       return null;
     }
 
-    if (isNonModerateImages(file)){
+    if (isUnmoderateImage(file)){
       return null;
     }
 
     Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException("Profile not found", HttpStatus.BAD_REQUEST));
-    if(!isOwnerImage(profile.getUser(), tokenUserId)){
+    if(!hasPermissionOnImage(profile.getUser(), userId)){
       throw new RingoException("삭제할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
     String imageUrl = getOriginalFilename(profile.getImageUrl());
@@ -133,7 +133,7 @@ public class ImageService {
 
     for(MultipartFile file : images){
 
-      if (isNonModerateImages(file)){
+      if (isUnmoderateImage(file)){
         continue;
       }
 
@@ -154,10 +154,10 @@ public class ImageService {
   }
 
   @Transactional
-  public void deleteProfile(Long profileId, Long tokenUserId){
+  public void deleteProfile(Long profileId, Long userId){
     Profile profile = profileRepository.findById(profileId)
         .orElseThrow(() -> new RingoException("Profile not found", HttpStatus.BAD_REQUEST));
-    if(!isOwnerImage(profile.getUser(), tokenUserId)){
+    if(!hasPermissionOnImage(profile.getUser(), userId)){
       return;
     }
     profileRepository.delete(profile);
@@ -191,12 +191,12 @@ public class ImageService {
   @Transactional
   public GetImageUrlResponseDto updateSnapImage(MultipartFile file, Long snapImageId, String description, Long tokenUserId){
 
-    if (isNonModerateImages(file)){
+    if (isUnmoderateImage(file)){
       return null;
     }
 
     SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException("Snap image not found", HttpStatus.BAD_REQUEST));
-    if(!isOwnerImage(snapImage.getUser(), tokenUserId)){
+    if(!hasPermissionOnImage(snapImage.getUser(), tokenUserId)){
       throw new RingoException("업데이트 할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
     String imageUrl = getOriginalFilename(snapImage.getImageUrl());
@@ -215,10 +215,10 @@ public class ImageService {
   }
 
   @Transactional
-  public void deleteSnapImage(Long snapImageId, Long tokenUserId){
+  public void deleteSnapImage(Long snapImageId, Long userId){
     SnapImage snapImage = snapImageRepository.findById(snapImageId)
         .orElseThrow(() -> new RingoException("Snap image not found", HttpStatus.BAD_REQUEST));
-    if (!isOwnerImage(snapImage.getUser(), tokenUserId)){
+    if (!hasPermissionOnImage(snapImage.getUser(), userId)){
       return;
     }
     snapImageRepository.delete(snapImage);
@@ -285,13 +285,13 @@ public class ImageService {
     return imageUrl;
   }
 
-  public boolean isOwnerImage(User user, Long tokenUserId){
+  public boolean hasPermissionOnImage(User user, Long accessUserId){
     Long userId = user.getId();
-    User tokenUser = userRepository.findById(tokenUserId).orElseThrow(() -> new RingoException("Token not found", HttpStatus.BAD_REQUEST));
-    if(tokenUser.getRole().equals(Role.ADMIN)){
+    User accessUser = userRepository.findById(accessUserId).orElseThrow(() -> new RingoException("Token not found", HttpStatus.BAD_REQUEST));
+    if(accessUser.getRole().equals(Role.ADMIN)){
       return true;
     }
-    return userId.equals(tokenUserId);
+    return userId.equals(accessUserId);
   }
 
   @Async
@@ -307,15 +307,20 @@ public class ImageService {
     return  ImageUrl.substring(ImageUrl.lastIndexOf("/") + 1);
   }
 
-  public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto){
+  public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto, Long userId){
+
     SnapImage image = snapImageRepository.findById(dto.snapImageId())
         .orElseThrow(() -> new RingoException("스냅 이미지를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
+    if (!hasPermissionOnImage(image.getUser(), userId)){
+      throw new RingoException("스냅 이미지에 글을 수정할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+    }
 
     image.setDescription(dto.description());
     snapImageRepository.save(image);
   }
 
-  public boolean isNonModerateImages(MultipartFile file) {
+  public boolean isUnmoderateImage(MultipartFile file) {
     byte[] imageBytes = null;
     try {
       imageBytes = file.getBytes();
@@ -337,17 +342,15 @@ public class ImageService {
         if (label.getConfidence() < MIN_CONFIDENCE)
           return false;
         return
-            (name != null && (name.contains("Nudity") || name.contains("Sexual") || name.contains(
-                "Suggestive"))) ||
-                (parent != null && (parent.contains("Nudity") || parent.contains("Sexual")
-                    || parent.contains("Suggestive")));
+            (name != null && (name.contains("Nudity") || name.contains("Sexual") || name.contains("Suggestive")))
+                || (parent != null && (parent.contains("Nudity") || parent.contains("Sexual") || parent.contains("Suggestive")));
       });
     }catch (Exception e){
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  public boolean isFaceImageExists(MultipartFile file){
+  public boolean existsFaceInImage(MultipartFile file){
     byte[] imageBytes = null;
     try {
       imageBytes = file.getBytes();
