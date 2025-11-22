@@ -8,10 +8,12 @@ import com.lingo.lingoproject.domain.ChatroomParticipant;
 import com.lingo.lingoproject.domain.Message;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.ChatType;
+import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.ChatroomRepository;
 import com.lingo.lingoproject.mongo_repository.MessageRepository;
+import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.GenericUtils;
 import jakarta.transaction.Transactional;
@@ -39,26 +41,26 @@ public class ChatService {
   private final UserRepository userRepository;
   private final ChatroomParticipantRepository chatroomParticipantRepository;
   private final GenericUtils genericUtils;
+  private final MatchingRepository matchingRepository;
 
   public List<GetChatResponseDto> getChatMessages(Long chatroomId, int page, int size){
     Pageable pageable = PageRequest.of(page, size);
 
     Page<Message> messages = messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable);
     return messages.stream()
-        .map(m -> {
-          log.info(m.getCreatedAt().toString());
-          return GetChatResponseDto.builder()
+        .map(m ->
+          GetChatResponseDto.builder()
               .chatroomId(chatroomId)
               .senderId(m.getSenderId())
               .content(m.getContent())
               .createdAt(m.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
               .readerIds(m.getReaderIds())
-              .build();
-        })
+              .build()
+        )
         .toList();
   }
 
-  public void saveMessage(GetChatResponseDto message, Long chatroomId){
+  public Message saveMessage(GetChatResponseDto message, Long chatroomId){
     Message messageEntity = Message.builder()
         .id(UUID.randomUUID().toString())
         .chatroomId(chatroomId)
@@ -67,7 +69,7 @@ public class ChatService {
         .readerIds(message.getReaderIds())
         .createdAt(LocalDateTime.now())
         .build();
-    messageRepository.save(messageEntity);
+    return messageRepository.save(messageEntity);
   }
 
   public Chatroom createChatroom(CreateChatroomDto dto){
@@ -78,18 +80,26 @@ public class ChatService {
         .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
     User user2 = userRepository.findById(dto.user2Id())
         .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    // 매칭된 유저가 아니면 채팅방을 생성할 수 없다.
+    if (!(matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(user1, user2, MatchingStatus.ACCEPTED)
+        || matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(user2, user1, MatchingStatus.ACCEPTED))
+    ){
+      throw new RingoException("매칭되지 않은 쌍은 채팅방을 생성할 수 없습니다.", HttpStatus.BAD_REQUEST);
+    }
+    // 채팅방 생성 및 저장
     Chatroom chatroom = Chatroom.builder()
         .chatroomName(dto.user1Id().toString() + "_" +dto.user2Id().toString())
         .type(ChatType.valueOf(dto.chatType()))
         .build();
     Chatroom savedChatroom = chatroomRepository.save(chatroom);
+    // 채팅방 참여자 생성 및 저장
     ChatroomParticipant participant1 = ChatroomParticipant.builder()
         .participant(user1)
-        .chatroom(chatroom)
+        .chatroom(savedChatroom)
         .build();
     ChatroomParticipant participant2 = ChatroomParticipant.builder()
         .participant(user2)
-        .chatroom(chatroom)
+        .chatroom(savedChatroom)
         .build();
     chatroomParticipantRepository.saveAll(List.of(participant1, participant2));
     return savedChatroom;
@@ -101,18 +111,20 @@ public class ChatService {
     List<Chatroom> chatrooms = chatroomRepository.findAllByUser(user);
     List<GetChatroomResponseDto> list = new ArrayList<>();
     for(Chatroom chatroom : chatrooms){
+      // 채팅방에 초대된 유저들의 닉네임을 조회한다. 만약 유저가 탈퇴했다면 유저의 닉네임을 '알 수 없음' 으로 변환한다.
       List<String> participants = chatroomParticipantRepository
           .findAllByChatroom(chatroom)
           .stream()
-          .map(p -> {
-            if(p.getIsWithdrawn()) return "알 수 없음";
-            else return p.getParticipant().getNickname();
+          .map(chatroomParticipant -> {
+            if(chatroomParticipant.getIsWithdrawn()) return "알 수 없음";
+            else return chatroomParticipant.getParticipant().getNickname();
           })
           .toList();
 
-      // 읽지 않은 대화 개수를 찾는다.
+      // 유저가 읽지 않은 메세지의 개수를 조회한다.
       int numberOfNotReadMessages = messageRepository.findNumberOfNotReadMessages(chatroom.getId(),
           user.getId());
+      // 채팅방 마지막 메세지를 조회한다.
       Optional<Message> lastMessage = messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(
           chatroom.getId());
       list.add(GetChatroomResponseDto.builder()
@@ -147,7 +159,11 @@ public class ChatService {
     return userIds.contains(userId);
   }
 
-  public List<String> getUsernamesInChatroom(Long roomId){
+
+  /**
+   * 채팅방에 존재하는 유저들의 이메일들을 조회하는 함수
+   */
+  public List<String> getUserEmailsInChatroom(Long roomId){
     Chatroom chatroom = chatroomRepository.findById(roomId)
         .orElseThrow(() -> new RingoException("Room not found", HttpStatus.BAD_REQUEST));
     return chatroomParticipantRepository.findAllByChatroom(chatroom)
