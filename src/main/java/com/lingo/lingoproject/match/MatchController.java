@@ -13,7 +13,10 @@ import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -45,15 +48,23 @@ public class MatchController {
       summary = "매칭요청",
       description = "유저가 매칭 요청을 할 때 사용하는 api"
   )
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "SUCCESS", content = @Content(schema = @Schema(implementation = RequestMatchingResponseDto.class))),
+      @ApiResponse(responseCode = "406", description = "NOT_ACCEPTABLE", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
+      @ApiResponse(responseCode = "400", description = "BAD_REQUEST", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
+  })
   @PostMapping()
-  public ResponseEntity<RequestMatchingResponseDto> requestMatching(
+  public ResponseEntity<?> requestMatching(
       @Valid @RequestBody MatchingRequestDto matchingRequestDto,
       @AuthenticationPrincipal User user
   ) {
     if (!matchingRequestDto.requestId().equals(user.getId())){
-      throw new RingoException("매칭 요청자와 dto가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("매칭 요청자와 요청 정보가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
     }
     Matching matching = matchService.matchRequest(matchingRequestDto);
+    if (matching == null){
+      return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ResultMessageResponseDto("매칭 점수가 기준 이하로 매칭되지 않았습니다."));
+    }
     return ResponseEntity.ok().body(new RequestMatchingResponseDto(matching.getId()));
   }
 

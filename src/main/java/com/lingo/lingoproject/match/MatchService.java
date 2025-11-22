@@ -88,7 +88,7 @@ public class MatchService {
     User requestUser = userRepository.findById(dto.requestId())
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
     if(!isMatch(calcMatchScore(requestedUser.getId(), requestUser.getId()))){
-      throw new RingoException("연결 적합도가 기준 미만입니다.", HttpStatus.NOT_ACCEPTABLE);
+      return null;
     }
     Matching matching = Matching.builder()
         .requestedUser(requestedUser)
@@ -110,7 +110,7 @@ public class MatchService {
     Matching matching = matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException("적절하지 않은 매칭 id 입니다.", HttpStatus.BAD_REQUEST));
 
-    // 해당 매칭을 요청받은 사람만이 수락 여부를 결정할 수 있다.
+    // 해당 매칭 요청을 받은 사람만이 수락 여부를 결정할 수 있다.
     if (!matching.getRequestedUser().getId().equals(userId)) {
       throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
     }
