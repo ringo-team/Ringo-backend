@@ -11,8 +11,6 @@ import com.lingo.lingoproject.auth.dto.PlainRequestData;
 import com.lingo.lingoproject.auth.dto.AuthWindowRequestDto;
 import com.lingo.lingoproject.auth.dto.UserSelfAuthInfo;
 import com.lingo.lingoproject.domain.User;
-import com.lingo.lingoproject.domain.enums.Gender;
-import com.lingo.lingoproject.domain.enums.Nation;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.RedisUtils;
@@ -24,7 +22,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
-import java.util.Date;
 import java.util.UUID;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -105,10 +102,7 @@ public class SelfAuthService {
   }
 
   /**
-   * access token으로 메세지를 암호화하는데 필요한 토큰을 얻는다.
-   * @param accessToken
-   * @return
-   * @throws NoSuchAlgorithmException
+   * access token으로 메세지를 암호화 및 복호화하는데 필요한 토큰을 얻는다.
    */
   public CryptoTokenInfo getCryptoTokenInfo(String accessToken) throws NoSuchAlgorithmException {
     apiUrl += "digital/niceid/api/v1.0/common/crypto/token";
@@ -121,10 +115,10 @@ public class SelfAuthService {
     headers.add("Authorization", auth);
     headers.add("ProductId", productId);
 
-    String trId = UUID.randomUUID().toString();
+    String createCryptoTokenInfoRequestTransactionId = UUID.randomUUID().toString();
 
     SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
-    String dateTime = sdf.format(timestamp);
+    String createCryptoTokenInfoRequestDateTime = sdf.format(timestamp);
 
     /*
      *  Authorization : bearer + Base64(accessToken:timestamp:clientId)
@@ -151,8 +145,8 @@ public class SelfAuthService {
         .dataBody(
             GetCryptoTokenRequestDto.DataBody
                 .builder()
-                .requestDateTime(dateTime)
-                .requestNum(trId)
+                .requestDateTime(createCryptoTokenInfoRequestDateTime)
+                .requestNum(createCryptoTokenInfoRequestTransactionId)
                 .encryptMode("1")
                 .build()
         )
@@ -180,17 +174,21 @@ public class SelfAuthService {
      *  응답으로부터 토큰을 생성
      */
     String siteCode = response.getDataBody().siteCode();
-    String tokenVersionId = response.getDataBody().tokenVersionId();
+    String responseCryptoTokenVersionId = response.getDataBody().tokenVersionId();
+    String responseCryptoTokenValue = response.getDataBody().tokenVal();
 
-    String token = dateTime.trim() + trId.trim() + response.getDataBody().tokenVal().trim();
-    MessageDigest md = MessageDigest.getInstance("SHA-256");
-    md.update(token.getBytes());
-    String encodedToken = Base64.getEncoder().encodeToString(md.digest());
+    String token = createCryptoTokenInfoRequestDateTime.trim() +
+        createCryptoTokenInfoRequestTransactionId.trim() +
+        responseCryptoTokenValue.trim();
+    MessageDigest hashFunction = MessageDigest.getInstance("SHA-256");
+    hashFunction.update(token.getBytes());
+    byte[] cryptoTokenByHashing = hashFunction.digest();
+    String base64EncodedCryptoToken = Base64.getEncoder().encodeToString(cryptoTokenByHashing);
 
     CryptoTokenInfo info = CryptoTokenInfo.builder()
         .siteCode(siteCode)
-        .tokenVersionId(tokenVersionId)
-        .token(encodedToken)
+        .tokenVersionId(responseCryptoTokenVersionId)
+        .token(base64EncodedCryptoToken)
         .build();
 
     return info;
@@ -200,7 +198,7 @@ public class SelfAuthService {
   /**
    * 클라이언트에서 호출창 호출을 위한 3가지 데이터를 생성 및 전달하는 함수
    *  - token_version_id
-   *  - enc_data = encrypt( sitecode, requestno, returnurl,authtype, methodtype )
+   *  - enc_data = encrypt( sitecode, requestno, returnurl, authtype, methodtype )
    *  - integrity_value
    */
   public AuthWindowRequestDto getAuthWindowRequestData (Long userId)
@@ -213,18 +211,19 @@ public class SelfAuthService {
      *  요청데이터(plainRequestData)를 암호화 및 복호화하기 위한 키 생성
      *  이전에 생성했던 암호화 토큰으로 키를 생성한다.
      */
-    String key = token.substring(0, 16);
-    String iv = token.substring(token.length() - 16);
-    String hmacKey = token.substring(0, 32);
+    String encryptionKey = token.substring(0, 16);
+    String initialValueForEncryption = token.substring(token.length() - 16);
+    String hmacKeyForIntegrityCheck  = token.substring(0, 32);
 
     /*
      * 나중에 복호화할 때 쓰기 위해
      * redis에 key 정보를 보관해놓는다.
+     * 대칭키 암호화 방식을 사용하기 때문에 암호화 키가 복호화할 때 사용된다.
      */
     DecryptKeyObject object = DecryptKeyObject.builder()
-        .key(key)
-        .iv(iv)
-        .hmacKey(hmacKey)
+        .decryptionKey(encryptionKey)
+        .initialValueForDecryption(initialValueForEncryption)
+        .hmacKeyForIntegrityCheck(hmacKeyForIntegrityCheck)
         .build();
     redisUtils.saveDecryptKeyObject(tokenInfo.getTokenVersionId(), object);
 
@@ -250,27 +249,27 @@ public class SelfAuthService {
 
     /*
      * plainRequestData를 암호화하는 로직이다.
-     * plainRequestData -> encryptedRequestData
+     * plainRequestData -> base64EncodedAndEncryptedRequestData
      */
-    SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "AES");
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    cipher.init(Cipher.ENCRYPT_MODE, secretKey, new IvParameterSpec(iv.getBytes(StandardCharsets.UTF_8)));
-    byte[] encryptedRequestByte = cipher.doFinal(dataStringValue.trim().getBytes(StandardCharsets.UTF_8));
-    String encryptedRequestData = Base64.getEncoder().encodeToString(encryptedRequestByte);
+    SecretKeySpec secretKeyForEncryption = new SecretKeySpec(encryptionKey.getBytes(StandardCharsets.UTF_8), "AES");
+    Cipher encryptFunction = Cipher.getInstance("AES/CBC/PKCS5Padding");
+    encryptFunction.init(Cipher.ENCRYPT_MODE, secretKeyForEncryption, new IvParameterSpec(initialValueForEncryption.getBytes(StandardCharsets.UTF_8)));
+    byte[] encryptedRequestByte = encryptFunction.doFinal(dataStringValue.trim().getBytes(StandardCharsets.UTF_8));
+    String base64EncodedAndEncryptedRequestData = Base64.getEncoder().encodeToString(encryptedRequestByte);
 
-    /**
+    /*
      * 암호화 후 무결성을 확인하기 위해 integrityValue를 추가적으로 생성하여 전달한다.
      */
-    Mac mac = Mac.getInstance("HmacSHA256");
-    secretKey = new SecretKeySpec(hmacKey.getBytes(), "HmacSHA256");
-    mac.init(secretKey);
-    byte[] integrityByte = mac.doFinal(encryptedRequestByte);
+    Mac hashFunction = Mac.getInstance("HmacSHA256");
+    SecretKeySpec secretKeyForHashing = new SecretKeySpec(hmacKeyForIntegrityCheck.getBytes(), "HmacSHA256");
+    hashFunction.init(secretKeyForHashing);
+    byte[] integrityByte = hashFunction.doFinal(encryptedRequestByte);
     String integrityValue = Base64.getEncoder().encodeToString(integrityByte);
 
     return AuthWindowRequestDto.builder()
         .m("m")
         .tokenVersionId(tokenInfo.getTokenVersionId())
-        .encryptedData(encryptedRequestData)
+        .encryptedData(base64EncodedAndEncryptedRequestData)
         .integrityValue(integrityValue)
         .build();
   }
@@ -285,16 +284,16 @@ public class SelfAuthService {
   public String validateIntegrityAndDecryptData(String tokenVersionId, String encryptedData, String originalIntegrityValue)
       throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException {
 
-    DecryptKeyObject object = (DecryptKeyObject) redisUtils.getDecryptKeyObject(tokenVersionId);
-    String key = object.getKey();
-    String iv = object.getIv();
-    String hmacKey = object.getHmacKey();
+    DecryptKeyObject object = redisUtils.getDecryptKeyObject(tokenVersionId);
+    String decryptionKey = object.getDecryptionKey();
+    String initialValueForDecryption = object.getInitialValueForDecryption();
+    String hmacKeyForIntegrityCheck = object.getHmacKeyForIntegrityCheck();
 
     /* encryptedData로부터 integrityValue를 생성 */
-    Mac mac = Mac.getInstance("HmacSHA256");
-    SecretKeySpec secretKey = new SecretKeySpec(hmacKey.getBytes(), "HmacSHA256");
-    mac.init(secretKey);
-    byte[] integrityByte = mac.doFinal(encryptedData.getBytes());
+    Mac hashFunction = Mac.getInstance("HmacSHA256");
+    SecretKeySpec secretKeyForHashing = new SecretKeySpec(hmacKeyForIntegrityCheck.getBytes(), "HmacSHA256");
+    hashFunction.init(secretKeyForHashing);
+    byte[] integrityByte = hashFunction.doFinal(encryptedData.getBytes());
     String integrityValue = Base64.getEncoder().encodeToString(integrityByte);
 
     /* pass 서버로부터 받은 originalIntegrityValue와 방금 생성한 integrityValue가 동일한지 확인 */
@@ -304,10 +303,10 @@ public class SelfAuthService {
     }
 
     /* 데이터를 복호화하여 리턴함 */
-    secretKey = new SecretKeySpec(key.getBytes(), "AES");
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    cipher.init(Cipher.DECRYPT_MODE, secretKey, new IvParameterSpec(iv.getBytes()));
-    String decryptedData = new String(cipher.doFinal(Base64.getDecoder().decode(encryptedData)), "EUC-KR");
+    SecretKeySpec secretKeyForDecryption = new SecretKeySpec(decryptionKey.getBytes(), "AES");
+    Cipher decryptFunction = Cipher.getInstance("AES/CBC/PKCS5Padding");
+    decryptFunction.init(Cipher.DECRYPT_MODE, secretKeyForDecryption, new IvParameterSpec(initialValueForDecryption.getBytes()));
+    String decryptedData = new String(decryptFunction.doFinal(Base64.getDecoder().decode(encryptedData)), "EUC-KR");
     return decryptedData;
   }
 
@@ -337,10 +336,6 @@ public class SelfAuthService {
     user.setUserSelfAuthInfo(userSelfAuthInfo);
     userRepository.save(user);
 
-    /*
-     * 본인인증에 성공했다는 사실을 레디스에 저장함
-     */
-    String id = "self-auth" + user.getId();
-    redisUtils.saveDecryptKeyObject(id, true);
+    redisUtils.saveSelfAuthCompletionMark(user.getId().toString());
   }
 }
