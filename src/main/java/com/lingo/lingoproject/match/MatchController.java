@@ -70,7 +70,7 @@ public class MatchController {
   public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> getUserWhoRequestsToId(
       @Parameter(description = "유저id", example = "5")
       @PathVariable("id") Long id){
-    List<GetUserProfileResponseDto> requestUserIds = matchService.getUserIdRequests(id);
+    List<GetUserProfileResponseDto> requestUserIds = matchService.getUserIdWhoRequestToMe(id);
     return ResponseEntity.ok().body(new JsonListWrapper<>(requestUserIds));
   }
 
@@ -79,7 +79,7 @@ public class MatchController {
   public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> getUserRequestedById(
       @Parameter(description = "유저id", example = "5")
       @PathVariable("id") Long id){
-    List<GetUserProfileResponseDto> requestedUserIds = matchService.getUserIdRequested(id);
+    List<GetUserProfileResponseDto> requestedUserIds = matchService.getUserIdWhoRequestedByMe(id);
     return ResponseEntity.ok().body(new JsonListWrapper<>(requestedUserIds));
   }
 

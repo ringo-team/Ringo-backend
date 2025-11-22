@@ -19,4 +19,6 @@ public interface MatchingRepository extends JpaRepository<Matching, Long> {
   void deleteAllByRequestedUser(User requestedUser);
 
   void deleteAllByRequestUser(User requestUser);
+
+  boolean existsByRequestUserAndRequestedUserAndMatchingStatus(User requestUser, User requestedUser, MatchingStatus matchingStatus);
 }

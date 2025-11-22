@@ -36,12 +36,14 @@ import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -66,9 +68,9 @@ public class MatchService {
   private final FcmTokenRepository fcmTokenRepository;
   private final UserRepositoryImpl userRepositoryImpl;
 
-  private final int MAX_RECOMMEND_PROFILE_SIZE = 10;
+  private final int MAX_RECOMMEND_PROFILE_SIZE = 4;
   private final int MAX_NUMBER_OF_LOOP = 10;
-  private final int NUMBER_OF_ENABLE_MATCHING = 7;
+  private final int NUMBER_OF_DAILY_RECOMMENDATION = 4;
   private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
 
   @Value("${ringo.config.survey.space_weight}")
@@ -152,40 +154,24 @@ public class MatchService {
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
     List<Long> banUserId = getBannedRecommendedUserList(userEntity.getId());
 
-    /**
+    /*
      * setSize는 rtnSet의 크기로 추천이성 정보의 개수이다.
-     * setSize의 크기가 10 이상이거나 반복문을 10번 돌면 반복문을 빠져나온다.
+     * setSize의 크기가 4 이상이거나 반복문을 10번 돌면 반복문을 빠져나온다.
      *
-     * findRandomUsers는 banIds를 제외한 이성친구를 무작위로 추천한다.
-     * setSize가 7이하 일때는 매칭이 가능한 사람을 추가하고 8이상일 때는 매칭이 불가능한 이성을 추천한다.
+     * findRandomUsers는 banUserIds를 제외한 이성친구를 무작위로 추천한다.
      */
     while(setSize < MAX_RECOMMEND_PROFILE_SIZE && count < MAX_NUMBER_OF_LOOP){
       List<User> randUsers = userRepositoryImpl.findRandomOppositeGenderAndNotBannedFriend(userEntity.getGender(), banUserId);
       for(User randUser : randUsers){
-        // setSize가 10 이상일 때는 while & for 반복문이 종료된다.
+        // setSize가 4 이상일 때는 while & for 반복문이 종료된다.
         if(setSize >= MAX_RECOMMEND_PROFILE_SIZE) break;
         Float matchingScore = calcMatchScore(userId, randUser.getId());
         /*
-        // 7명은 매칭이 가능하도록
         if((setSize < NUMBER_OF_ENABLE_MATCHING && isMatch(matchingScore)) ||
             (setSize >= NUMBER_OF_ENABLE_MATCHING && !isMatch(matchingScore))){
          */
         if(isMatch(matchingScore)){
-          Profile profile = profileRepository.findByUser(randUser)
-              .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
-          List<String> hashtags = hashtagRepository.findAllByUser(randUser)
-              .stream()
-              .map(Hashtag::getHashtag)
-              .toList();
-          rtnSet.add(
-              GetUserProfileResponseDto.builder()
-                  .userId(randUser.getId())
-                  .age(randUser.getAge())
-                  .nickname(randUser.getNickname())
-                  .profileUrl(profile.getImageUrl())
-                  .hashtags(hashtags)
-                  .build()
-          );
+          addUserInfoInCollection(rtnSet, randUser);
           setSize++;
         }
       }
@@ -198,22 +184,25 @@ public class MatchService {
   }
 
   public List<GetUserProfileResponseDto> recommendUserForDailySurvey(Long userId){
+    // 일일 추천 이성이 레디스에 저장되어 있다면 레디스의 저장된 값을 반환한다.
     if (redisUtils.containsRecommendUserForDailySurvey(userId.toString())){
       return redisUtils.getRecommendUserForDailySurvey(userId.toString());
     }
     User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
-    if (!isCompleteTodaySurvey(user)){
-      return null;
-    }
+
     List<AnsweredSurvey> answeredSurveys = answeredSurveyRepository.findAllByUserAndCreatedAtBetween(
         user,
         LocalDate.now().atStartOfDay(),
         LocalDateTime.now()
     );
-    Random random = new Random(System.currentTimeMillis());
+    // 만약 설문을 완료하지 않았다면 추천받을 수 없다.
+    if (answeredSurveys.isEmpty()){
+      return null;
+    }
 
-    // 4명만 추천해줌
-    while(answeredSurveys.size() > 4){
+    // 무작위로 4명을 추천해줌
+    Random random = new Random(System.currentTimeMillis());
+    while(answeredSurveys.size() > NUMBER_OF_DAILY_RECOMMENDATION){
       int index = random.nextInt(answeredSurveys.size());
       answeredSurveys.remove(index);
     }
@@ -227,23 +216,29 @@ public class MatchService {
       );
       AnsweredSurvey sameAnsweredSurvey = sameAnsweredSurveyList.get(random.nextInt(sameAnsweredSurveyList.size()));
       User recommendedUser = sameAnsweredSurvey.getUser();
-      Profile profile = profileRepository.findByUser(recommendedUser)
-          .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
-      List<String> hashtags = hashtagRepository.findAllByUser(recommendedUser)
-          .stream()
-          .map(Hashtag::getHashtag)
-          .toList();
-      recommendUserList.add(
-          GetUserProfileResponseDto.builder()
-              .userId(recommendedUser.getId())
-              .age(recommendedUser.getAge())
-              .nickname(recommendedUser.getNickname())
-              .profileUrl(profile.getImageUrl())
-              .hashtags(hashtags)
-              .build()
-      );
+      addUserInfoInCollection(recommendUserList, recommendedUser);
     }
+    // 레디스에 일일 유저 설문 내용을 저장함
+    redisUtils.saveRecommendUserForDailySurvey(userId.toString(), recommendUserList);
     return recommendUserList;
+  }
+
+  public void addUserInfoInCollection(Collection<GetUserProfileResponseDto> collection, User user){
+    Profile profile = profileRepository.findByUser(user)
+        .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
+    List<String> hashtags = hashtagRepository.findAllByUser(user)
+        .stream()
+        .map(Hashtag::getHashtag)
+        .toList();
+    collection.add(
+        GetUserProfileResponseDto.builder()
+            .userId(user.getId())
+            .age(user.getAge())
+            .nickname(user.getNickname())
+            .profileUrl(profile.getImageUrl())
+            .hashtags(hashtags)
+            .build()
+    );
   }
   
   public List<Long> getBannedRecommendedUserList(Long userId){
@@ -281,15 +276,6 @@ public class MatchService {
     return userRepository.findAllByIdIn(idList);
   }
 
-  public boolean isCompleteTodaySurvey(User user){
-    boolean isComplete = answeredSurveyRepository.existsByUserAndCreatedAtBetween(
-        user,
-        LocalDate.now().atStartOfDay(),
-        LocalDateTime.now()
-    );
-    return isComplete;
-  }
-
   public boolean isMatch(Float matchingScore){
     return matchingScore > LIMIT_OF_MATCHING_SCORE;
   }
@@ -319,27 +305,24 @@ public class MatchService {
   /**
    * 내가 매칭 요청한 사람들의 정보
    */
-  public List<GetUserProfileResponseDto> getUserIdRequested(Long userId){
+  public List<GetUserProfileResponseDto> getUserIdWhoRequestedByMe(Long userId){
     User requestUser = userRepository.findById(userId)
             .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
     List<Matching> matchings = matchingRepository.findByRequestUserAndMatchingStatus(requestUser, MatchingStatus.PENDING);
     List<Long> matchingIds = matchings.stream()
         .map(Matching::getId)
         .toList();
-    /**
-     * userId 기반으로 user의 id, age, gender, nickname, profileUrl, hashtags
-     * 를 조회하는 함수
-     */
-    List<GetUserProfileResponseDto> profiles = profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
+    List<GetUserProfileResponseDto> requestedUserProfileDtoList = profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
 
     List<User> matchingRequestedUsers = matchings.stream()
         .map(Matching::getRequestedUser)
         .toList();
-    Map<Long, List<String>> hashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestedUsers));
-    profiles.forEach(profile -> profile.setHashtags(hashtagMap.get(profile.getUserId())));
-    return profiles;
+    Map<Long, List<String>> userIdToHashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestedUsers));
+    requestedUserProfileDtoList.forEach(profile -> profile.setHashtags(userIdToHashtagMap.get(profile.getUserId())));
+    return requestedUserProfileDtoList;
   }
-  public List<GetUserProfileResponseDto> getUserIdRequests(Long userId){
+
+  public List<GetUserProfileResponseDto> getUserIdWhoRequestToMe(Long userId){
     User requestedUser = userRepository.findById(userId)
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
     List<Matching> matchings = matchingRepository.findByRequestedUserAndMatchingStatus(requestedUser, MatchingStatus.PENDING);
@@ -348,26 +331,24 @@ public class MatchService {
     List<Long> matchingIds = matchings.stream()
         .map(Matching::getId)
         .toList();
-    List<GetUserProfileResponseDto> profiles = profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
+    List<GetUserProfileResponseDto> requestUserProfileDtoList = profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
 
     // hashtags 조회
     List<User> matchingRequestUsers = matchings.stream()
         .map(Matching::getRequestUser)
         .toList();
-    Map<Long, List<String>> hashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestUsers));
-    profiles.forEach(profile -> profile.setHashtags(hashtagMap.get(profile.getUserId())));
+    Map<Long, List<String>> userIdToHashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestUsers));
+    requestUserProfileDtoList.forEach(profile -> profile.setHashtags(userIdToHashtagMap.get(profile.getUserId())));
 
-    return profiles;
+    return requestUserProfileDtoList;
   }
 
   public Map<Long, List<String>> convertToMapFromHashtags(List<Hashtag> hashtags){
-    Map<Long, List<String>> hashtagMap = new HashMap<>();
-    for(Hashtag hashtag : hashtags){
-      Long userId = hashtag.getUser().getId();
-      hashtagMap.putIfAbsent(userId, new ArrayList<>());
-      hashtagMap.get(userId).add(hashtag.getHashtag());
-    }
-    return hashtagMap;
+    return hashtags.stream()
+        .collect(Collectors.groupingBy(
+            h -> h.getUser().getId(),
+            Collectors.mapping(Hashtag::getHashtag, Collectors.toList())
+        ));
   }
 
   public void deleteMatching(Long id){
