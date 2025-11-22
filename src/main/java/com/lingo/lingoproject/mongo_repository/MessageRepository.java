@@ -11,8 +11,6 @@ import org.springframework.data.mongodb.repository.Query;
 
 public interface MessageRepository extends MongoRepository<Message, String> {
 
-  Page<Message> findAllByChatroomId(Long chatroomId, Pageable pageable);
-
   void deleteAllByChatroomId(Long chatroomId);
 
   @Query(value = "{ 'chatroomId': ?0, 'readerIds':  { $ne:  ?1 }, 'senderId':  { $ne:  ?1 }}", count = true)
