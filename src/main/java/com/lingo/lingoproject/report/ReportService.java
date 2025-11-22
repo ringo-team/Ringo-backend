@@ -74,7 +74,6 @@ public class ReportService {
         break;
       case "PERMANENT_ACCOUNT_SUSPENSION":
         report.setReportedUserStatus(ReportStatus.PERMANENT_ACCOUNT_SUSPENSION);
-        redisUtils.suspendUser(report.getReportedUserId(), MINOR_ACCOUNT_SUSPENSION_INTERVAL_DAY);
         userService.blockUser(report.getReportedUserId(), adminId);
       case "LEGAL_REVIEW":
         report.setReportedUserStatus(ReportStatus.LEGAL_REVIEW);
