@@ -7,9 +7,9 @@ import com.lingo.lingoproject.stats.dto.GetDailyNumberOfVisitorRequestDto;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -34,28 +34,29 @@ public class StatService {
     LocalDate startDate = LocalDate.now().minusDays(6);
     LocalDateTime startDateTime = startDate.atStartOfDay();
 
-    Map<String, Integer> userAccessMap = new HashMap<>();
-    userAccessLogRepository.findAllByCreateAtBetween(startDateTime, LocalDateTime.now())
-        .forEach(element -> {
-          String createDate = element.getCreateAt().toLocalDate().toString();
-          userAccessMap.putIfAbsent(createDate, 0);
-          userAccessMap.put(createDate, userAccessMap.get(createDate) + 1);
-        });
+    Map<String, Long> userAccessMap = userAccessLogRepository.findAllByCreateAtBetween(startDateTime, LocalDateTime.now())
+        .stream()
+        .collect(Collectors.groupingBy(
+            log -> log.getCreateAt().toLocalDate().toString(),
+            Collectors.counting()
+        ));
 
-    Map<String, Integer> userSignupMap = new HashMap<>();
-    userRepository.findAllByCreatedAtBetween(startDateTime, LocalDateTime.now())
-        .forEach(element -> {
-          String createDate = element.getCreatedAt().toLocalDate().toString();
-          userSignupMap.putIfAbsent(createDate, 0);
-          userSignupMap.put(createDate, userSignupMap.get(createDate) + 1);
-        });
+    Map<String, Long> userSignupMap = userRepository.findAllByCreatedAtBetween(startDateTime, LocalDateTime.now())
+        .stream()
+        .collect(Collectors.groupingBy(
+            user -> user.getCreatedAt().toLocalDate().toString(),
+            Collectors.counting()
+        ));
 
     List<GetDailyNumberOfVisitorRequestDto> result = new ArrayList<>();
     for (int i = 0; i < 7; i++){
       LocalDate currentDate = startDate.plusDays(i);
-      int dailyNumberOfVisitor = userAccessMap.getOrDefault(currentDate.toString(), 0);
-      int dailyNumberOfSignup = userSignupMap.getOrDefault(currentDate.toString(), 0);
-      result.add(new GetDailyNumberOfVisitorRequestDto(currentDate.toString(), dailyNumberOfVisitor, dailyNumberOfSignup));
+      long dailyNumberOfVisitor = userAccessMap.getOrDefault(currentDate.toString(), 0L);
+      long dailyNumberOfSignup = userSignupMap.getOrDefault(currentDate.toString(), 0L);
+      result.add(new GetDailyNumberOfVisitorRequestDto(
+          currentDate.toString(),
+          (int) dailyNumberOfVisitor,
+          (int) dailyNumberOfSignup));
     }
     return result;
   }
