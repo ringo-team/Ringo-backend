@@ -52,11 +52,8 @@ public class JwtUtil {
     else{
       throw new RingoException("토큰 타입은 access, refresh 둘 중 하나입니다.", HttpStatus.BAD_REQUEST);
     }
-    Map<String, Object> claims = new HashMap<>();
-    claims.put("userId", user.getId());
     return Jwts.builder()
         .issuer(issuer)
-        .claims(claims)
         .issuedAt(new Date())
         .subject(user.getEmail())
         .expiration(new Date(System.currentTimeMillis() + expiration))

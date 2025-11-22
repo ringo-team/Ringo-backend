@@ -38,16 +38,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     if (accessToken != null && accessToken.startsWith("Bearer ")) {
       accessToken = accessToken.substring(7);
 
-      /**
+      /*
        * blackList에 들어있는 토큰인지 확인
        * blackList는 로그아웃한 유저들의 토큰을 모아놓은 리스트임
        * redis에 blackList가 저장되어 있음. 유효기간은 1일임
        * 유저가 다시 로그인을 하면 새로 accessToken을 발급받기 때문에 삭제할 필요없음
        */
-      if(redisUtils.containsBlackList(accessToken)){
+      if(redisUtils.containsLogoutUserList(accessToken)){
         throw new RingoException("유효하지 않은 토큰 입니다.", HttpStatus.FORBIDDEN);
       }
-      /**
+      /*
        * 유효한 토큰인지 확인
        * (비밀키에 제대로 파싱이 되는지)
        * 유효기간이 지난 토큰일 경우 예외를 발생시킴
@@ -78,6 +78,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       if(!user.getStatus().equals(SignupStatus.COMPLETED)){
         throw new RingoException("회원가입을 마치고 요청 주시길 바랍니다.", HttpStatus.FORBIDDEN);
       }
+
       SecurityContextHolder.getContext().setAuthentication(
           new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities())
       );
