@@ -76,13 +76,7 @@ public class LoginController {
       )
       @RequestParam String refreshToken
   ) {
-    LoginResponseDto response = null;
-    try {
-      response = loginService.regenerateToken(refreshToken);
-    } catch (Exception e) {
-      e.printStackTrace();
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    LoginResponseDto response = loginService.regenerateToken(refreshToken);
     return ResponseEntity.status(HttpStatus.OK)
         .body(response);
   }
@@ -101,6 +95,13 @@ public class LoginController {
     return ResponseEntity.ok().body(new ResultMessageResponseDto("유저 정보 저장이 완료되었습니다."));
   }
 
+  @GetMapping()
+  @Operation(summary = "아이디 중복 확인", description = "중복시 true 반환 ")
+  public ResponseEntity<ResultMessageResponseDto> verifyDuplicatedLoginId(@RequestParam(value = "email") String email)
+  {
+    boolean isDuplicated = loginService.verifyDuplicatedLoginId(email);
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(String.valueOf(isDuplicated)));
+  }
   @GetMapping("/api/logout")
   @Operation(summary = "로그아웃", description = "헤더의 액세스 토큰을 무효화합니다.")
   public ResponseEntity<ResultMessageResponseDto> logout(HttpServletRequest request, @AuthenticationPrincipal User user, @RequestHeader(value = "Authorization") String token) {

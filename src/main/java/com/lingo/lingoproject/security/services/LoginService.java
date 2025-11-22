@@ -11,7 +11,6 @@ import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.Smoking;
 import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.fcm.FcmService;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
@@ -146,6 +145,10 @@ public class LoginService {
     userRepository.save(user);
   }
 
+  public boolean verifyDuplicatedLoginId(String email){
+    return userRepository.existsByEmail(email);
+  }
+
   @Transactional
   public void saveUserInfo(SignupUserInfoDto dto){
     if(!genericUtils.isContains(Smoking.values(), dto.isSmoking())){
@@ -204,7 +207,7 @@ public class LoginService {
   @Transactional
   public void logout(User user, String accessToken){
     // redis의 blacklist에 저장해 놓는다.
-    redisUtils.saveBlackList(accessToken.substring(7), "true");
+    redisUtils.saveLogoutUserList(accessToken.substring(7), "true");
 
     /*
      * 로그아웃 시 refresh 토큰에 관한 정보도 삭제하여 토큰 재발급을 막는다.
