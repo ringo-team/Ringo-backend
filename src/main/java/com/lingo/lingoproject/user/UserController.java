@@ -60,8 +60,8 @@ public class UserController {
       description = "본인인증 성공한 유저의 id 찾기"
   )
   @GetMapping("/find-id")
-  public ResponseEntity<GetUserLoginIdResponseDto> findUserId(@AuthenticationPrincipal User user){
-    String username = userService.findUserId(user.getId());
+  public ResponseEntity<GetUserLoginIdResponseDto> findUserEmail(@AuthenticationPrincipal User user){
+    String username = userService.findUserEmail(user.getId());
     return ResponseEntity.ok().body(new GetUserLoginIdResponseDto(username));
   }
 
@@ -108,7 +108,8 @@ public class UserController {
     return ResponseEntity.ok().body(new ResultMessageResponseDto("친구와 본인 모두 보상을 획득하였습니다."));
   }
 
-  @Operation(summary = "휴면 계정을 업데이트합니다.", description = "계정을 휴면시키거나 해제시킵니다.")
+  @Operation(summary = "휴면 계정을 업데이트합니다.",
+      description = "계정을 휴면시키거나 해제시킵니다. 유저가 휴면 상태에 들어가면 이성추천에서 유저가 배제됩니다.")
   @PostMapping("dormant")
   public ResponseEntity<ResultMessageResponseDto> updateDormantAccount(
       @Parameter(description = "계정 휴면 혹은 휴면 해제",
@@ -119,6 +120,13 @@ public class UserController {
 
     userService.updateDormantAccount(user, request);
     return ResponseEntity.ok().body(new ResultMessageResponseDto("휴면 계정 정보를 업데이트 하였습니다."));
+  }
+
+  @Operation(summary = "유저의 접근정보를 저장합니다.", description = "유저가 앱을 실행할 때 이 api를 호출합니다.")
+  @PostMapping("access")
+  public ResponseEntity<ResultMessageResponseDto> saveUserAccessLog(@AuthenticationPrincipal User user){
+    userService.saveUserAccessLog(user);
+    return ResponseEntity.ok().body(new ResultMessageResponseDto("유저 접속 정보가 저장되었습니다."));
   }
 
 }

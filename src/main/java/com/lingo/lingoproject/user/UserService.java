@@ -20,7 +20,6 @@ import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.FriendInvitationLogRepository;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
-import com.lingo.lingoproject.mongo_repository.MessageRepository;
 import com.lingo.lingoproject.repository.UserAccessLogRepository;
 import com.lingo.lingoproject.repository.UserPointRepository;
 import com.lingo.lingoproject.repository.UserRepository;
@@ -30,6 +29,8 @@ import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
 import com.lingo.lingoproject.utils.GenericUtils;
 import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +71,7 @@ public class UserService {
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
     withdrawerRepository.save(Withdrawer
         .builder()
-        .joinPeriod(user.getCreatedAt())
+        .joinPeriod(ChronoUnit.DAYS.between(user.getCreatedAt(), LocalDate.now()))
         .reason(reason)
         .build());
 
@@ -93,8 +94,8 @@ public class UserService {
     }
   }
 
-  public String findUserId(Long userId) {
-    boolean isAuthenticated = (boolean) redisUtils.getDecryptKeyObject("self-auth" + userId);
+  public String findUserEmail(Long userId) {
+    boolean isAuthenticated = redisUtils.isCompleteSelfAuth(userId.toString());
     if (isAuthenticated) {
       User user = userRepository.findById(userId)
           .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
@@ -105,7 +106,7 @@ public class UserService {
   }
 
   public void resetPassword(String password, Long userId) {
-    boolean isAuthenticated = (boolean) redisUtils.getDecryptKeyObject("self-auth" + userId);
+    boolean isAuthenticated = redisUtils.isCompleteSelfAuth(userId.toString());
     if (isAuthenticated) {
       User user = userRepository.findById(userId)
           .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
@@ -156,8 +157,8 @@ public class UserService {
     Pageable pageable = PageRequest.of(page, size);
     Page<User> users = userRepository.findAll(pageable);
     return users.stream()
-        .map(user -> {
-          return GetUserInfoResponseDto.builder()
+        .map(user ->
+          GetUserInfoResponseDto.builder()
               .id(user.getId())
               .gender(user.getGender().toString())
               .height(user.getHeight())
@@ -167,8 +168,8 @@ public class UserService {
               .job(user.getJob())
               .nickname(user.getNickname())
               .biography(user.getBiography())
-              .build();
-        })
+              .build()
+        )
         .toList();
   }
 
@@ -186,6 +187,10 @@ public class UserService {
   }
 
   public void saveUserAccessLog(User user) {
+    // 오늘 유저가 접속했으면 접속 정보를 추가로 저장하지 않는다.
+    if (userAccessLogRepository.existsByUserIdAndCreateAtAfter(user.getId(), LocalDate.now().atStartOfDay())){
+      return;
+    }
     userAccessLogRepository.save(UserAccessLog.builder()
         .age(user.getAge())
         .userId(user.getId())

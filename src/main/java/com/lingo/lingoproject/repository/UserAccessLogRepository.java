@@ -15,4 +15,6 @@ public interface UserAccessLogRepository extends JpaRepository<UserAccessLog, Lo
   List<UserAccessLog> findAllByCreateAtBetween(LocalDateTime createAtAfter, LocalDateTime createAtBefore);
 
   long countByCreateAtBetween(LocalDateTime createAtAfter, LocalDateTime createAtBefore);
+
+  boolean existsByUserIdAndCreateAtAfter(Long userId, LocalDateTime createAtAfter);
 }

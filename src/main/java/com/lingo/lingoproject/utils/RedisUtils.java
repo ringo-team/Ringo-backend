@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.utils;
 
+import com.lingo.lingoproject.auth.dto.DecryptKeyObject;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.survey.dto.GetSurveyRequestDto;
@@ -26,17 +27,32 @@ public class RedisUtils {
     ops.set(key,value, 30, TimeUnit.MINUTES);
   }
 
-  public Object getDecryptKeyObject(String key){
-    return redisTemplate.opsForValue().get(key);
+  public DecryptKeyObject getDecryptKeyObject(String key){
+    DecryptKeyObject savedDecryptedKey = null;
+    try {
+      savedDecryptedKey = (DecryptKeyObject) redisTemplate.opsForValue().get(key);
+    } catch (Exception e) {
+      throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    return savedDecryptedKey;
   }
 
-  public void saveBlackList(String key, String value){
+  public void saveSelfAuthCompletionMark(String userId){
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.set("blacklist::" + key, value, 1, TimeUnit.DAYS);
+    ops.set("self-auth::" + userId,true, 30, TimeUnit.MINUTES);
   }
 
-  public boolean containsBlackList(String key){
-    return redisTemplate.hasKey("blacklist::" + key);
+  public boolean isCompleteSelfAuth(String userId){
+    return redisTemplate.hasKey("self-auth::" + userId);
+  }
+
+  public void saveLogoutUserList(String key, String value){
+    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
+    ops.set("logoutUser::" + key, value, 1, TimeUnit.DAYS);
+  }
+
+  public boolean containsLogoutUserList(String key){
+    return redisTemplate.hasKey("logoutUser::" + key);
   }
 
   public void saveRecommendUser(String key, Object value){
