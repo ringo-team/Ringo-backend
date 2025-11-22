@@ -105,10 +105,16 @@ public class MatchService {
    * @param decision
    * @param matchingId
    */
-  public void responseToRequest(String decision, Long matchingId)
+  public void responseToRequest(String decision, Long matchingId, Long userId)
       throws FirebaseMessagingException {
     Matching matching = matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException("적절하지 않은 매칭 id 입니다.", HttpStatus.BAD_REQUEST));
+
+    // 해당 매칭을 요청받은 사람만이 수락 여부를 결정할 수 있다.
+    if (!matching.getRequestedUser().getId().equals(userId)) {
+      throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+    }
+
     MatchingStatus status = null;
     if(decision.equals(MatchingStatus.ACCEPTED.toString())){
       status = MatchingStatus.ACCEPTED;
@@ -355,16 +361,23 @@ public class MatchService {
     matchingRepository.deleteById(id);
   }
 
-  public void saveMatchingRequestMessage(SaveMatchingRequestMessageRequestDto dto){
+  public void saveMatchingRequestMessage(SaveMatchingRequestMessageRequestDto dto, Long userId){
     Matching match = matchingRepository.findById(dto.matchingId())
         .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    if (!match.getRequestUser().getId().equals(userId)){
+      throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+    }
     match.setMatchingRequestMessage(dto.message());
     matchingRepository.save(match);
   }
 
-  public String getMatchingRequestMessage(Long matchingId){
+  public String getMatchingRequestMessage(Long matchingId, Long userId){
     Matching match = matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    if (!(match.getRequestedUser().getId().equals(userId) ||
+          match.getRequestUser().getId().equals(userId))){
+      throw new RingoException("해당 매칭의 요청 메세지를 확인할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+    }
     return match.getMatchingRequestMessage();
   }
 }
