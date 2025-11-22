@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.match.dto;
 
 import com.lingo.lingoproject.domain.enums.Gender;
+import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -30,7 +31,7 @@ public class GetUserProfileResponseDto {
   private Integer age;
 
   @Schema(description = "유저 성별", example = "MALE")
-  private Gender gender;
+  private String gender;
 
   @Schema(description = "유저 닉네임", example = "불타는 망고")
   private String nickname;
@@ -39,17 +40,27 @@ public class GetUserProfileResponseDto {
   private String profileUrl;
 
   @Schema(description = "연결 적합도", example = "75")
-  private float matchingScore;
+  private Float matchingScore;
+
+  @Schema(description = "매칭 id", example = "199")
+  private Long matchingId;
+
+  @Schema(description = "매칭 여부", example = "PENDING", allowableValues = {"PENDING", "ACCEPTED", "REJECTED"})
+  private String matchingStatus;
 
   @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
   private List<String> hashtags;
 
-  public GetUserProfileResponseDto(Long userId, Integer age, Gender gender, String nickname, String profileUrl, Float matchingScore) {
+
+  public GetUserProfileResponseDto(Long userId, Integer age, Gender gender, String nickname,
+      String profileUrl, Float matchingScore, Long matchingId, MatchingStatus matchingStatus) {
     this.userId = userId;
     this.age = age;
-    this.gender = gender;
+    this.gender = gender.toString();
     this.nickname = nickname;
     this.profileUrl = profileUrl;
     this.matchingScore = matchingScore;
+    this.matchingId = matchingId;
+    this.matchingStatus = matchingStatus.toString();
   }
 }
