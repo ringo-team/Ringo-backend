@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.user;
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.UserAccessLog;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.user.dto.GetFriendInvitationCodeRequestDto;
 import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
@@ -125,7 +126,13 @@ public class UserController {
   @Operation(summary = "유저의 접근정보를 저장합니다.", description = "유저가 앱을 실행할 때 이 api를 호출합니다.")
   @PostMapping("access")
   public ResponseEntity<ResultMessageResponseDto> saveUserAccessLog(@AuthenticationPrincipal User user){
-    userService.saveUserAccessLog(user);
+    if (user.getId() == null){
+      return ResponseEntity.ok().body(new ResultMessageResponseDto("아직 로그인하지 않은 유저입니다."));
+    }
+    UserAccessLog log = userService.saveUserAccessLog(user);
+    if (log == null){
+      return ResponseEntity.ok().body(new ResultMessageResponseDto("오늘 이미 접속했던 유저 입니다."));
+    }
     return ResponseEntity.ok().body(new ResultMessageResponseDto("유저 접속 정보가 저장되었습니다."));
   }
 

@@ -186,12 +186,12 @@ public class UserService {
     blockedUserRepository.save(blockedUser);
   }
 
-  public void saveUserAccessLog(User user) {
+  public UserAccessLog saveUserAccessLog(User user) {
     // 오늘 유저가 접속했으면 접속 정보를 추가로 저장하지 않는다.
     if (userAccessLogRepository.existsByUserIdAndCreateAtAfter(user.getId(), LocalDate.now().atStartOfDay())){
-      return;
+      return null;
     }
-    userAccessLogRepository.save(UserAccessLog.builder()
+    return userAccessLogRepository.save(UserAccessLog.builder()
         .age(user.getAge())
         .userId(user.getId())
         .username(user.getUsername())
