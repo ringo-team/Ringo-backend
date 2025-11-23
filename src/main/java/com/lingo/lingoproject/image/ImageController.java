@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.image;
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
@@ -41,15 +42,26 @@ public class ImageController {
       description = "생성 성공"
   )
   @PostMapping(value = "/profiles/{userId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public ResponseEntity<GetImageUrlResponseDto> uploadProfileImage(
+  public ResponseEntity<?> uploadProfileImage(
       @Parameter(description = "이미지 파일")
       @RequestParam(value = "image") MultipartFile image,
 
       @Parameter(description = "유저id", example = "12")
-      @PathVariable("userId") Long userId
+      @PathVariable("userId") Long userId,
+
+      @AuthenticationPrincipal User user
       ) {
 
-    GetImageUrlResponseDto dto = imageService.uploadProfileImage(image, userId);
+    if (!userId.equals(user.getId())){
+      throw new RingoException("프로필을 업로드할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+    }
+
+    GetImageUrlResponseDto dto = imageService.uploadProfileImage(image, user);
+
+    if(dto == null){
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto("이미 프로필 사진이 존재합니다."));
+    }
+
     return ResponseEntity.status(HttpStatus.CREATED).body(dto);
   }
 
@@ -66,7 +78,7 @@ public class ImageController {
   }
 
   @Operation(summary = "프로필 이미지 업데이트")
-  @PatchMapping("profiles/{profileId}")
+  @PatchMapping(value = "profiles/{profileId}", consumes =  MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<GetImageUrlResponseDto> updateProfileImage(
       @Parameter(description = "업데이트할 사진")
       @RequestParam(value = "image") MultipartFile image,
@@ -102,9 +114,15 @@ public class ImageController {
       @RequestParam(value = "images") List<MultipartFile> images,
 
       @Parameter(description = "유저 id", example = "5")
-      @PathVariable("userId") Long userId
+      @PathVariable("userId") Long userId,
+
+      @AuthenticationPrincipal User user
   ){
-    List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images, userId);
+    if (!userId.equals(user.getId())){
+      throw new RingoException("스냅사진을 업로드할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+    }
+
+    List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images, user);
     return ResponseEntity.status(HttpStatus.CREATED).body(new JsonListWrapper<>(dtos));
   }
 
@@ -162,5 +180,17 @@ public class ImageController {
   ){
     imageService.updateSnapImageDescription(dto, user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("성공적으로 스냅 사진 설명을 성공적으로 저장하였습니다."));
+  }
+
+  @Operation(summary = "얼굴 인증")
+  @PostMapping(value = "/profiles/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ResultMessageResponseDto> verifyProfile(
+      @RequestParam(value = "image") MultipartFile image,
+      @AuthenticationPrincipal User user
+  ){
+    if (!imageService.verifyProfileImage(image, user)){
+      return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ResultMessageResponseDto("얼굴이 인증되지 않았습니다."));
+    }
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("얼굴이 성공적으로 인증되었습니다."));
   }
 }

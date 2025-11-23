@@ -28,4 +28,6 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
   List<Profile> findAllByUser(User user);
 
   void deleteAllByUser(User user);
+
+  boolean existsByUser(User user);
 }

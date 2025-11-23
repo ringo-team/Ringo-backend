@@ -2,6 +2,9 @@ package com.lingo.lingoproject.image;
 
 
 import com.amazonaws.services.rekognition.AmazonRekognition;
+import com.amazonaws.services.rekognition.model.CompareFacesMatch;
+import com.amazonaws.services.rekognition.model.CompareFacesRequest;
+import com.amazonaws.services.rekognition.model.CompareFacesResult;
 import com.amazonaws.services.rekognition.model.DetectFacesRequest;
 import com.amazonaws.services.rekognition.model.DetectFacesResult;
 import com.amazonaws.services.rekognition.model.DetectModerationLabelsRequest;
@@ -11,6 +14,7 @@ import com.amazonaws.services.rekognition.model.Image;
 import com.amazonaws.services.rekognition.model.ModerationLabel;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.S3Object;
 import com.lingo.lingoproject.domain.PhotographerImage;
 import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.SnapImage;
@@ -52,7 +56,9 @@ public class ImageService {
   @Value("${aws.s3.bucket}")
   private String bucket;
 
-  private final Float MIN_CONFIDENCE = 70f;
+  private final Integer MAX_NUMBER_OF_SNAP_IMAGES = 9;
+  private final Float IMAGE_MODERATION_MIN_CONFIDENCE = 70f;
+  private final Float FACE_SIMILARITY_THRESHOLD = 80F;
 
 
   /**
@@ -60,17 +66,19 @@ public class ImageService {
    */
 
   @Transactional
-  public GetImageUrlResponseDto uploadProfileImage(MultipartFile file, Long userId) {
+  public GetImageUrlResponseDto uploadProfileImage(MultipartFile file, User  user) {
 
     if (!existsFaceInImage(file)){
-      return null;
+      throw new RingoException("프로필에 얼굴이 존재하지 않습니다.", HttpStatus.NOT_ACCEPTABLE);
     }
 
     if (isUnmoderateImage(file)){
-      return null;
+      throw new RingoException("적절하지 않은 사진을 업로드 하였습니다.", HttpStatus.NOT_ACCEPTABLE);
     }
 
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
+    if (profileRepository.existsByUser(user)){
+      return null;
+    }
 
     String imageUrl = uploadImageToS3(file);
 
@@ -91,7 +99,7 @@ public class ImageService {
   }
 
   public GetImageUrlResponseDto getProfileImageUrl(Long userId){
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
+    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
     Profile profile = profileRepository.findByUser(user)
         .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
     return new GetImageUrlResponseDto(profile.getImageUrl(), profile.getId());
@@ -108,9 +116,9 @@ public class ImageService {
       return null;
     }
 
-    Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException("Profile not found", HttpStatus.BAD_REQUEST));
+    Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException("프로필을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
     if(!hasPermissionOnImage(profile.getUser(), userId)){
-      throw new RingoException("삭제할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("이미지를 업데이트할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
     String imageUrl = getOriginalFilename(profile.getImageUrl());
     // s3에 이미지 삭제
@@ -126,8 +134,12 @@ public class ImageService {
   }
 
   @Transactional
-  public List<GetImageUrlResponseDto> uploadSnapImages(List<MultipartFile> images, Long userId) {
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+  public List<GetImageUrlResponseDto> uploadSnapImages(List<MultipartFile> images, User user) {
+
+    List<SnapImage> existedSnapImages = snapImageRepository.findAllByUser(user);
+    if (existedSnapImages.size() + images.size() > MAX_NUMBER_OF_SNAP_IMAGES){
+      throw new RingoException("최대 업로드 개수를 초과하였습니다.", HttpStatus.BAD_REQUEST);
+    }
 
     List<SnapImage> snapImages = new ArrayList<>();
 
@@ -189,14 +201,14 @@ public class ImageService {
   }
 
   @Transactional
-  public GetImageUrlResponseDto updateSnapImage(MultipartFile file, Long snapImageId, String description, Long tokenUserId){
+  public GetImageUrlResponseDto updateSnapImage(MultipartFile file, Long snapImageId, String description, Long userId){
 
     if (isUnmoderateImage(file)){
       return null;
     }
 
     SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException("Snap image not found", HttpStatus.BAD_REQUEST));
-    if(!hasPermissionOnImage(snapImage.getUser(), tokenUserId)){
+    if(!hasPermissionOnImage(snapImage.getUser(), userId)){
       throw new RingoException("업데이트 할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
     String imageUrl = getOriginalFilename(snapImage.getImageUrl());
@@ -330,7 +342,7 @@ public class ImageService {
     try {
       DetectModerationLabelsRequest request = new DetectModerationLabelsRequest()
           .withImage(new Image().withBytes(ByteBuffer.wrap(imageBytes)))
-          .withMinConfidence(MIN_CONFIDENCE);
+          .withMinConfidence(IMAGE_MODERATION_MIN_CONFIDENCE);
 
       DetectModerationLabelsResult result = amazonRekognition.detectModerationLabels(request);
       List<ModerationLabel> labels = result.getModerationLabels();
@@ -339,12 +351,49 @@ public class ImageService {
         String name = label.getName();
         String parent = label.getParentName();
 
-        if (label.getConfidence() < MIN_CONFIDENCE)
+        if (label.getConfidence() < IMAGE_MODERATION_MIN_CONFIDENCE)
           return false;
         return
             (name != null && (name.contains("Nudity") || name.contains("Sexual") || name.contains("Suggestive")))
                 || (parent != null && (parent.contains("Nudity") || parent.contains("Sexual") || parent.contains("Suggestive")));
       });
+    }catch (Exception e){
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  public boolean verifyProfileImage(MultipartFile targetImage, User user){
+    try {
+      Profile profile = profileRepository.findByUser(user)
+          .orElseThrow(() -> new RingoException("유저의 프로필이 존재하지 않습니다.", HttpStatus.BAD_REQUEST));
+      String profileUrl = getOriginalFilename(profile.getImageUrl());
+      S3Object profileObject = amazonS3Client.getObject(bucket, profileUrl);
+
+      return isSamePerson(profileObject.getObjectContent().readAllBytes(), targetImage);
+    }catch (Exception e){
+      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  public boolean isSamePerson(byte[] source, MultipartFile target){
+    try{
+      Image sourceImage = new Image().withBytes(ByteBuffer.wrap(source));
+      Image targetImage = new Image().withBytes(ByteBuffer.wrap(target.getBytes()));
+
+      CompareFacesRequest request = new CompareFacesRequest()
+          .withSourceImage(sourceImage)
+          .withTargetImage(targetImage)
+          .withSimilarityThreshold(FACE_SIMILARITY_THRESHOLD);
+
+      CompareFacesResult results = amazonRekognition.compareFaces(request);
+      List<CompareFacesMatch> matches = results.getFaceMatches();
+
+      if (matches.isEmpty()){
+        return false;
+      }
+
+      return true;
+
     }catch (Exception e){
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
