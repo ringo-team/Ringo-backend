@@ -3,7 +3,7 @@ package com.lingo.lingoproject.utils;
 import com.lingo.lingoproject.auth.dto.DecryptKeyObject;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
-import com.lingo.lingoproject.survey.dto.GetSurveyRequestDto;
+import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -64,13 +64,13 @@ public class RedisUtils {
   }
 
   public List<GetUserProfileResponseDto> getRecommendUser(String key){
-    List<GetUserProfileResponseDto> savedRecommendUserList = null;
+    JsonListWrapper<GetUserProfileResponseDto> savedRecommendUserList = null;
     try {
-      savedRecommendUserList = (List<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);
+      savedRecommendUserList = (JsonListWrapper<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);
     } catch (Exception e) {
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedRecommendUserList;
+    return savedRecommendUserList.getList();
   }
 
   public void saveRecommendUserForDailySurvey(String key, Object value){
@@ -82,31 +82,31 @@ public class RedisUtils {
   }
 
   public List<GetUserProfileResponseDto> getRecommendUserForDailySurvey(String key){
-    List<GetUserProfileResponseDto> savedRecommendUserList = null;
+    JsonListWrapper<GetUserProfileResponseDto> savedRecommendUserList = null;
     try {
-      savedRecommendUserList = (List<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend-for-daily-survey::" + key);
+      savedRecommendUserList = (JsonListWrapper<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend-for-daily-survey::" + key);
     } catch (Exception e) {
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedRecommendUserList;
+    return savedRecommendUserList.getList();
   }
 
-  public void saveUserDailySurvey(String key, Object value){
-    cacheUntilMidnight("dailySurvey::" + key, value);
+  public void saveUserDailySurvey(String key, List<GetSurveyResponseDto> value){
+    cacheUntilMidnight("dailySurvey::" + key, new JsonListWrapper<>(value));
   }
 
   public boolean containsUserDailySurvey(String key){
     return redisTemplate.hasKey("dailySurvey::" + key);
   }
 
-  public List<GetSurveyRequestDto> getUserDailySurvey(String key){
-    List<GetSurveyRequestDto> savedUserDailySurveyList = null;
+  public List<GetSurveyResponseDto> getUserDailySurvey(String key){
+    JsonListWrapper<GetSurveyResponseDto> savedUserDailySurveyList = null;
     try {
-      savedUserDailySurveyList = (List<GetSurveyRequestDto>) redisTemplate.opsForValue().get(key);
+      savedUserDailySurveyList = (JsonListWrapper<GetSurveyResponseDto>) redisTemplate.opsForValue().get("dailySurvey::" + key);
     }catch (Exception e){
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedUserDailySurveyList;
+    return savedUserDailySurveyList.getList();
   }
 
   public void suspendUser(Long userId, int day){
