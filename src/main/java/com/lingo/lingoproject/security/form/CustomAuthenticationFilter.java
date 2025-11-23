@@ -34,7 +34,7 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
 
   private final CustomAuthenticationManager customAuthenticationManager;
   private final ObjectMapper objectMapper;
-  private final String[] whiteList = {"/signup", "/swagger", "/v3/api-docs", "/swagger-resources", "/ws", "/stomp"};
+  private final String[] whiteList = {"/signup", "/swagger", "/v3/api-docs", "/swagger-resources", "/ws", "/stomp", "/users/access", "/actuator", "/error"};
 
   public CustomAuthenticationFilter(CustomAuthenticationManager customAuthenticationManager,
       ObjectMapper objectMapper,
@@ -64,7 +64,7 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
           new UsernamePasswordAuthenticationToken(info.email(), info.password(),
               new ArrayList<>())
       );
-      /**
+      /*
        * 로그인 할 때에는 authentication에 userDetail이 들어가고
        * stomp interceptor나 filter에서 jwt 인증을 할 때에는 User가 들어간다.
        */
