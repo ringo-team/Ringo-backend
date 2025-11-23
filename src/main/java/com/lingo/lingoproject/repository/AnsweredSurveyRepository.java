@@ -3,6 +3,7 @@ package com.lingo.lingoproject.repository;
 import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
+import com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -29,11 +30,13 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
 
   long countByUser(User user);
 
-  boolean existsByUserAndCreatedAtBetween(User user, LocalDateTime createdAtAfter, LocalDateTime createdAtBefore);
-
   List<AnsweredSurvey> findAllByUserAndCreatedAtBetween(User user, LocalDateTime createdAtAfter, LocalDateTime createdAtBefore);
 
-  List<AnsweredSurvey> findAllByUserNotAndAnswerAndSurveyNum(User user, Integer answer, Integer surveyNum);
-
   List<AnsweredSurvey> findAllByUserNotInAndAnswerAndSurveyNum(Collection<User> users, Integer answer, Integer surveyNum);
+
+  @Query(value = "select new com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto"
+      + "(s.surveyNum, s.content, a.answer, :userId) "
+      + "from Survey s join AnsweredSurvey a on s.surveyNum = a.surveyNum "
+      + "where a.user.id = :userId")
+  List<GetUserSurveyResponseDto> getUserSurveyResponseDto(Long userId);
 }

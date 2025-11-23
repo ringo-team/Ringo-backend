@@ -2,7 +2,8 @@ package com.lingo.lingoproject.survey;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.survey.dto.GetSurveyRequestDto;
+import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
+import com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
 import com.lingo.lingoproject.survey.dto.UploadSurveyRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
@@ -16,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -50,8 +52,8 @@ public class SurveyController {
 
   @Operation(summary = "설문지 조회")
   @GetMapping()
-  public ResponseEntity<JsonListWrapper<GetSurveyRequestDto>> getSurveys(){
-    List<GetSurveyRequestDto> list = surveyService.getSurveys();
+  public ResponseEntity<JsonListWrapper<GetSurveyResponseDto>> getSurveys(){
+    List<GetSurveyResponseDto> list = surveyService.getSurveys();
     return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(list));
   }
 
@@ -65,8 +67,18 @@ public class SurveyController {
 
   @Operation(summary = "일일 설문 조회", description = "날마다 진행하는 설문 문항들 조회, 만약 설문을 진행했으면 null 반환")
   @GetMapping("/daily")
-  public ResponseEntity<JsonListWrapper<GetSurveyRequestDto>> getDailySurveys(@RequestParam Long userId){
-    List<GetSurveyRequestDto> dto = surveyService.getDailySurveys(userId);
+  public ResponseEntity<JsonListWrapper<GetSurveyResponseDto>> getDailySurveys(@RequestParam Long userId){
+    List<GetSurveyResponseDto> dto = surveyService.getDailySurveys(userId);
     return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(dto));
+  }
+
+  @Operation(summary = "유저가 응답한 설문 조회", description = "유저가 그동안 응답한 모든 설문 응답들을 조회")
+  @GetMapping("/{userId}")
+  public ResponseEntity<JsonListWrapper<GetUserSurveyResponseDto>> getUserSurveyResponses(@PathVariable Long userId, @AuthenticationPrincipal User user){
+    if (!(userId.equals(user.getId()) || user.getRole().equals(Role.ADMIN))) {
+      throw new RingoException("설문을 조회할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+    }
+    List<GetUserSurveyResponseDto> result = surveyService.getUserSurveyResponses(user);
+    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(result));
   }
 }

@@ -8,7 +8,8 @@ import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.SurveyRepository;
 import com.lingo.lingoproject.repository.UserRepository;
-import com.lingo.lingoproject.survey.dto.GetSurveyRequestDto;
+import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
+import com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
 import com.lingo.lingoproject.survey.dto.UploadSurveyRequestDto;
 import com.lingo.lingoproject.utils.GenericUtils;
@@ -86,11 +87,11 @@ public class SurveyService {
     surveyRepository.save(survey);
   }
 
-  public List<GetSurveyRequestDto> getSurveys(){
+  public List<GetSurveyResponseDto> getSurveys(){
     return surveyRepository.findAll()
         .stream()
         .map(s -> {
-              return GetSurveyRequestDto.builder()
+              return GetSurveyResponseDto.builder()
                   .surveyNum(s.getSurveyNum())
                   .confrontSurveyNum(s.getConfrontSurveyNum())
                   .content(s.getContent())
@@ -115,9 +116,11 @@ public class SurveyService {
     List<AnsweredSurvey> alreadyAnsweredSurveys = answeredSurveyRepository.findAllByUser(user);
 
     for (AnsweredSurvey answeredSurvey : list){
+      Integer answeredSurveyNum = answeredSurvey.getSurveyNum();
       for (AnsweredSurvey alreadyAnsweredSurvey : alreadyAnsweredSurveys){
-        if (answeredSurvey.getSurveyNum().equals(alreadyAnsweredSurvey.getSurveyNum())){
+        if (answeredSurveyNum.equals(alreadyAnsweredSurvey.getSurveyNum())){
           answeredSurvey.setId(alreadyAnsweredSurvey.getId());
+          break;
         }
       }
     }
@@ -125,7 +128,7 @@ public class SurveyService {
     answeredSurveyRepository.saveAll(list);
   }
   
-  public List<GetSurveyRequestDto> getDailySurveys(Long userId){
+  public List<GetSurveyResponseDto> getDailySurveys(Long userId){
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new RingoException("해당 요청의 유저가 존재하지 않습니다.", HttpStatus.BAD_REQUEST));
     LocalDateTime now = LocalDate.now().atStartOfDay();
@@ -137,10 +140,11 @@ public class SurveyService {
       return redisUtils.getUserDailySurvey(userId.toString());
     }
     int numberOfAnswerSurveys = (int) answeredSurveyRepository.countByUser(user);
+    // 일정기간까지는 정해진 설문을 응답한다.
     if (numberOfAnswerSurveys < SIGNUP_NUMBER_OF_SURVEYS + NUMBER_OF_DAILY_SURVEYS * MAX_SURVEY_STARTER_DAYS){
       List<Survey> surveys = surveyRepository.findAllBySurveyNumBetween(numberOfAnswerSurveys + 1, numberOfAnswerSurveys + NUMBER_OF_DAILY_SURVEYS);
-      List<GetSurveyRequestDto> results = surveys.stream().map(
-          e -> GetSurveyRequestDto.builder()
+      List<GetSurveyResponseDto> results = surveys.stream().map(
+          e -> GetSurveyResponseDto.builder()
               .surveyNum(e.getSurveyNum())
               .confrontSurveyNum(e.getConfrontSurveyNum())
               .category(e.getCategory().toString())
@@ -158,8 +162,8 @@ public class SurveyService {
       randomSelectedSurveyNums.add(random.nextInt(numberOfSurveys) + 1);
     }
     List<Survey> randomSurveys = surveyRepository.findAllBySurveyNumIn(randomSelectedSurveyNums);
-    List<GetSurveyRequestDto> results = randomSurveys.stream().map(
-        e -> GetSurveyRequestDto.builder()
+    List<GetSurveyResponseDto> results = randomSurveys.stream().map(
+        e -> GetSurveyResponseDto.builder()
             .surveyNum(e.getSurveyNum())
             .confrontSurveyNum(e.getConfrontSurveyNum())
             .category(e.getCategory().toString())
@@ -169,6 +173,10 @@ public class SurveyService {
     ).toList();
     redisUtils.saveUserDailySurvey(userId.toString(), results);
     return results;
+  }
+
+  public List<GetUserSurveyResponseDto> getUserSurveyResponses(User user){
+    return answeredSurveyRepository.getUserSurveyResponseDto(user.getId());
   }
 
 }
