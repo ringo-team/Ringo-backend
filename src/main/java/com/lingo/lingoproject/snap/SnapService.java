@@ -50,9 +50,9 @@ public class SnapService {
     snapApplyRepository.save(snapApply);
   }
 
-  public void savePhotographerInfo(SavePhotographerInfoRequestDto dto){
+  public void savePhotographerInfo(SavePhotographerInfoRequestDto dto, Long photographerId){
 
-    User photographer = userRepository.findById(dto.photographerId())
+    User photographer = userRepository.findById(photographerId)
         .orElseThrow(() -> new RingoException("해당 촬영 기사가 없습니다.", HttpStatus.BAD_REQUEST));
 
     PhotographerInfo photographerInfo = PhotographerInfo.builder()
@@ -68,11 +68,17 @@ public class SnapService {
   public void updatePhotographerExampleImagesInfo(UpdatePhotographerExampleImagesInfoRequestDto dto){
     PhotographerImage image = photographerImageRepository.findById(dto.imageId())
         .orElseThrow(() -> new RingoException("해당 사진을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
     image.setSnapLocation(dto.snapLocation());
-    if(dto.snapDate() != null) {
-      image.setSnapDate(LocalDate.parse(dto.snapDate()));
-    }else{
-      image.setSnapDate(null);
+
+    try {
+      if (dto.snapDate() != null) {
+        image.setSnapDate(LocalDate.parse(dto.snapDate()));
+      } else {
+        image.setSnapDate(null);
+      }
+    }catch (Exception e){
+      throw new RingoException("시간을 파싱하던 중 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     photographerImageRepository.save(image);

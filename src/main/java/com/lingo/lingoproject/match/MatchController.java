@@ -1,6 +1,5 @@
 package com.lingo.lingoproject.match;
 
-import com.google.firebase.messaging.FirebaseMessagingException;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.RingoException;
@@ -32,13 +31,11 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping("/matches")
 @RequiredArgsConstructor
 public class MatchController {
 
@@ -53,18 +50,21 @@ public class MatchController {
       @ApiResponse(responseCode = "406", description = "NOT_ACCEPTABLE", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "400", description = "BAD_REQUEST", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
   })
-  @PostMapping()
+  @PostMapping("/matches")
   public ResponseEntity<?> requestMatching(
       @Valid @RequestBody MatchingRequestDto matchingRequestDto,
       @AuthenticationPrincipal User user
   ) {
-    if (!matchingRequestDto.requestId().equals(user.getId())){
+    Long requestUserId = matchingRequestDto.requestId();
+    if (!requestUserId.equals(user.getId())){
       throw new RingoException("매칭 요청자와 요청 정보가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
     }
+
     Matching matching = matchService.matchRequest(matchingRequestDto);
     if (matching == null){
       return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ResultMessageResponseDto("매칭 점수가 기준 이하로 매칭되지 않았습니다."));
     }
+
     return ResponseEntity.ok().body(new RequestMatchingResponseDto(matching.getId()));
   }
 
@@ -72,92 +72,108 @@ public class MatchController {
       summary = "매칭 응답",
       description = "매칭 요청에 대한 응답(승낙, 거부)을 하는 api"
   )
-  @PatchMapping()
+  @PatchMapping("/matches/{matchingId}")
   public ResponseEntity<ResultMessageResponseDto>  responseToMatching(
+      @NotNull @PathVariable(value = "matchingId") Long matchingId,
       @Parameter(
           description = "매칭 승낙 여부",
           example = "ACCEPTED",
           schema = @Schema(allowableValues = {"ACCEPTED", "REJECTED"})
       )
       @NotBlank @RequestParam(value = "decision") String decision,
-      @NotNull @RequestParam(value = "matchingId") Long matchingId,
-      @AuthenticationPrincipal User user)
-      throws FirebaseMessagingException {
-    matchService.responseToRequest(decision, matchingId, user.getId());
+      @AuthenticationPrincipal User user) {
+    matchService.responseToRequest(decision, matchingId, user);
     return ResponseEntity.ok().body(new ResultMessageResponseDto("매칭 상태가 변경되었습니다."));
   }
 
-  @Operation(summary = "나에게 매칭 요청한 사람 확인")
-  @GetMapping("/{id}/requested") // 나를 지목한 사람
-  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> getUserWhoRequestsToId(
+  @Operation(summary = "나에게/내가 매칭 요청한 사람 확인")
+  @GetMapping("users/{userId}/match-requests") // 나를 지목한 사람
+  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> getMatchRequestsByDirection(
       @Parameter(description = "유저id", example = "5")
-      @PathVariable("id") Long id,
+      @PathVariable(value = "userId") Long userId,
+
+      @Parameter(
+          description = "SENT 경우 내가 매칭 요청한 사람, RECEIVED 경우 나에게 매칭 요청한 사람",
+          example = "SENT",
+          schema = @Schema(allowableValues = {"SENT", "RECEIVED"})
+      )
+      @RequestParam(value = "direction") String direction,
+
       @AuthenticationPrincipal User user){
-    if (!id.equals(user.getId())) {
+    if (!userId.equals(user.getId())) {
       throw new RingoException("본인의 매칭 정보만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
     }
-    List<GetUserProfileResponseDto> requestUserIds = matchService.getUserIdWhoRequestToMe(id);
-    return ResponseEntity.ok().body(new JsonListWrapper<>(requestUserIds));
+    List<GetUserProfileResponseDto> responseDtoList = null;
+    if (direction.equals("SENT")){
+      responseDtoList = matchService.getUserIdWhoRequestedByMe(user);
+    }
+    else if (direction.equals("RECEIVED")){
+      responseDtoList = matchService.getUserIdWhoRequestToMe(user);
+    }
+    else{
+      throw new RingoException("적절하지 않은 direction이 입력되었습니다.", HttpStatus.BAD_REQUEST);
+    }
+
+    return ResponseEntity.ok().body(new JsonListWrapper<>(responseDtoList));
   }
 
-  @Operation(summary = "내가 매칭 요청한 사람 확인")
-  @GetMapping("/{id}/requests") // 내가 지목한 사람
-  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> getUserRequestedById(
-      @Parameter(description = "유저id", example = "5")
-      @PathVariable("id") Long id,
-      @AuthenticationPrincipal User user){
-    if (!id.equals(user.getId())) {
-      throw new RingoException("본인의 매칭 정보만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
-    }
-    List<GetUserProfileResponseDto> requestedUserIds = matchService.getUserIdWhoRequestedByMe(id);
-    return ResponseEntity.ok().body(new JsonListWrapper<>(requestedUserIds));
-  }
 
   @Operation(
-      summary = "이성 친구 추천",
+      summary = "기본 이성 친구 추천",
       description = "매칭이 가능한 이성을 무작위로 골라 추천"
   )
-  @GetMapping("/{id}/recommend")
+  @GetMapping("/users/{userId}/recommendations")
   public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>>  recommend(
       @Parameter(description = "유저id", example = "5")
-      @PathVariable Long id,
+      @PathVariable(value = "userId") Long userId,
       @AuthenticationPrincipal User user) {
-    if (!id.equals(user.getId())) {
+    if (!userId.equals(user.getId())) {
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
     }
-    List<GetUserProfileResponseDto> rtnList = matchService.recommend(id);
+    List<GetUserProfileResponseDto> rtnList = matchService.recommend(userId);
+    return ResponseEntity.ok().body(new JsonListWrapper<>(rtnList));
+  }
+
+  @Operation(summary = "설문을 통해 제공하는 이성추천", description = "일일 설문에 일치한 응답을 한 유저를 무작위로 추천")
+  @GetMapping("/users/{userId}/recommendations/daily-survey")
+  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> recommendByDailySurvey(
+      @PathVariable(value = "userId") Long userId,
+      @AuthenticationPrincipal User user
+  ){
+    if (!userId.equals(user.getId())) {
+      throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
+    }
+    List<GetUserProfileResponseDto> rtnList = matchService.recommendUserByDailySurvey(user);
     return ResponseEntity.ok().body(new JsonListWrapper<>(rtnList));
   }
 
   @Operation(summary = "매칭 삭제")
-  @DeleteMapping("/{id}")
+  @DeleteMapping("/matches/{matchingId}")
   public ResponseEntity<ResultMessageResponseDto> deleteMatching(
       @Parameter(description = "매칭 id", example = "5")
-      @PathVariable("id") Long id,
+      @PathVariable("matchingId") Long matchingId,
       @AuthenticationPrincipal User user) {
-    if (!id.equals(user.getId())) {
-      throw new RingoException("본인의 매칭 정보만 삭제할 수 있습니다.", HttpStatus.BAD_REQUEST);
-    }
-    matchService.deleteMatching(id);
+    matchService.deleteMatching(matchingId, user);
     log.info("성공적으로 매칭 삭제");
     return ResponseEntity.ok().body(new ResultMessageResponseDto("성공적으로 매칭을 삭제하였습니다."));
   }
 
   @Operation(summary = "매칭 요청 매세지 저장 및 수정")
-  @PostMapping("/message")
+  @PostMapping("/matches/{matchingId}/message")
   public ResponseEntity<ResultMessageResponseDto> saveMatchingRequestMessage(
       @Valid @RequestBody SaveMatchingRequestMessageRequestDto dto,
+      @PathVariable(value = "matchingId") Long matchingId,
       @AuthenticationPrincipal User user) {
-    matchService.saveMatchingRequestMessage(dto, user.getId());
+    matchService.saveMatchingRequestMessage(dto, matchingId, user);
     return ResponseEntity.ok().body(new ResultMessageResponseDto("매칭 메세지가 성공적으로 저장되었습니다."));
   }
 
   @Operation(summary = "매칭 요청 메세지 조회")
-  @GetMapping("/message")
+  @GetMapping("/matches/{matchingId}/message")
   public ResponseEntity<GetMatchingRequestMessageResponseDto> getMatchingRequestMessage(
-      @NotNull @RequestParam(value = "matchingId") Long matchingId,
+      @PathVariable(value = "matchingId") Long matchingId,
       @AuthenticationPrincipal User user) {
-    String message = matchService.getMatchingRequestMessage(matchingId, user.getId());
+    String message = matchService.getMatchingRequestMessage(matchingId, user);
     return ResponseEntity.ok().body(new GetMatchingRequestMessageResponseDto(message));
   }
 

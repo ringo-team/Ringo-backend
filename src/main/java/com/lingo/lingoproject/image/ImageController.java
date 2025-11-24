@@ -41,7 +41,7 @@ public class ImageController {
       responseCode = "201",
       description = "생성 성공"
   )
-  @PostMapping(value = "/profiles/{userId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PostMapping(value = "/users/{userId}/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<?> uploadProfileImage(
       @Parameter(description = "이미지 파일")
       @RequestParam(value = "image") MultipartFile image,
@@ -69,7 +69,7 @@ public class ImageController {
       summary = "프로필 조회.",
       description = "프로필 URL과 이미지 id를 반환합니다."
   )
-  @GetMapping("/profiles/{userId}")
+  @GetMapping("/users/{userId}/profile")
   public ResponseEntity<GetImageUrlResponseDto> getProfileImageUrl(
       @Parameter(description = "이미지 id", example = "5")
       @PathVariable(value = "userId") Long userId){
@@ -108,7 +108,7 @@ public class ImageController {
   }
 
   @Operation(summary = "스냅 사진 일괄 업로드")
-  @PostMapping(value = "/snaps/{userId}", consumes =  MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PostMapping(value = "/users/{userId}/snaps", consumes =  MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadSnapImages(
       @Parameter(description = "이미지 파일들 업로드")
       @RequestParam(value = "images") List<MultipartFile> images,
@@ -130,10 +130,10 @@ public class ImageController {
       summary = "스냅 이미지 조회.",
       description = "유저가 올린 모든 스냅 사진을 조회"
   )
-  @GetMapping("/snaps")
+  @GetMapping("users/{userId}/snaps")
   public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> getAllSnapImageUrls(
       @Parameter(description = "유저 Id", example = "5")
-      @RequestParam("userId") Long userId
+      @PathVariable(value = "userId") Long userId
   ){
     List<GetImageUrlResponseDto> responses = imageService.getAllSnapImageUrls(userId);
     return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(responses));
@@ -163,7 +163,7 @@ public class ImageController {
   )
   @DeleteMapping("/snaps/{snapImageId}")
   public ResponseEntity<ResultMessageResponseDto> deleteSnapImage(
-    @Parameter(description = "스냅 사진 id", example = "11")
+      @Parameter(description = "스냅 사진 id", example = "11")
       @PathVariable(value = "snapImageId") Long snapImageId,
 
       @AuthenticationPrincipal User user
@@ -173,12 +173,16 @@ public class ImageController {
   }
 
   @Operation(summary = "스냅 사진 내용 저장")
-  @PatchMapping("/snaps")
+  @PatchMapping("/snaps/{snapImageId}/description")
   public ResponseEntity<ResultMessageResponseDto> updateSnapImageDescription(
+      @Parameter(description = "스냅 사진 id", example = "11")
+      @PathVariable(value = "snapImageId") Long snapImageId,
+
       @RequestBody UpdateSnapImageDescriptionRequestDto dto,
+
       @AuthenticationPrincipal User user
   ){
-    imageService.updateSnapImageDescription(dto, user.getId());
+    imageService.updateSnapImageDescription(dto, snapImageId, user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("성공적으로 스냅 사진 설명을 성공적으로 저장하였습니다."));
   }
 

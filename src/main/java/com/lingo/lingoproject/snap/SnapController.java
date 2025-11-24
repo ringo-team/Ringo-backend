@@ -40,14 +40,17 @@ public class SnapController {
   }
 
   @Operation(summary = "사진 작가 정보 저장")
-  @PostMapping("/photo/snaps")
-  public ResponseEntity<ResultMessageResponseDto> savePhotographerInfo(@Valid @RequestBody SavePhotographerInfoRequestDto dto){
-    snapService.savePhotographerInfo(dto);
+  @PostMapping("/photographers/{photographerId}")
+  public ResponseEntity<ResultMessageResponseDto> savePhotographerInfo(
+      @Valid @RequestBody SavePhotographerInfoRequestDto dto,
+      @PathVariable(value = "photographerId") Long photographerId
+  ){
+    snapService.savePhotographerInfo(dto, photographerId);
     return ResponseEntity.ok().body(new ResultMessageResponseDto("성공적으로 작가 정보가 저장되었습니다."));
   }
 
   @Operation(summary = "촬영 예시 사진 업로드")
-  @PostMapping(value = "photo/snaps/{photographerId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PostMapping(value = "photographers/{photographerId}/example-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadPhotographerExampleImages(
       @Parameter(description = "이미지 파일들 업로드")
       @RequestParam(value = "images") List<MultipartFile> images,
@@ -59,8 +62,8 @@ public class SnapController {
     return ResponseEntity.status(HttpStatus.CREATED).body(new JsonListWrapper<>(dtos));
   }
 
-  @Operation(summary = "촬영 예시 사진 정보 저장")
-  @PatchMapping(value = "/photo/snaps")
+  @Operation(summary = "촬영 예시 사진 정보 저장 또는 수정")
+  @PatchMapping(value = "/photographers/example-images")
   public ResponseEntity<ResultMessageResponseDto> updatePhotographerExampleImagesInfo(
     @Valid @RequestBody UpdatePhotographerExampleImagesInfoRequestDto dto
   ){
@@ -69,7 +72,7 @@ public class SnapController {
   }
 
   @Operation(summary = "작가 정보 가져오기")
-  @GetMapping("/snaps/photographers")
+  @GetMapping("/photographers")
   public ResponseEntity<JsonListWrapper<GetPhotographerInfosRequestDto>> getPhotographerInfos(){
     List<GetPhotographerInfosRequestDto> list = snapService.getPhotographerInfos();
     return ResponseEntity.ok().body(new JsonListWrapper<>(list));

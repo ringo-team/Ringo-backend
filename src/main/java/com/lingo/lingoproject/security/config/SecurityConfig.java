@@ -54,7 +54,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(authorize ->
             authorize
                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                .requestMatchers("/photo/**").hasRole("PHOTOGRAPHER")
+                .requestMatchers("/photographers/**").hasRole("PHOTOGRAPHER")
                 .anyRequest().authenticated())
         .formLogin(AbstractHttpConfigurer::disable)
         .csrf(AbstractHttpConfigurer::disable)

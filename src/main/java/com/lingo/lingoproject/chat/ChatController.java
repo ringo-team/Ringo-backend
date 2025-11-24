@@ -50,7 +50,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping("/chat")
 @RequiredArgsConstructor
 public class ChatController {
 
@@ -73,10 +72,10 @@ public class ChatController {
       summary = "채팅방 메세지 불러오기",
       description = "채팅방 메세지들을 불러오는 api"
   )
-  @GetMapping()
+  @GetMapping("/chatrooms/{roomId}/messages")
   public ResponseEntity<JsonListWrapper<GetChatResponseDto>> getChattingMessages(
       @Parameter(description = "채팅방 id", example = "4")
-      @RequestParam("roomId")@NotNull Long roomId,
+      @PathVariable(value = "roomId")@NotNull Long roomId,
 
       @Parameter(description = "페이지 수", example = "2")
       @RequestParam(value = "page", defaultValue = "0") int page,
@@ -105,7 +104,7 @@ public class ChatController {
       summary = "채팅방 생성",
       description = "채팅방과 채팅방 참여자 정보를 데이터베이스에 저장"
   )
-  @PostMapping
+  @PostMapping("/chatrooms")
   public ResponseEntity<CreateChatroomResponseDto> createChatRoom(@Valid @RequestBody CreateChatroomDto dto){
     Chatroom chatroom = chatService.createChatroom(dto);
     log.info("채팅방을 생성하였습니다. 채팅방명: {}", chatroom.getChatroomName());
@@ -116,16 +115,16 @@ public class ChatController {
       summary = "채팅방 불러오기",
       description = "채팅방 목록 불러오기"
   )
-  @GetMapping("/{id}")
+  @GetMapping("/users/{userId}/chatrooms")
   public ResponseEntity<List<GetChatroomResponseDto>> getChatrooms(
       @Parameter(description = "유저id", example = "5")
-      @PathVariable(value = "id") Long id,
+      @PathVariable(value = "userId") Long userId,
 
       @AuthenticationPrincipal User user){
-    if (!id.equals(user.getId())){
+    if (!userId.equals(user.getId())){
       throw new RingoException("잘못된 경로입니다.", HttpStatus.FORBIDDEN);
     }
-    List<GetChatroomResponseDto> dtos = chatService.getAllChatroomByUserId(user.getId());
+    List<GetChatroomResponseDto> dtos = chatService.getAllChatroomByUserId(user);
     return ResponseEntity.status(HttpStatus.OK).body(dtos);
   }
 
@@ -136,12 +135,14 @@ public class ChatController {
       summary = "채팅방 삭제",
       description = "채팅방, 채팅방 참여자 정보, 메세지 등을 삭제하는 api"
   )
-  @DeleteMapping()
+  @DeleteMapping("/chatrooms/{roomId}")
   public ResponseEntity<ResultMessageResponseDto> deleteChatroom(
       @Parameter(description = "채팅방 id", example = "3")
-      @RequestParam("roomId")@NotNull Long roomId
+      @PathVariable("roomId") Long roomId,
+
+      @AuthenticationPrincipal User user
   ) {
-    chatService.deleteChatroom(roomId);
+    chatService.deleteChatroom(roomId, user);
     log.info("채팅방을 삭제했습니다. 삭제한 채팅방 id:  {}", roomId);
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("채팅방을 성공적으로 삭제했습니다."));
   }
@@ -245,29 +246,23 @@ public class ChatController {
   /**
    *  레디스의 접속 정보를 삭제한다.
    * @param roomId
-   * @param userId
    */
   @Operation(
       summary = "채팅방 나가기",
       description = "유저가 채팅방을 나갈 때 호출하는 api"
   )
-  @PatchMapping()
+  @PatchMapping("/chatrooms/{roomId}/leave")
   public ResponseEntity<ResultMessageResponseDto> disconnect(
       @Parameter(description = "채팅방 id", example = "5")
-      @RequestParam(value = "roomId")@NotNull Long roomId,
+      @PathVariable(value = "roomId") Long roomId,
 
-      @Parameter(description = "유저 id", example = "5")
-      @RequestParam(value = "userId")@NotNull Long userId,
 
       @AuthenticationPrincipal User user
   ){
-    if(!userId.equals(user.getId())){
-      throw new RingoException("잘못된 경로 입니다.", HttpStatus.FORBIDDEN);
-    }
     // 유저가 채팅방을 나가면 레디스에 저장했던 접속 정보를 삭제한다.
     // Delete connect::userId::roomId
     ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.getAndDelete("connect::" + userId + "::" + roomId);
+    ops.getAndDelete("connect::" + user.getId() + "::" + roomId);
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("유저가 채팅방을 나갔습니다."));
   }

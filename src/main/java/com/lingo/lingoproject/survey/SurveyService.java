@@ -77,8 +77,8 @@ public class SurveyService {
     surveyRepository.saveAll(surveyList);
   }
 
-  public void updateSurvey(UpdateSurveyRequestDto dto){
-    Survey survey = surveyRepository.findById(dto.surveyId())
+  public void updateSurvey(UpdateSurveyRequestDto dto, Long surveyId){
+    Survey survey = surveyRepository.findById(surveyId)
         .orElseThrow(() -> new RingoException("해당 설문을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
     if(dto.purpose() != null && !dto.purpose().isEmpty()) survey.setPurpose(dto.purpose());
     if(dto.content() != null && !dto.content().isEmpty()) survey.setContent(dto.content());

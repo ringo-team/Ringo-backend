@@ -319,9 +319,9 @@ public class ImageService {
     return  ImageUrl.substring(ImageUrl.lastIndexOf("/") + 1);
   }
 
-  public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto, Long userId){
+  public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto, Long snapImageId, Long userId){
 
-    SnapImage image = snapImageRepository.findById(dto.snapImageId())
+    SnapImage image = snapImageRepository.findById(snapImageId)
         .orElseThrow(() -> new RingoException("스냅 이미지를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
 
     if (!hasPermissionOnImage(image.getUser(), userId)){

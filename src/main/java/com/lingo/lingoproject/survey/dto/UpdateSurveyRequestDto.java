@@ -2,12 +2,8 @@ package com.lingo.lingoproject.survey.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 public record UpdateSurveyRequestDto(
-    @NotNull(message = "id는 필수값입니다.")
-    @Schema(description = "설문 id", example = "5")
-    Long surveyId,
 
     @Schema(description = "목적", example = "SPACE", allowableValues = {"SPACE", "SELF_REPRESENTATION", "CONTENT", "SHARING"})
     @NotBlank

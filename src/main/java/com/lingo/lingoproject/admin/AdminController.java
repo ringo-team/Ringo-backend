@@ -1,10 +1,11 @@
-package com.lingo.lingoproject.user;
+package com.lingo.lingoproject.admin;
 
 
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.report.ReportService;
 import com.lingo.lingoproject.report.dto.GetReportInfoRequestDto;
 import com.lingo.lingoproject.report.dto.GetReportInfoResponseDto;
+import com.lingo.lingoproject.user.UserService;
 import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
-public class UserManagementController {
+public class AdminController {
 
   private final UserService userService;
   private final ReportService reportService;
@@ -32,7 +33,7 @@ public class UserManagementController {
       summary = "유저들의 정보 조회",
       description = "관리자 페이지의 유저 정보들을 조회하는 페이짖"
   )
-  @GetMapping()
+  @GetMapping("/users")
   public ResponseEntity<?> getUsersInfo(
       @Parameter(description = "페이지 수", example = "2")
       @RequestParam int page,
