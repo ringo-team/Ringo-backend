@@ -38,27 +38,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     if (accessToken != null && accessToken.startsWith("Bearer ")) {
       accessToken = accessToken.substring(7);
 
-      /*
-       * blackList에 들어있는 토큰인지 확인
-       * blackList는 로그아웃한 유저들의 토큰을 모아놓은 리스트임
-       * redis에 blackList가 저장되어 있음. 유효기간은 1일임
-       * 유저가 다시 로그인을 하면 새로 accessToken을 발급받기 때문에 삭제할 필요없음
-       */
-      if(redisUtils.containsLogoutUserList(accessToken)){
-        throw new RingoException("유효하지 않은 토큰 입니다.", HttpStatus.FORBIDDEN);
-      }
-      /*
-       * 유효한 토큰인지 확인
-       * (비밀키에 제대로 파싱이 되는지)
-       * 유효기간이 지난 토큰일 경우 예외를 발생시킴
-       */
-      else if (!jwtUtil.isValidToken(accessToken)) {
-        throw new RingoException("유효하지 않은 토큰 입니다.", HttpStatus.FORBIDDEN);
-      }
-
       Claims claims = jwtUtil.getClaims(accessToken);
       User user = userRepository.findByEmail(claims.getSubject())
           .orElseThrow(() -> new RingoException("유효하지 않은 토큰입니다.", HttpStatus.FORBIDDEN));
+
+      // 로그아웃한 유저가 기존 토큰으로 접근하려고 할때 접근을 차단함
+      if(redisUtils.containsLogoutUserList(accessToken)){
+        throw new RingoException("유효하지 않은 토큰 입니다.", HttpStatus.FORBIDDEN);
+      }
 
       // 계정 정지된 사람일 경우 접근을 차단함
       if (redisUtils.isSuspendedUser(user.getId())){
@@ -82,12 +69,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       SecurityContextHolder.getContext().setAuthentication(
           new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities())
       );
-    }else{
+    }
+
+    else{
       Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
       if(!(authentication.getPrincipal() instanceof User)) {
         throw new RingoException("인증되지 않았습니다.", HttpStatus.FORBIDDEN);
       }
     }
+
     filterChain.doFilter(request, response);
   }
 }

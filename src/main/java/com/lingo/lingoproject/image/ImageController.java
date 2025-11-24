@@ -41,20 +41,14 @@ public class ImageController {
       responseCode = "201",
       description = "생성 성공"
   )
-  @PostMapping(value = "/users/{userId}/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PostMapping(value = "profiles", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<?> uploadProfileImage(
       @Parameter(description = "이미지 파일")
       @RequestParam(value = "image") MultipartFile image,
 
-      @Parameter(description = "유저id", example = "12")
-      @PathVariable("userId") Long userId,
 
       @AuthenticationPrincipal User user
       ) {
-
-    if (!userId.equals(user.getId())){
-      throw new RingoException("프로필을 업로드할 권한이 없습니다.", HttpStatus.FORBIDDEN);
-    }
 
     GetImageUrlResponseDto dto = imageService.uploadProfileImage(image, user);
 
@@ -88,6 +82,10 @@ public class ImageController {
 
       @AuthenticationPrincipal User user
   ){
+    if (user.getId() == null){
+      throw new RingoException("로그인 후 이용 부탁드립니다.", HttpStatus.FORBIDDEN);
+    }
+
     GetImageUrlResponseDto dto = imageService.updateProfileImage(image, profileId, user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(dto);
   }
@@ -103,6 +101,10 @@ public class ImageController {
 
       @AuthenticationPrincipal User user
   ){
+    if (user.getId() == null){
+      throw new RingoException("로그인 후 이용 부탁드립니다.", HttpStatus.FORBIDDEN);
+    }
+
     imageService.deleteProfile(profileId, user.getId());
     return ResponseEntity.ok().body(new ResultMessageResponseDto("이미지를 성공적으로 삭제했습니다."));
   }
@@ -192,6 +194,10 @@ public class ImageController {
       @RequestParam(value = "image") MultipartFile image,
       @AuthenticationPrincipal User user
   ){
+    if (user.getId() == null){
+      throw new RingoException("로그인 후 이용 부탁드립니다.", HttpStatus.FORBIDDEN);
+    }
+
     if (!imageService.verifyProfileImage(image, user)){
       return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ResultMessageResponseDto("얼굴이 인증되지 않았습니다."));
     }

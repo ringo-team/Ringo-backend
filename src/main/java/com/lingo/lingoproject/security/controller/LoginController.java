@@ -6,6 +6,7 @@ import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.security.controller.dto.LoginInfoDto;
 import com.lingo.lingoproject.security.controller.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
+import com.lingo.lingoproject.security.dto.RegenerateTokenResponseDto;
 import com.lingo.lingoproject.security.services.LoginService;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -69,14 +70,14 @@ public class LoginController {
 
   @GetMapping("/refresh")
   @Operation(summary = "토큰 재발급", description = "리프레시 토큰을 사용해 새로운 액세스/리프레시 토큰을 발급합니다.")
-  public ResponseEntity<LoginResponseDto> refresh(
+  public ResponseEntity<RegenerateTokenResponseDto> refresh(
       @Parameter(
           description = "리프레시 토큰 값",
           example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
       )
       @RequestParam String refreshToken
   ) {
-    LoginResponseDto response = loginService.regenerateToken(refreshToken);
+    RegenerateTokenResponseDto response = loginService.regenerateToken(refreshToken);
     return ResponseEntity.status(HttpStatus.OK)
         .body(response);
   }
@@ -108,8 +109,11 @@ public class LoginController {
 
   @GetMapping("/api/logout")
   @Operation(summary = "로그아웃", description = "헤더의 액세스 토큰을 무효화합니다.")
-  public ResponseEntity<ResultMessageResponseDto> logout(HttpServletRequest request, @AuthenticationPrincipal User user, @RequestHeader(value = "Authorization") String token) {
-    log.info(user.getId().toString());
+  public ResponseEntity<ResultMessageResponseDto> logout(
+      HttpServletRequest request,
+      @AuthenticationPrincipal User user,
+      @RequestHeader(value = "Authorization") String token
+  ) {
     request.getSession().invalidate();
     loginService.logout(user, token);
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("로그아웃이 완료되었습니다."));

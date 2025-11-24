@@ -43,9 +43,7 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
       throw new RingoException("토큰이 없습니다.", HttpStatus.FORBIDDEN);
     }
     token = token.substring(7);
-    if(!jwtUtil.isValidToken(token)){
-      throw new RingoException("유효한 토큰이 아닙니다.", HttpStatus.FORBIDDEN);
-    }
+
     Claims claims = jwtUtil.getClaims(token);
     User user = userRepository.findByEmail(claims.getSubject())
             .orElseThrow(() -> new RingoException("유효한 토큰이 아닙니다.", HttpStatus.FORBIDDEN));

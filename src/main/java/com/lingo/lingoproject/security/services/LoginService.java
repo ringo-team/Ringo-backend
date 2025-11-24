@@ -21,6 +21,7 @@ import com.lingo.lingoproject.security.TokenType;
 import com.lingo.lingoproject.security.controller.dto.LoginInfoDto;
 import com.lingo.lingoproject.security.controller.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
+import com.lingo.lingoproject.security.dto.RegenerateTokenResponseDto;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.utils.GenericUtils;
 import com.lingo.lingoproject.utils.RedisUtils;
@@ -60,71 +61,51 @@ public class LoginService {
       throw new RingoException("유저가 인증되지 않았습니다.", HttpStatus.FORBIDDEN);
     }
 
-    /*
-     * contextHolder에 Authentication 객체가 존재한다는 것은 이미 로그인에 성공했다는 의미이므로
-     * 데이터베이스에 이메일에 해당하는 user가 존재함을 보장할 수 있다.
-     * 따라서 get으로 optional을 캡슐을 제거할 수 있다.
-     */
-    User user = userRepository.findByEmail(dto.email()).get();
+    User user = userRepository.findByEmail(dto.email())
+        .orElseThrow(() -> new RingoException("해당 이메일을 가진 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
 
-    /*
-     * 로그인 진행시 access token과 refresh token을 발급한다.
-     */
+    // 토큰 재발급
     String access = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
 
-    /*
-     * 리프레시 토큰이 유효기간이 지날 때까지
-     * 접속을 안하면 재로그인을 해야한다. 이때 리프레시 토큰은 db에 저장되어 있다.
-     * 로그인 성공 시 저장된 리프레시 토큰이 업데이트 된다.
-     */
+    // 리프레시 토큰 업데이트
     JwtRefreshToken tokenInfo = jwtRefreshTokenRepository.findByUser(user)
-        .orElse(null);
-    if(tokenInfo != null){
-      tokenInfo.setRefreshToken(refresh);
-    }
-    else {
-      /*
-       * 로그아웃을 했거나 신규가입자의 경우 리프레시 토큰이 존재하지 않으므로
-       */
-      tokenInfo = JwtRefreshToken.builder()
-          .refreshToken(refresh)
-          .user(user)
-          .build();
-    }
+        .orElseThrow(() -> new RingoException("유저의 리프레시 토큰을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    tokenInfo.setRefreshToken(refresh);
     jwtRefreshTokenRepository.save(tokenInfo);
+
     return new  LoginResponseDto(user.getId(), access, refresh);
   }
 
   /**
-   * 서버에 저장된 refresh token과 비교, 토큰의 유효성을 검증한다.
-   * accessToken과 refreshToken을 각각 재발행한 후에
-   * db에 저장되어 있던 refreshToken을 업데이트한다.
-   * @param refreshToken
-   * @return
+   * 서버에 저장된 refresh token과 비교하여 토큰의 유효성을 검증한다.
+   * accessToken과 refreshToken을 각각 재발급한 후에
+   * db에 저장되어 있는 refreshToken을 업데이트한다.
    */
-  public LoginResponseDto regenerateToken(String refreshToken){
+  public RegenerateTokenResponseDto regenerateToken(String refreshToken){
+
+
     Claims claims =  jwtUtil.getClaims(refreshToken);
-    Optional<User> optionalUser = userRepository.findByEmail(claims.getSubject());
-    if (optionalUser.isEmpty()){
-      throw new RingoException("유효하지 않은 토큰입니다.",  HttpStatus.FORBIDDEN);
-    }
-    User user = optionalUser.get();
+
+    User user = userRepository.findByEmail(claims.getSubject())
+        .orElseThrow(() -> new RingoException("해당 이메일을 가진 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
     JwtRefreshToken tokenInfo = jwtRefreshTokenRepository.findByUser(user)
         .orElseThrow(() -> new RingoException("토큰을 찾을 수 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
-    /*
-     * 저장된 리프레시 토큰과 동일해야 하며
-     * 리프레시 토큰의 유효기간이 지나지 않아야한다.
-     */
-    if(tokenInfo.getRefreshToken().equals(refreshToken) && jwtUtil.isValidToken(refreshToken)){
-      String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
-      String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
-      // 리프레시 토큰의 값을 업데이트 한다.
-      tokenInfo.setRefreshToken(refresh);
-      jwtRefreshTokenRepository.save(tokenInfo);
-      return new  LoginResponseDto(user.getId(), accessToken, refresh);
+
+    if(!tokenInfo.getRefreshToken().equals(refreshToken)){
+      throw new RingoException("유효하지 않은 토큰입니다.", HttpStatus.FORBIDDEN);
     }
-    else throw new RingoException("유효하지 않은 토큰입니다.", HttpStatus.FORBIDDEN);
+
+    // 토큰 재발급
+    String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
+    String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
+
+    // 리프레시 토큰 업데이트
+    tokenInfo.setRefreshToken(refresh);
+    jwtRefreshTokenRepository.save(tokenInfo);
+
+    return new  RegenerateTokenResponseDto(user.getId(), accessToken, refresh);
   }
 
   public void signup(LoginInfoDto dto){
@@ -192,6 +173,7 @@ public class LoginService {
       hashtagRepository.saveAll(hashtags);
       userPointRepository.save(UserPoint.builder().user(user).build());
       fcmTokenRepository.save(FcmToken.builder().user(user).build());
+      jwtRefreshTokenRepository.save(JwtRefreshToken.builder().user(user).build());
     } catch (DataIntegrityViolationException e) {
       throw new RingoException(e.getMessage(), HttpStatus.BAD_REQUEST);
     } catch (Exception e) {
