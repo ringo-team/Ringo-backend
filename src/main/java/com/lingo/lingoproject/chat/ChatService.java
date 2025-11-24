@@ -73,25 +73,32 @@ public class ChatService {
   }
 
   public Chatroom createChatroom(CreateChatroomDto dto){
+
+    // 채팅 타입 검사
     if(!genericUtils.isContains(ChatType.values(), dto.chatType())){
       throw new RingoException("적절하지 않은 채팅타입이 입력되었습니다.", HttpStatus.BAD_REQUEST);
     }
+
+    // 유저 조회
     User user1 = userRepository.findById(dto.user1Id())
         .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
     User user2 = userRepository.findById(dto.user2Id())
         .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
     // 매칭된 유저가 아니면 채팅방을 생성할 수 없다.
     if (!(matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(user1, user2, MatchingStatus.ACCEPTED)
         || matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(user2, user1, MatchingStatus.ACCEPTED))
     ){
       throw new RingoException("매칭되지 않은 쌍은 채팅방을 생성할 수 없습니다.", HttpStatus.BAD_REQUEST);
     }
+
     // 채팅방 생성 및 저장
     Chatroom chatroom = Chatroom.builder()
         .chatroomName(dto.user1Id().toString() + "_" +dto.user2Id().toString())
         .type(ChatType.valueOf(dto.chatType()))
         .build();
     Chatroom savedChatroom = chatroomRepository.save(chatroom);
+
     // 채팅방 참여자 생성 및 저장
     ChatroomParticipant participant1 = ChatroomParticipant.builder()
         .participant(user1)
@@ -102,12 +109,12 @@ public class ChatService {
         .chatroom(savedChatroom)
         .build();
     chatroomParticipantRepository.saveAll(List.of(participant1, participant2));
+
     return savedChatroom;
   }
 
-  public List<GetChatroomResponseDto> getAllChatroomByUserId(Long userId){
-    User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+  public List<GetChatroomResponseDto> getAllChatroomByUserId(User user){
+
     List<Chatroom> chatrooms = chatroomRepository.findAllByUser(user);
     List<GetChatroomResponseDto> list = new ArrayList<>();
     for(Chatroom chatroom : chatrooms){
@@ -139,9 +146,15 @@ public class ChatService {
   }
 
   @Transactional
-  public void deleteChatroom(Long chatroomId){
+  public void deleteChatroom(Long chatroomId, User user){
+
     Chatroom chatroom = chatroomRepository.findById(chatroomId)
-        .orElseThrow(() -> new RingoException("chatroom not found", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
+    if (!isMemberInChatroom(chatroomId, user.getId())){
+      throw new RingoException("채팅방을 삭제할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+    }
+
     chatroomParticipantRepository.deleteAllByChatroom(chatroom);
     messageRepository.deleteAllByChatroomId(chatroomId);
     chatroomRepository.delete(chatroom);

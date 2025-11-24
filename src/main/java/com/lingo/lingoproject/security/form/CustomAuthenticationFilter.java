@@ -34,7 +34,8 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
 
   private final CustomAuthenticationManager customAuthenticationManager;
   private final ObjectMapper objectMapper;
-  private final String[] whiteList = {"/signup", "/swagger", "/v3/api-docs", "/swagger-resources", "/ws", "/stomp", "/users/access", "/actuator", "/error"};
+  private final String[] whiteList = {"/signup", "/swagger", "/v3/api-docs", "/swagger-resources",
+        "/ws", "/stomp", "/users/access", "/actuator", "/error"};
 
   public CustomAuthenticationFilter(CustomAuthenticationManager customAuthenticationManager,
       ObjectMapper objectMapper,

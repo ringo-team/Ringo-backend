@@ -8,10 +8,27 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 public interface BlockedFriendRepository extends JpaRepository<BlockedFriend, Long> {
-  @Query("select b.user from BlockedFriend b join User u on b.phoneNumber=u.phoneNumber and  u.id = :userId "
-      + " union all "
-      + "select u from BlockedFriend b join User u on b.phoneNumber=u.phoneNumber and b.user.id = :userId")
-  List<User> findBlockedFriends(Long userId); // 나를 block한 사람과 내가 block한 사람
+
+  /**
+   * blackedFriend 에는 유저(나) id와 유저가(내가) 차단한 연락처가 저장되어 있다.
+   * blockedFriend와 User를 연락처에 대해서 조인하면
+   * 유저의(나의) id와 유저가(내가) 차단한 유저의 id 쌍을 구할 수 있다.
+   *
+   * 아래 쿼리는
+   *  나를 차단한 유저(when u.id = :userId then b.user) 와
+   *  내가 차단한 유저(else u)
+   * 의 목록을 조회한다.
+   */
+  @Query("""
+    select
+        case
+           when u.id = :userId then b.user
+           else u
+        end
+    from BlockedFriend b join User u on b.phoneNumber = u.phoneNumber
+    where b.user.id = :userId or u.id = :userId
+    """)
+  List<User> findUsersMutuallyBlockedWith(Long userId);
 
   void deleteByUser(User user);
 }

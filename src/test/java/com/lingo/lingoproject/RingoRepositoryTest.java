@@ -17,7 +17,7 @@ public class RingoRepositoryTest {
 
   @Test
   public void getSuspendedUserTest(){
-    List<Long> banIds = matchService.getBannedRecommendedUserList(5L);
+    List<Long> banIds = matchService.getExcludedUserIdsForRecommendation(5L);
     System.out.println("-----밴당한 유저 아이디 : " + banIds);
   }
 }

@@ -1,7 +1,6 @@
 package com.lingo.lingoproject.match;
 
 import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
 import com.lingo.lingoproject.chat.ChatService;
@@ -9,7 +8,6 @@ import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
 import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
-import com.lingo.lingoproject.domain.FcmToken;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
@@ -37,7 +35,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -84,12 +81,15 @@ public class MatchService {
 
   public Matching matchRequest(MatchingRequestDto dto){
     User requestedUser = userRepository.findById(dto.requestedId())
-        .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("매칭을 요청 받은 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
     User requestUser = userRepository.findById(dto.requestId())
-        .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-    if(!isMatch(calcMatchScore(requestedUser.getId(), requestUser.getId()))){
+        .orElseThrow(() -> new RingoException("매칭을 요청한 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
+    Float matchingScore = calcMatchScore(requestedUser.getId(), requestUser.getId());
+    if(!isMatch(matchingScore)){
       return null;
     }
+
     Matching matching = Matching.builder()
         .requestedUser(requestedUser)
         .requestUser(requestUser)
@@ -105,131 +105,146 @@ public class MatchService {
    * @param decision
    * @param matchingId
    */
-  public void responseToRequest(String decision, Long matchingId, Long userId)
-      throws FirebaseMessagingException {
+  public void responseToRequest(String decision, Long matchingId, User user) {
+
     Matching matching = matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException("적절하지 않은 매칭 id 입니다.", HttpStatus.BAD_REQUEST));
 
-    // 해당 매칭 요청을 받은 사람만이 수락 여부를 결정할 수 있다.
-    if (!matching.getRequestedUser().getId().equals(userId)) {
+    Long requestedUserId = matching.getRequestedUser().getId();
+    if (!requestedUserId.equals(user.getId())) {
       throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
     }
 
-    MatchingStatus status = null;
-    if(decision.equals(MatchingStatus.ACCEPTED.toString())){
-      status = MatchingStatus.ACCEPTED;
-      chatService.createChatroom(
-          new CreateChatroomDto(matching.getRequestedUser().getId(), matching.getRequestUser().getId(), ChatType.USER.toString()));
+    switch (decision) {
+      case "ACCEPTED" -> handleAcceptedMatching(matching);
+      case "REJECTED" -> matching.setMatchingStatus(MatchingStatus.REJECTED);
+      default -> throw new RingoException("decision 값이 적절하지 않습니다.", HttpStatus.BAD_REQUEST);
     }
-    else if(decision.equals(MatchingStatus.REJECTED.toString())){
-      status = MatchingStatus.REJECTED;
-    }
-    else{
-      throw new RingoException("decision 값이 적절하지 않습니다.", HttpStatus.BAD_REQUEST);
-    }
-    matching.setMatchingStatus(status);
-    matchingRepository.save(matching);
 
-    if (status == MatchingStatus.ACCEPTED) {
-      // 매칭 수락을 하면 fcm 알림 전송
-      User user = matching.getRequestUser();
-      FcmToken token = fcmTokenRepository.findByUser(user).orElse(null);
-      if (token != null){
-        Message message = Message.builder()
-            .setNotification(Notification.builder()
-                .setTitle("누군가 요청을 수락했어요")
-                .setImage("ImageUrl")
-                .build())
-            .build();
+    matchingRepository.save(matching);
+  }
+
+  private void handleAcceptedMatching(Matching matching){
+    matching.setMatchingStatus(MatchingStatus.ACCEPTED);
+
+    chatService.createChatroom(
+        new CreateChatroomDto(
+            matching.getRequestedUser().getId(),
+            matching.getRequestUser().getId(),
+            ChatType.USER.toString()
+        )
+    );
+
+    sendAcceptedNotification(matching.getRequestUser());
+  }
+
+  private void sendAcceptedNotification(User requestUser) {
+    fcmTokenRepository.findByUser(requestUser).ifPresent(token -> {
+      Message message = Message.builder()
+          .setNotification(
+              Notification.builder()
+                  .setTitle("누군가 요청을 수락했어요")
+                  .setImage("ImageUrl")
+                  .build()
+          )
+          .build();
+      try {
         FirebaseMessaging.getInstance().send(message);
+      }catch (Exception e){
+        throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
       }
-    }
+    });
   }
 
   @Transactional
   public List<GetUserProfileResponseDto> recommend(Long userId){
 
+    // 캐시 조회
     if(redisUtils.containsRecommendUser(userId.toString())){
       return redisUtils.getRecommendUser(userId.toString());
     }
 
-    Set<GetUserProfileResponseDto> rtnSet = new HashSet<>();
-    int count =  0;
-    int setSize = 0;
-    User userEntity = userRepository.findById(userId)
+    // 유저 조회
+    User currentUser = userRepository.findById(userId)
         .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-    List<Long> banUserId = getBannedRecommendedUserList(userEntity.getId());
 
-    /*
-     * setSize는 rtnSet의 크기로 추천이성 정보의 개수이다.
-     * setSize의 크기가 4 이상이거나 반복문을 10번 돌면 반복문을 빠져나온다.
-     *
-     * findRandomUsers는 banUserIds를 제외한 이성친구를 무작위로 추천한다.
-     */
-    while(setSize < MAX_RECOMMEND_PROFILE_SIZE && count < MAX_NUMBER_OF_LOOP){
-      List<User> randUsers = userRepositoryImpl.findRandomOppositeGenderAndNotBannedFriend(userEntity.getGender(), banUserId);
-      for(User randUser : randUsers){
-        // setSize가 4 이상일 때는 while & for 반복문이 종료된다.
-        if(setSize >= MAX_RECOMMEND_PROFILE_SIZE) break;
-        Float matchingScore = calcMatchScore(userId, randUser.getId());
-        /*
-        if((setSize < NUMBER_OF_ENABLE_MATCHING && isMatch(matchingScore)) ||
-            (setSize >= NUMBER_OF_ENABLE_MATCHING && !isMatch(matchingScore))){
-         */
+    Set<GetUserProfileResponseDto> recommendUserProfileSet = new HashSet<>();
+
+    List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(currentUser.getId());
+
+    int whileLoopCount =  0;
+    int recommendationSize = 0;
+
+    while(recommendationSize < MAX_RECOMMEND_PROFILE_SIZE && whileLoopCount < MAX_NUMBER_OF_LOOP){
+      List<User> randomCandidates = userRepositoryImpl.findRandomRecommendationCandidates(currentUser.getGender(), excludedUserIds);
+      for(User candidateUser : randomCandidates){
+        if(recommendationSize >= MAX_RECOMMEND_PROFILE_SIZE) break;
+        Float matchingScore = calcMatchScore(userId, candidateUser.getId());
         if(isMatch(matchingScore)){
-          addUserInfoInCollection(rtnSet, randUser);
-          setSize++;
+          addUserProfileToCollection(recommendUserProfileSet, candidateUser);
+          recommendationSize++;
         }
       }
-      count++;
+      whileLoopCount++;
     }
 
-    List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>(rtnSet);
+    List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>(recommendUserProfileSet);
+
+    // 캐시 저장
     redisUtils.saveRecommendUser(userId.toString(), recommendUserList);
+
     return recommendUserList;
   }
 
-  public List<GetUserProfileResponseDto> recommendUserForDailySurvey(Long userId){
-    // 일일 추천 이성이 레디스에 저장되어 있다면 레디스의 저장된 값을 반환한다.
+  public List<GetUserProfileResponseDto> recommendUserByDailySurvey(User user){
+
+    Long userId = user.getId();
+
+    //캐시 조회
     if (redisUtils.containsRecommendUserForDailySurvey(userId.toString())){
       return redisUtils.getRecommendUserForDailySurvey(userId.toString());
     }
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
 
-    List<AnsweredSurvey> answeredSurveys = answeredSurveyRepository.findAllByUserAndCreatedAtBetween(
+    // 오늘 응답한 설문 조회
+    List<AnsweredSurvey> todayAnsweredSurveys = answeredSurveyRepository.findAllByUserAndCreatedAtBetween(
         user,
         LocalDate.now().atStartOfDay(),
         LocalDateTime.now()
     );
-    // 만약 설문을 완료하지 않았다면 추천받을 수 없다.
-    if (answeredSurveys.isEmpty()){
+
+    // 만약 설문을 완료하지 않았다면 추천받을 수 없음.
+    if (todayAnsweredSurveys.isEmpty()){
       return null;
     }
 
-    // 무작위로 4명을 추천해줌
-    Random random = new Random(System.currentTimeMillis());
-    while(answeredSurveys.size() > NUMBER_OF_DAILY_RECOMMENDATION){
-      int index = random.nextInt(answeredSurveys.size());
-      answeredSurveys.remove(index);
+    // 4개의 설문에 대해서만 추천해줌
+    Random randomGenerator = new Random(System.currentTimeMillis());
+    while(todayAnsweredSurveys.size() > NUMBER_OF_DAILY_RECOMMENDATION){
+      int index = randomGenerator.nextInt(todayAnsweredSurveys.size());
+      todayAnsweredSurveys.remove(index);
     }
-    List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>();
-    for (AnsweredSurvey answeredSurvey : answeredSurveys) {
-      List<User> bannedUsers = convertIdListToUserList(getBannedRecommendedUserList(user.getId()));
-      List<AnsweredSurvey> sameAnsweredSurveyList = answeredSurveyRepository.findAllByUserNotInAndAnswerAndSurveyNum(
-          bannedUsers,
-          answeredSurvey.getAnswer(),
-          answeredSurvey.getSurveyNum()
+
+    // 유저와 같은 응답을 한 이성을 추천해줌
+    List<GetUserProfileResponseDto> recommendUserProfileList = new ArrayList<>();
+    for (AnsweredSurvey todayAnsweredSurvey : todayAnsweredSurveys) {
+      List<User> excludedUsers = convertIdListToUserList(getExcludedUserIdsForRecommendation(user.getId()));
+      List<AnsweredSurvey> matchingAnsweredSurveyList = answeredSurveyRepository.findAllByUserNotInAndAnswerAndSurveyNum(
+          excludedUsers,
+          todayAnsweredSurvey.getAnswer(),
+          todayAnsweredSurvey.getSurveyNum()
       );
-      AnsweredSurvey sameAnsweredSurvey = sameAnsweredSurveyList.get(random.nextInt(sameAnsweredSurveyList.size()));
-      User recommendedUser = sameAnsweredSurvey.getUser();
-      addUserInfoInCollection(recommendUserList, recommendedUser);
+      int randomIndex = randomGenerator.nextInt(matchingAnsweredSurveyList.size());
+      AnsweredSurvey matchingAnsweredSurvey = matchingAnsweredSurveyList.get(randomIndex);
+      User recommendedUser = matchingAnsweredSurvey.getUser();
+      addUserProfileToCollection(recommendUserProfileList, recommendedUser);
     }
-    // 레디스에 일일 유저 설문 내용을 저장함
-    redisUtils.saveRecommendUserForDailySurvey(userId.toString(), recommendUserList);
-    return recommendUserList;
+
+    // 캐시 저장
+    redisUtils.saveRecommendUserForDailySurvey(userId.toString(), recommendUserProfileList);
+    return recommendUserProfileList;
   }
 
-  public void addUserInfoInCollection(Collection<GetUserProfileResponseDto> collection, User user){
+  public void addUserProfileToCollection(Collection<GetUserProfileResponseDto> collection, User user){
     Profile profile = profileRepository.findByUser(user)
         .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
     List<String> hashtags = hashtagRepository.findAllByUser(user)
@@ -247,8 +262,9 @@ public class MatchService {
     );
   }
   
-  public List<Long> getBannedRecommendedUserList(Long userId){
-    List<Long> blockedFriendIds = blockedFriendRepository.findBlockedFriends(userId)
+  public List<Long> getExcludedUserIdsForRecommendation(Long userId){
+    // 연락처에 존재하는 유저
+    List<Long> blockedFriendUserIds = blockedFriendRepository.findUsersMutuallyBlockedWith(userId)
         .stream()
         .map(User::getId)
         .toList();
@@ -263,19 +279,19 @@ public class MatchService {
         .stream()
         .map(BlockedUser::getBlockedUserId)
         .toList();
-    List<Long> suspendedUserId = redisUtils.getSuspendedUser()
+    List<Long> suspendedUserIds = redisUtils.getSuspendedUser()
         .stream()
         .map(s -> s.replace("suspension::", ""))
         .map(Long::parseLong)
         .toList();
 
-    List<Long> banUserId = new ArrayList<>();
-    banUserId.addAll(blockedFriendIds);
-    banUserId.addAll(dormantUserIds);
-    banUserId.addAll(blockedUserIds);
-    banUserId.addAll(suspendedUserId);
+    List<Long> excludedUserId = new ArrayList<>();
+    excludedUserId.addAll(blockedFriendUserIds);
+    excludedUserId.addAll(dormantUserIds);
+    excludedUserId.addAll(blockedUserIds);
+    excludedUserId.addAll(suspendedUserIds);
     
-    return banUserId;
+    return excludedUserId;
   }
   
   public List<User> convertIdListToUserList(List<Long> idList){
@@ -311,9 +327,7 @@ public class MatchService {
   /**
    * 내가 매칭 요청한 사람들의 정보
    */
-  public List<GetUserProfileResponseDto> getUserIdWhoRequestedByMe(Long userId){
-    User requestUser = userRepository.findById(userId)
-            .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
+  public List<GetUserProfileResponseDto> getUserIdWhoRequestedByMe(User requestUser){
     List<Matching> matchings = matchingRepository.findByRequestUserAndMatchingStatus(requestUser, MatchingStatus.PENDING);
     List<Long> matchingIds = matchings.stream()
         .map(Matching::getId)
@@ -328,9 +342,7 @@ public class MatchService {
     return requestedUserProfileDtoList;
   }
 
-  public List<GetUserProfileResponseDto> getUserIdWhoRequestToMe(Long userId){
-    User requestedUser = userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
+  public List<GetUserProfileResponseDto> getUserIdWhoRequestToMe(User requestedUser){
     List<Matching> matchings = matchingRepository.findByRequestedUserAndMatchingStatus(requestedUser, MatchingStatus.PENDING);
 
     // id, age, gender, nickname, profileUrl 조회
@@ -357,27 +369,45 @@ public class MatchService {
         ));
   }
 
-  public void deleteMatching(Long id){
-    matchingRepository.deleteById(id);
-  }
+  public void deleteMatching(Long matchingId, User user){
 
-  public void saveMatchingRequestMessage(SaveMatchingRequestMessageRequestDto dto, Long userId){
-    Matching match = matchingRepository.findById(dto.matchingId())
-        .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
-    if (!match.getRequestUser().getId().equals(userId)){
-      throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+    Matching match = matchingRepository.findById(matchingId).orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
+    Long requestedUserId = match.getRequestedUser().getId();
+    Long requestUserId = match.getRequestUser().getId();
+    if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))){
+      throw new RingoException("매칭을 삭제할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
     }
-    match.setMatchingRequestMessage(dto.message());
-    matchingRepository.save(match);
+
+    matchingRepository.deleteById(matchingId);
   }
 
-  public String getMatchingRequestMessage(Long matchingId, Long userId){
+  public void saveMatchingRequestMessage(SaveMatchingRequestMessageRequestDto dto, Long matchingId, User user){
+
     Matching match = matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
-    if (!(match.getRequestedUser().getId().equals(userId) ||
-          match.getRequestUser().getId().equals(userId))){
+
+    Long requestUserId = match.getRequestUser().getId();
+    if (!requestUserId.equals(user.getId())){
+      throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+    }
+
+    match.setMatchingRequestMessage(dto.message());
+    matchingRepository.save(match);
+
+  }
+
+  public String getMatchingRequestMessage(Long matchingId, User user){
+
+    Matching match = matchingRepository.findById(matchingId)
+        .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
+    Long requestedUserId = match.getRequestedUser().getId();
+    Long requestUserId = match.getRequestUser().getId();
+    if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))){
       throw new RingoException("해당 매칭의 요청 메세지를 확인할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
     }
+
     return match.getMatchingRequestMessage();
   }
 }

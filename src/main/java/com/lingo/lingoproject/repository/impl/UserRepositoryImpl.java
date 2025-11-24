@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 public class UserRepositoryImpl {
   private final QUser qUser =  QUser.user;
   private final JPAQueryFactory jpaQueryFactory;
-  public List<User> findRandomOppositeGenderAndNotBannedFriend(Gender gender, List<Long> banIds){
+  public List<User> findRandomRecommendationCandidates(Gender gender, List<Long> banIds){
 
     BooleanBuilder builder = new BooleanBuilder();
 
