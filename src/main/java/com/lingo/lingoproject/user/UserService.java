@@ -34,6 +34,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +43,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserService {
 
   private final int FRIEND_INVITATION_REWARD = 10;
@@ -89,6 +91,7 @@ public class UserService {
       jwtRefreshTokenRepository.deleteByUser(user);
       userRepository.deleteById(userId);
     } catch (Exception e) {
+      log.error("유저 데이터 삭제 실패. userId: {}, reason: {}", userId, reason, e);
       throw new RingoException("유저 정보를 삭제하는데 실패하였습니다." + e.getMessage(),
           HttpStatus.INTERNAL_SERVER_ERROR);
     }

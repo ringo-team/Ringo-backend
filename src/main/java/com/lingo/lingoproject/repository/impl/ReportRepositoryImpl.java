@@ -18,11 +18,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
 @RequiredArgsConstructor
 @Repository
+@Slf4j
 public class ReportRepositoryImpl{
   private final JPAQueryFactory jpaQueryFactory;
 
@@ -46,6 +48,7 @@ public class ReportRepositoryImpl{
         builder.and(report.createdAt.goe(startedAt));
         builder.and(report.createdAt.loe(finishedAt));
       }catch (Exception e){
+        log.error("신고 조회 기간 파싱 실패. startedAt: {}, finishedAt: {}", dto.startedAt(), dto.finishedAt(), e);
         throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
       }
     }

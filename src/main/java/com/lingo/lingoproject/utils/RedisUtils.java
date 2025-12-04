@@ -11,11 +11,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RedisUtils {
@@ -32,6 +34,8 @@ public class RedisUtils {
     try {
       savedDecryptedKey = (DecryptKeyObject) redisTemplate.opsForValue().get(key);
     } catch (Exception e) {
+      log.error("본인인증 api에서 복호화 정보를 역질렬화하던 중 오류가 발생하였습니다.");
+      log.error("key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return savedDecryptedKey;
@@ -68,6 +72,7 @@ public class RedisUtils {
     try {
       savedRecommendUserList = (JsonListWrapper<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);
     } catch (Exception e) {
+      log.error("추천 유저 캐시 역직렬화 실패. key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return savedRecommendUserList.getList();
@@ -86,6 +91,7 @@ public class RedisUtils {
     try {
       savedRecommendUserList = (JsonListWrapper<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend-for-daily-survey::" + key);
     } catch (Exception e) {
+      log.error("일일 설문 추천 캐시 역직렬화 실패. key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return savedRecommendUserList.getList();
@@ -104,6 +110,7 @@ public class RedisUtils {
     try {
       savedUserDailySurveyList = (JsonListWrapper<GetSurveyResponseDto>) redisTemplate.opsForValue().get("dailySurvey::" + key);
     }catch (Exception e){
+      log.error("일일 설문 캐시 역직렬화 실패. key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return savedUserDailySurveyList.getList();
@@ -134,4 +141,3 @@ public class RedisUtils {
     redisTemplate.expireAt(key, expireAtUtc);
   }
 }
-

@@ -89,13 +89,18 @@ public class SelfAuthService {
     try{
       response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, GetAccessTokenResponseDto.class).getBody();
     } catch (Exception e) {
+      log.error("POST : " + apiUrl + ":: 요청을 보내는데 실패하였습니다.");
+      log.error("request_body : {}", request.getBody());
+      log.error("액세스 토큰 조회 중 예외 발생", e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if (response == null) {
+      log.error("POST : {} :: 응답값이 null입니다.", apiUrl);
       throw new RingoException("본인인증 api response의 값이 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     else if(!response.getDataHeader().resultCd().equals("1200")){
-      throw new RingoException("정상 토큰을 얻지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      log.error("POST : " + apiUrl + ":: response:result_cd : " +  response.getDataHeader().resultCd());
+      throw new RingoException("본인인증 api의 응답값에서 정상 토큰을 얻지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     return response.getDataBody().accessToken();
@@ -158,8 +163,12 @@ public class SelfAuthService {
      */
     GetCryptoTokenResponseDto response = null;
     try{
+      log.info("POST : " + apiUrl + "암호화 토큰 생성 정보 요청을 진행합니다.");
       response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, GetCryptoTokenResponseDto.class).getBody();
     }catch (Exception e){
+      log.error("POST : " + apiUrl + ":: 요청을 보내는데 실패하였습니다.");
+      log.error("request_body : {}", request.getBody());
+      log.error("암호화 토큰 정보 요청 중 예외 발생", e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if(response == null
@@ -168,6 +177,7 @@ public class SelfAuthService {
         || response.getDataBody().responseMsg().startsWith("EAPI")
         || !response.getDataBody().resultCd().equals("0000")
     ){
+      log.error("POST : " + apiUrl + ":: response:result_cd : " +  response.getDataHeader().resultCd());
       throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     /*
@@ -176,6 +186,7 @@ public class SelfAuthService {
     String siteCode = response.getDataBody().siteCode();
     String responseCryptoTokenVersionId = response.getDataBody().tokenVersionId();
     String responseCryptoTokenValue = response.getDataBody().tokenVal();
+
 
     String token = createCryptoTokenInfoRequestDateTime.trim() +
         createCryptoTokenInfoRequestTransactionId.trim() +
@@ -298,7 +309,7 @@ public class SelfAuthService {
 
     /* pass 서버로부터 받은 originalIntegrityValue와 방금 생성한 integrityValue가 동일한지 확인 */
     if(!integrityValue.equals(originalIntegrityValue)){
-      log.info("메세지가 위조되었거나 무결성 검증 과정에서 오류가 발생하였습니다.");
+      log.error("메세지가 위조되었거나 무결성 검증 과정에서 오류가 발생하였습니다.");
       throw new RingoException("잘못된 암호문이 도달했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -315,6 +326,7 @@ public class SelfAuthService {
     try {
       userSelfAuthInfo = objectMapper.readValue(data, UserSelfAuthInfo.class);
     } catch (Exception e) {
+      log.error("본인인증 api에서 유저 정보를 역질렬화하던 중 오류가 발생하였습니다.", e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 

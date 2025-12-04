@@ -57,6 +57,7 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
         info = objectMapper.readValue(requestBody, LoginInfoDto.class);
         request.setAttribute("requestBody", info);
       } catch (Exception e) {
+        log.error("AuthenticationFilter : 로그인 요청값을 역질렬화하는데 실패하였습니다. uri: {}", request.getRequestURI(), e);
         throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
       }
 

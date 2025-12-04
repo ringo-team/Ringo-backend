@@ -13,6 +13,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,9 +22,11 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.lingo.lingoproject.exception.RingoException;
 
 @RestController
 @RequestMapping("/admin")
+@Slf4j
 @RequiredArgsConstructor
 public class AdminController {
 
@@ -40,8 +44,18 @@ public class AdminController {
 
       @Parameter(description = "페이지 크기", example = "5")
       @RequestParam int size){
-    List<GetUserInfoResponseDto> dtos = userService.getPageableUserInfo(page, size);
-    return ResponseEntity.ok().body(dtos);
+    try {
+      log.info("page={}, size={}, step=관리자_유저정보_조회_시작, status=SUCCESS", page, size);
+      List<GetUserInfoResponseDto> dtos = userService.getPageableUserInfo(page, size);
+      log.info("page={}, size={}, count={}, step=관리자_유저정보_조회_완료, status=SUCCESS", page, size, dtos.size());
+      return ResponseEntity.ok().body(dtos);
+    } catch (Exception e) {
+      log.error("page={}, size={}, step=관리자_유저정보_조회_실패, status=FAILED", page, size, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("관리자 유저 정보 조회에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
 //  @Operation(
@@ -82,8 +96,11 @@ public class AdminController {
       @Parameter(description = "신고자 상태",
           schema = @Schema(
               example = "PENDING",
-              allowableValues = {"PENDING", "PERMANENT_ACCOUNT_SUSPENSION", "SEVERE_ACCOUNT_SUSPENSION",
-                  "RISKY_ACCOUNT_SUSPENSION", "MINOR_ACCOUNT_SUSPENSION", "WARNING", "LEGAL_REVIEW", "INNOCENT_REPORT"})
+              allowableValues = {
+                  "PENDING", "PERMANENT_ACCOUNT_SUSPENSION", "SEVERE_ACCOUNT_SUSPENSION",
+                  "RISKY_ACCOUNT_SUSPENSION", "MINOR_ACCOUNT_SUSPENSION", "WARNING",
+                  "LEGAL_REVIEW", "INNOCENT_REPORT"
+              })
       )
       @RequestParam(required = false)
       String reportedUserStatus,
@@ -113,10 +130,20 @@ public class AdminController {
       @RequestParam(required = false)
       String finishedAt
   ){
-    List<GetReportInfoResponseDto> list = reportService.getReportInfos(new GetReportInfoRequestDto(
-        userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt
-    ));
-    return ResponseEntity.ok().body(new JsonListWrapper<>(list));
+    try {
+      log.info("step=신고정보_조회_시작, status=SUCCESS, userId={}, reportedUserStatus={}, reportIntensity={}, ordering={}, startedAt={}, finishedAt={}", userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt);
+      List<GetReportInfoResponseDto> list = reportService.getReportInfos(new GetReportInfoRequestDto(
+          userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt
+      ));
+      log.info("count={}, step=신고정보_조회_완료, status=SUCCESS", list.size());
+      return ResponseEntity.ok().body(new JsonListWrapper<>(list));
+    } catch (Exception e) {
+      log.error("step=신고정보_조회_실패, status=FAILED", e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("신고 정보를 조회하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
 
@@ -126,9 +153,11 @@ public class AdminController {
       @Parameter(description = "신고 조치 상태",
       schema = @Schema(
           example = "PENDING",
-          allowableValues = {"PENDING", "INNOCENT_REPORT", "WARNING",
+          allowableValues = {
+              "PENDING", "INNOCENT_REPORT", "WARNING",
               "MINOR_ACCOUNT_SUSPENSION", "RISKY_ACCOUNT_SUSPENSION", "SEVERE_ACCOUNT_SUSPENSION",
-              "PERMANENT_ACCOUNT_SUSPENSION", "LEGAL_REVIEW"}
+              "PERMANENT_ACCOUNT_SUSPENSION", "LEGAL_REVIEW"
+          }
       ))
       @RequestParam String reportedUserStatus,
 
@@ -137,9 +166,20 @@ public class AdminController {
 
       @AuthenticationPrincipal User admin
   ){
-    reportService.suspendUser(reportId, reportedUserStatus, admin.getId());
+    try {
 
-    return ResponseEntity.ok().body("성공적으로 신고조치가 완료되었습니다.");
+      log.info("adminId={}, reportId={}, step=신고조치_시작, status=SUCCESS", admin.getId(), reportId);
+      reportService.suspendUser(reportId, reportedUserStatus, admin.getId());
+      log.info("adminId={}, reportId={}, step=신고조치_완료, status=SUCCESS", admin.getId(), reportId);
+
+      return ResponseEntity.ok().body("성공적으로 신고조치가 완료되었습니다.");
+    } catch (Exception e) {
+      log.error("adminId={}, reportId={}, step=신고조치_실패, status=FAILED", admin.getId(), reportId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("신고 조치에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
 }

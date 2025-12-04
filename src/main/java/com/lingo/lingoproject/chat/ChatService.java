@@ -178,7 +178,7 @@ public class ChatService {
    */
   public List<String> getUserEmailsInChatroom(Long roomId){
     Chatroom chatroom = chatroomRepository.findById(roomId)
-        .orElseThrow(() -> new RingoException("Room not found", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("채팅방에 초대된 유저를 찾는 중 채팅방가 존재하지 않습니다", HttpStatus.BAD_REQUEST));
     return chatroomParticipantRepository.findAllByChatroom(chatroom)
         .stream()
         .filter(participant -> !participant.getIsWithdrawn())

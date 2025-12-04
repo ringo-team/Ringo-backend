@@ -55,13 +55,35 @@ public class MatchController {
       @Valid @RequestBody MatchingRequestDto matchingRequestDto,
       @AuthenticationPrincipal User user
   ) {
+    // 매칭 요청자 검증
     Long requestUserId = matchingRequestDto.requestId();
     if (!requestUserId.equals(user.getId())){
       throw new RingoException("매칭 요청자와 요청 정보가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
     }
+    Matching matching = null;
+    try{
+      log.info("requestId={}, requestedId={}, step=매칭_요청_시작, status=SUCCESS",
+          matchingRequestDto.requestId(),
+          matchingRequestDto.requestedId());
+      matching = matchService.matchRequest(matchingRequestDto);
+      log.info("requestId={}, requestedId={}, step=매칭_요청_완료, status=SUCCESS",
+          matchingRequestDto.requestId(),
+          matchingRequestDto.requestedId());
+    }
+    catch (Exception e){
+      log.error("requestId={}, requestedId={}, step=매칭_요청_실패, status=SUCCESS",
+          matchingRequestDto.requestId(),
+          matchingRequestDto.requestedId(), e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("매칭 요청이 실패하였습니다:: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
-    Matching matching = matchService.matchRequest(matchingRequestDto);
     if (matching == null){
+      log.info("requestId={}, requestedId={}, step=매칭_점수_미충족, status=SUCCESS",
+          matchingRequestDto.requestId(),
+          matchingRequestDto.requestedId());
       return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ResultMessageResponseDto("매칭 점수가 기준 이하로 매칭되지 않았습니다."));
     }
 
@@ -82,8 +104,21 @@ public class MatchController {
       )
       @NotBlank @RequestParam(value = "decision") String decision,
       @AuthenticationPrincipal User user) {
-    matchService.responseToRequest(decision, matchingId, user);
-    return ResponseEntity.ok().body(new ResultMessageResponseDto("매칭 상태가 변경되었습니다."));
+    try {
+      log.info("userId={}, matchingId={}, decision={}, step=매칭_응답_시작, status=SUCCESS",
+          user.getId(), matchingId, decision);
+      matchService.responseToRequest(decision, matchingId, user);
+      log.info("userId={}, matchingId={}, decision={}, step=매칭_응답_완료, status=SUCCESS",
+          user.getId(), matchingId, decision);
+      return ResponseEntity.ok().body(new ResultMessageResponseDto("매칭 상태가 변경되었습니다."));
+    } catch (Exception e) {
+      log.error("userId={}, matchingId={}, decision={}, step=매칭_응답_실패, status=FAILED",
+          user.getId(), matchingId, decision, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("매칭 응답에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(summary = "나에게/내가 매칭 요청한 사람 확인")
@@ -99,22 +134,29 @@ public class MatchController {
       )
       @RequestParam(value = "direction") String direction,
 
-      @AuthenticationPrincipal User user){
+      @AuthenticationPrincipal User user) {
     if (!userId.equals(user.getId())) {
       throw new RingoException("본인의 매칭 정보만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
     }
-    List<GetUserProfileResponseDto> responseDtoList = null;
-    if (direction.equals("SENT")){
-      responseDtoList = matchService.getUserIdWhoRequestedByMe(user);
-    }
-    else if (direction.equals("RECEIVED")){
-      responseDtoList = matchService.getUserIdWhoRequestToMe(user);
-    }
-    else{
-      throw new RingoException("적절하지 않은 direction이 입력되었습니다.", HttpStatus.BAD_REQUEST);
-    }
+    try {
 
-    return ResponseEntity.ok().body(new JsonListWrapper<>(responseDtoList));
+      log.info("userId={}, direction={}, step=매칭_요청_확인_시작, status=SUCCESS", userId, direction);
+      List<GetUserProfileResponseDto> responseDtoList = switch (direction) {
+        case "SENT" -> matchService.getUserIdWhoRequestedByMe(user);
+        case "RECEIVED" -> matchService.getUserIdWhoRequestToMe(user);
+        default -> throw new RingoException("적절하지 않은 direction이 입력되었습니다.", HttpStatus.BAD_REQUEST);
+      };
+      log.info("userId={}, direction={}, step=매칭_요청_확인_완료, status=SUCCESS", userId, direction);
+
+      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(responseDtoList));
+
+    }catch (Exception e){
+      log.error("userId={}, direction={}, step=매칭_확인_실패, status=FAILED", user.getId(), direction);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("매칭 요청 정보를 확인하는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
 
@@ -130,8 +172,19 @@ public class MatchController {
     if (!userId.equals(user.getId())) {
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
     }
-    List<GetUserProfileResponseDto> rtnList = matchService.recommend(userId);
-    return ResponseEntity.ok().body(new JsonListWrapper<>(rtnList));
+    try {
+      log.info("userId={}, step=이성_추천_시작, status=SUCCESS", userId);
+      List<GetUserProfileResponseDto> rtnList = matchService.recommend(userId);
+      log.info("userId={}, step=이성_추천_시작, status=SUCCESS", userId);
+
+      return ResponseEntity.ok().body(new JsonListWrapper<>(rtnList));
+    }catch (Exception e){
+      log.error("userId={}, step=이성_추천_실패, status=FAILED", userId);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("이성 추천에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(summary = "설문을 통해 제공하는 이성추천", description = "일일 설문에 일치한 응답을 한 유저를 무작위로 추천")
@@ -143,8 +196,18 @@ public class MatchController {
     if (!userId.equals(user.getId())) {
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
     }
-    List<GetUserProfileResponseDto> rtnList = matchService.recommendUserByDailySurvey(user);
-    return ResponseEntity.ok().body(new JsonListWrapper<>(rtnList));
+    try {
+      log.info("userId={}, step=설문_기반_이성_추천_시작, status=SUCCESS", user.getId());
+      List<GetUserProfileResponseDto> rtnList = matchService.recommendUserByDailySurvey(user);
+      log.info("userId={}, step=설문_기반_이성_추천_완료, status=SUCCESS", user.getId());
+      return ResponseEntity.ok().body(new JsonListWrapper<>(rtnList));
+    } catch (Exception e) {
+      log.error("userId={}, step=설문_기반_이성_추천_실패, status=FAILED", user.getId());
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("설문 기반 이성추천에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(summary = "매칭 삭제")
@@ -153,9 +216,19 @@ public class MatchController {
       @Parameter(description = "매칭 id", example = "5")
       @PathVariable("matchingId") Long matchingId,
       @AuthenticationPrincipal User user) {
-    matchService.deleteMatching(matchingId, user);
-    log.info("성공적으로 매칭 삭제");
-    return ResponseEntity.ok().body(new ResultMessageResponseDto("성공적으로 매칭을 삭제하였습니다."));
+    try {
+      log.info("userId={}, matchingId={}, step=매칭_삭제_시작, status=SUCCESS", user.getId(), matchingId);
+      matchService.deleteMatching(matchingId, user);
+      log.info("userId={}, matchingId={}, step=매칭_삭제_완료, status=SUCCESS", user.getId(), matchingId);
+
+      return ResponseEntity.ok().body(new ResultMessageResponseDto("성공적으로 매칭을 삭제하였습니다."));
+    } catch (Exception e) {
+      log.error("userId={}, matchingId={}, step=매칭_삭제_실패, status=FAILED", user.getId(), matchingId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("매칭 삭제에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(summary = "매칭 요청 매세지 저장 및 수정")
@@ -164,8 +237,19 @@ public class MatchController {
       @Valid @RequestBody SaveMatchingRequestMessageRequestDto dto,
       @PathVariable(value = "matchingId") Long matchingId,
       @AuthenticationPrincipal User user) {
-    matchService.saveMatchingRequestMessage(dto, matchingId, user);
-    return ResponseEntity.ok().body(new ResultMessageResponseDto("매칭 메세지가 성공적으로 저장되었습니다."));
+    try {
+      log.info("userId={}, matchingId={}, step=매칭_요청_메세지_저장_시작, status=SUCCESS", user.getId(), matchingId);
+      matchService.saveMatchingRequestMessage(dto, matchingId, user);
+      log.info("userId={}, matchingId={}, step=매칭_요청_메세지_저장_완료, status=SUCCESS", user.getId(), matchingId);
+
+      return ResponseEntity.ok().body(new ResultMessageResponseDto("매칭 메세지가 성공적으로 저장되었습니다."));
+    } catch (Exception e) {
+      log.error("userId={}, matchingId={}, step=매칭_요청_메세지_저장_실패, status=FAILED", user.getId(), matchingId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("매칭 요청 메세지 저장에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(summary = "매칭 요청 메세지 조회")
@@ -173,8 +257,21 @@ public class MatchController {
   public ResponseEntity<GetMatchingRequestMessageResponseDto> getMatchingRequestMessage(
       @PathVariable(value = "matchingId") Long matchingId,
       @AuthenticationPrincipal User user) {
-    String message = matchService.getMatchingRequestMessage(matchingId, user);
-    return ResponseEntity.ok().body(new GetMatchingRequestMessageResponseDto(message));
+    try {
+      log.info("userId={}, matchingId={}, step=매칭_요청_메세지_조회_시작, status=SUCCESS", user.getId(),
+          matchingId);
+      String message = matchService.getMatchingRequestMessage(matchingId, user);
+      log.info("userId={}, matchingId={}, step=매칭_요청_메세지_조회_완료, status=SUCCESS", user.getId(),
+          matchingId);
+      return ResponseEntity.ok().body(new GetMatchingRequestMessageResponseDto(message));
+    } catch (Exception e) {
+      log.error("userId={}, matchingId={}, step=매칭_요청_메세지_조화_실패, status=FAILED", user.getId(),
+          matchingId, e);
+      if (e instanceof RingoException re) {
+        throw re;
+      }
+      throw new RingoException("매칭 요청 메세지 조회에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
 }

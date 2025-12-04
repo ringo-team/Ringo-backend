@@ -80,16 +80,23 @@ public class MatchService {
   private float SURVEY_SHARING_WEIGHT;
 
   public Matching matchRequest(MatchingRequestDto dto){
+
+    // 유저 검증
     User requestedUser = userRepository.findById(dto.requestedId())
         .orElseThrow(() -> new RingoException("매칭을 요청 받은 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
     User requestUser = userRepository.findById(dto.requestId())
         .orElseThrow(() -> new RingoException("매칭을 요청한 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
 
+    // 매칭 점수 계산
     Float matchingScore = calcMatchScore(requestedUser.getId(), requestUser.getId());
     if(!isMatch(matchingScore)){
       return null;
     }
 
+    // 유저 알림
+    sendFcmNotification(requestedUser, "누군가 매칭을 요청했어요");
+
+    // 매칭 내용 저장
     Matching matching = Matching.builder()
         .requestedUser(requestedUser)
         .requestUser(requestUser)
@@ -125,8 +132,11 @@ public class MatchService {
   }
 
   private void handleAcceptedMatching(Matching matching){
+
+    // 매칭 수락으로 변경
     matching.setMatchingStatus(MatchingStatus.ACCEPTED);
 
+    // 채팅방 생성
     chatService.createChatroom(
         new CreateChatroomDto(
             matching.getRequestedUser().getId(),
@@ -135,15 +145,16 @@ public class MatchService {
         )
     );
 
-    sendAcceptedNotification(matching.getRequestUser());
+    // fcm 요청 전송
+    sendFcmNotification(matching.getRequestUser(), "누군가 요청을 수락했어요");
   }
 
-  private void sendAcceptedNotification(User requestUser) {
+  private void sendFcmNotification(User requestUser, String title) {
     fcmTokenRepository.findByUser(requestUser).ifPresent(token -> {
       Message message = Message.builder()
           .setNotification(
               Notification.builder()
-                  .setTitle("누군가 요청을 수락했어요")
+                  .setTitle(title)
                   .setImage("ImageUrl")
                   .build()
           )
@@ -151,6 +162,7 @@ public class MatchService {
       try {
         FirebaseMessaging.getInstance().send(message);
       }catch (Exception e){
+        log.error("FCM 알림 전송 실패. requestUserId: {}, title: {}", requestUser.getId(), title, e);
         throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
       }
     });
@@ -328,7 +340,7 @@ public class MatchService {
    * 내가 매칭 요청한 사람들의 정보
    */
   public List<GetUserProfileResponseDto> getUserIdWhoRequestedByMe(User requestUser){
-    List<Matching> matchings = matchingRepository.findByRequestUserAndMatchingStatus(requestUser, MatchingStatus.PENDING);
+    List<Matching> matchings = matchingRepository.findByRequestUser(requestUser);
     List<Long> matchingIds = matchings.stream()
         .map(Matching::getId)
         .toList();
@@ -343,7 +355,7 @@ public class MatchService {
   }
 
   public List<GetUserProfileResponseDto> getUserIdWhoRequestToMe(User requestedUser){
-    List<Matching> matchings = matchingRepository.findByRequestedUserAndMatchingStatus(requestedUser, MatchingStatus.PENDING);
+    List<Matching> matchings = matchingRepository.findByRequestedUser(requestedUser);
 
     // id, age, gender, nickname, profileUrl 조회
     List<Long> matchingIds = matchings.stream()

@@ -19,11 +19,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SnapService {
 
   private final UserRepository userRepository;
@@ -78,6 +80,7 @@ public class SnapService {
         image.setSnapDate(null);
       }
     }catch (Exception e){
+      log.error("스냅 촬영일 파싱 실패. imageId: {}, snapDate: {}", dto.imageId(), dto.snapDate(), e);
       throw new RingoException("시간을 파싱하던 중 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 

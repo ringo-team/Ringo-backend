@@ -27,8 +27,4 @@ public class GetChatResponseDto {
   String createdAt;
   @Schema(description = "채팅 읽은 사람 리스트", example = "[\"12\", \"25\"]")
   List<Long> readerIds;
-
-  // fcm 을 위한 토큰
-  @Schema(description = "fcm 토큰", example = "c9rjA23eF@...")
-  String fcmToken;
 }

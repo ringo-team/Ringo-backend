@@ -11,14 +11,13 @@ import org.springframework.data.repository.query.Param;
 
 public interface MatchingRepository extends JpaRepository<Matching, Long> {
 
-  List<Matching> findByRequestUserAndMatchingStatus(User requestUser, MatchingStatus matchingStatus);
-
-  List<Matching> findByRequestedUserAndMatchingStatus(User requestedUser, MatchingStatus matchingStatus);
-
-
   void deleteAllByRequestedUser(User requestedUser);
 
   void deleteAllByRequestUser(User requestUser);
 
   boolean existsByRequestUserAndRequestedUserAndMatchingStatus(User requestUser, User requestedUser, MatchingStatus matchingStatus);
+
+  List<Matching> findByRequestUser(User requestUser);
+
+  List<Matching> findByRequestedUser(User requestedUser);
 }

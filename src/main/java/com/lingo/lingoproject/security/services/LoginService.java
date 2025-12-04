@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -43,6 +44,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class LoginService {
 
   private final JwtUtil jwtUtil;
@@ -175,8 +177,10 @@ public class LoginService {
       fcmTokenRepository.save(FcmToken.builder().user(user).build());
       jwtRefreshTokenRepository.save(JwtRefreshToken.builder().user(user).build());
     } catch (DataIntegrityViolationException e) {
+      log.error("회원가입 데이터 무결성 위반. userId: {}", user.getId(), e);
       throw new RingoException(e.getMessage(), HttpStatus.BAD_REQUEST);
     } catch (Exception e) {
+      log.error("회원가입 처리 중 예기치 못한 오류 발생. userId: {}", user.getId(), e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

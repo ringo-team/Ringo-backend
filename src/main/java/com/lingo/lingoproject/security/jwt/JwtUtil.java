@@ -13,8 +13,6 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import javax.crypto.SecretKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,8 +71,10 @@ public class JwtUtil {
           .parseSignedClaims(token)
           .getPayload();
     } catch (ExpiredJwtException e){
+      log.error("유효기간이 지난 토큰입니다", e);
       throw new RingoException("유효기간이 지난 토큰입니다.", HttpStatus.UNAUTHORIZED);
     } catch (Exception e){
+      log.error("토큰이 유효하지 않습니다.", e);
       throw new RingoException("토큰이 유효하지 않습니다.", HttpStatus.BAD_REQUEST);
     }
   }

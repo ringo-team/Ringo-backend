@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -32,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SurveyService {
 
   private final SurveyRepository surveyRepository;
@@ -72,6 +74,7 @@ public class SurveyService {
       throw new RingoException(e.getMessage(), e.getStatus());
     }
     catch (Exception e){
+      log.error("설문 엑셀 파일 파싱 실패. filename: {}", file.getOriginalFilename(), e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     surveyRepository.saveAll(surveyList);

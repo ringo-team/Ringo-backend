@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping()
+@Slf4j
 @RequiredArgsConstructor
 public class ImageController {
 
@@ -50,25 +52,49 @@ public class ImageController {
       @AuthenticationPrincipal User user
       ) {
 
-    GetImageUrlResponseDto dto = imageService.uploadProfileImage(image, user);
+    try {
 
-    if(dto == null){
-      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto("이미 프로필 사진이 존재합니다."));
+      log.info("userId={}, step=프로필_업로드_시작, status=SUCCESS", user.getId());
+      GetImageUrlResponseDto dto = imageService.uploadProfileImage(image, user);
+
+      if(dto == null){
+        log.info("userId={}, step=프로필_업로드_실패, status=FAILED, reason=이미_존재", user.getId());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto("이미 프로필 사진이 존재합니다."));
+      }
+      log.info("userId={}, imageId={}, step=프로필_업로드_완료, status=SUCCESS", user.getId(), dto.imageId());
+
+      return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }catch (Exception e){
+      log.error("userId={}, step=프로필_업로드_실패, status=FAILED", user.getId(), e);
+      if(e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("프로필 업로드에 실패하였습니다", HttpStatus.INTERNAL_SERVER_ERROR);
     }
-
-    return ResponseEntity.status(HttpStatus.CREATED).body(dto);
   }
 
   @Operation(
-      summary = "프로필 조회.",
+      summary = "프로필 조회",
       description = "프로필 URL과 이미지 id를 반환합니다."
   )
   @GetMapping("/users/{userId}/profile")
   public ResponseEntity<GetImageUrlResponseDto> getProfileImageUrl(
       @Parameter(description = "이미지 id", example = "5")
       @PathVariable(value = "userId") Long userId){
-    GetImageUrlResponseDto dto = imageService.getProfileImageUrl(userId);
-    return ResponseEntity.status(HttpStatus.OK).body(dto);
+
+    try {
+      log.info("userId={}, step=프로필_URL_조회_시작, status=SUCCESS", userId);
+      GetImageUrlResponseDto dto = imageService.getProfileImageUrl(userId);
+      log.info("userId={}, step=프로필_URL_조회_완료, status=SUCCESS", userId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(dto);
+    }catch (Exception e){
+      log.error("userId={}, step=프로필_URL_조회_실패, status=FAILED", userId, e);
+      if(e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("프로필 조회에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(summary = "프로필 이미지 업데이트")
@@ -85,9 +111,21 @@ public class ImageController {
     if (user.getId() == null){
       throw new RingoException("로그인 후 이용 부탁드립니다.", HttpStatus.FORBIDDEN);
     }
+    try {
 
-    GetImageUrlResponseDto dto = imageService.updateProfileImage(image, profileId, user.getId());
-    return ResponseEntity.status(HttpStatus.OK).body(dto);
+      log.info("userId={}, profileId={}, step=프로필_업데이트_시작, status=SUCCESS", user.getId(), profileId);
+      GetImageUrlResponseDto dto = imageService.updateProfileImage(image, profileId, user.getId());
+      log.info("userId={}, profileId={}, step=프로필_업데이트_완료, status=SUCCESS", user.getId(), profileId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(dto);
+
+    }catch (Exception e){
+      log.error("userId={}, profileId={}, step=프로필_업데이트_실패, status=FAILED", user.getId(), profileId, e);
+      if(e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("프로필 업데이트에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(
@@ -104,9 +142,21 @@ public class ImageController {
     if (user.getId() == null){
       throw new RingoException("로그인 후 이용 부탁드립니다.", HttpStatus.FORBIDDEN);
     }
+    try {
 
-    imageService.deleteProfile(profileId, user.getId());
-    return ResponseEntity.ok().body(new ResultMessageResponseDto("이미지를 성공적으로 삭제했습니다."));
+      log.info("userId={}, profileId={}, step=프로필_삭제_시작, status=SUCCESS", user.getId(), profileId);
+      imageService.deleteProfile(profileId, user.getId());
+      log.info("userId={}, profileId={}, step=프로필_삭제_완료, status=SUCCESS", user.getId(), profileId);
+
+      return ResponseEntity.ok().body(new ResultMessageResponseDto("이미지를 성공적으로 삭제했습니다."));
+
+    }catch (Exception e){
+      log.error("userId={}, profileId={}, step=프로필_삭제_실패, status=FAILED", user.getId(), profileId);
+      if(e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("프로필 삭제에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(summary = "스냅 사진 일괄 업로드")
@@ -123,9 +173,21 @@ public class ImageController {
     if (!userId.equals(user.getId())){
       throw new RingoException("스냅사진을 업로드할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
+    try {
 
-    List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images, user);
-    return ResponseEntity.status(HttpStatus.CREATED).body(new JsonListWrapper<>(dtos));
+      log.info("userId={}, step=스냅_업로드_시작, status=SUCCESS", userId);
+      List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images, user);
+      log.info("userId={}, step=스냅_업로드_완료, status=SUCCESS", userId);
+
+      return ResponseEntity.status(HttpStatus.CREATED).body(new JsonListWrapper<>(dtos));
+
+    } catch (Exception e) {
+      log.error("userId={}, step=스냅_업로드_실패, status=FAILED", userId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("스냅 이미지를 업로드하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(
@@ -137,8 +199,20 @@ public class ImageController {
       @Parameter(description = "유저 Id", example = "5")
       @PathVariable(value = "userId") Long userId
   ){
-    List<GetImageUrlResponseDto> responses = imageService.getAllSnapImageUrls(userId);
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(responses));
+    try {
+      log.info("userId={}, step=스냅_조회_시작, status=SUCCESS", userId);
+      List<GetImageUrlResponseDto> responses = imageService.getAllSnapImageUrls(userId);
+      log.info("userId={}, step=스냅_조회_완료, status=SUCCESS", userId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(responses));
+
+    } catch (Exception e) {
+      log.error("userId={}, step=스냅_조회_실패, status=FAILED", userId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("스냅 이미지를 조회하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(summary = "스냅 사진 업데이트")
@@ -155,8 +229,21 @@ public class ImageController {
 
       @AuthenticationPrincipal User user
   ){
-    GetImageUrlResponseDto dto = imageService.updateSnapImage(image, snapImageId, description, user.getId());
-    return ResponseEntity.status(HttpStatus.OK).body(dto);
+    try {
+
+      log.info("userId={}, snapImageId={}, step=스냅_업데이트_시작, status=SUCCESS", user.getId(), snapImageId);
+      GetImageUrlResponseDto dto = imageService.updateSnapImage(image, snapImageId, description, user.getId());
+      log.info("userId={}, snapImageId={}, step=스냅_업데이트_완료, status=SUCCESS", user.getId(), snapImageId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(dto);
+
+    } catch (Exception e) {
+      log.error("userId={}, snapImageId={}, step=스냅_업데이트_실패, status=FAILED", user.getId(), snapImageId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("스냅 이미지를 수정하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(
@@ -170,11 +257,24 @@ public class ImageController {
 
       @AuthenticationPrincipal User user
   ){
-    imageService.deleteSnapImage(snapImageId, user.getId());
-    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("성공적으로 스냅 사진을 삭제하였습니다."));
+    try {
+
+      log.info("userId={}, snapImageId={}, step=스냅_삭제_시작, status=SUCCESS", user.getId(), snapImageId);
+      imageService.deleteSnapImage(snapImageId, user.getId());
+      log.info("userId={}, snapImageId={}, step=스냅_삭제_완료, status=SUCCESS", user.getId(), snapImageId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("성공적으로 스냅 사진을 삭제하였습니다."));
+
+    } catch (Exception e) {
+      log.error("userId={}, snapImageId={}, step=스냅_삭제_실패, status=FAILED", user.getId(), snapImageId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("스냅 이미지를 삭제하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
-  @Operation(summary = "스냅 사진 내용 저장")
+  @Operation(summary = "스냅 사진 설명 저장")
   @PatchMapping("/snaps/{snapImageId}/description")
   public ResponseEntity<ResultMessageResponseDto> updateSnapImageDescription(
       @Parameter(description = "스냅 사진 id", example = "11")
@@ -184,8 +284,21 @@ public class ImageController {
 
       @AuthenticationPrincipal User user
   ){
-    imageService.updateSnapImageDescription(dto, snapImageId, user.getId());
-    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("성공적으로 스냅 사진 설명을 성공적으로 저장하였습니다."));
+    try {
+
+      log.info("userId={}, snapImageId={}, step=스냅_설명_저장_시작, status=SUCCESS", user.getId(), snapImageId);
+      imageService.updateSnapImageDescription(dto, snapImageId, user.getId());
+      log.info("userId={}, snapImageId={}, step=스냅_설명_저장_완료, status=SUCCESS", user.getId(), snapImageId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("성공적으로 스냅 사진 설명을 성공적으로 저장하였습니다."));
+
+    } catch (Exception e) {
+      log.error("userId={}, snapImageId={}, step=스냅_설명_저장_실패, status=FAILED", user.getId(), snapImageId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("스냅 사진 설명을 저장하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(summary = "얼굴 인증")
@@ -197,10 +310,22 @@ public class ImageController {
     if (user.getId() == null){
       throw new RingoException("로그인 후 이용 부탁드립니다.", HttpStatus.FORBIDDEN);
     }
+    try {
 
-    if (!imageService.verifyProfileImage(image, user)){
-      return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ResultMessageResponseDto("얼굴이 인증되지 않았습니다."));
+      log.info("userId={}, step=프로필_얼굴인증_시작, status=SUCCESS", user.getId());
+      if (!imageService.verifyProfileImage(image, user)){
+        log.info("userId={}, step=프로필_얼굴인증_미통과_완료, status=SUCCESS", user.getId());
+        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ResultMessageResponseDto("얼굴이 인증되지 않았습니다."));
+      }
+      log.info("userId={}, step=프로필_얼굴인증_통과_완료, status=SUCCESS", user.getId());
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("얼굴이 성공적으로 인증되었습니다."));
+
+    } catch (Exception e) {
+      log.error("userId={}, step=프로필_얼굴인증_실패, status=FAILED", user.getId(), e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("프로필 얼굴 인증에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("얼굴이 성공적으로 인증되었습니다."));
   }
 }

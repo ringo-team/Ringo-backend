@@ -64,7 +64,6 @@ public class ImageService {
   /**
    * profile 이미지 crud
    */
-
   @Transactional
   public GetImageUrlResponseDto uploadProfileImage(MultipartFile file, User  user) {
 
@@ -191,7 +190,6 @@ public class ImageService {
   /**
    * snap 이미지 crud
    */
-
   public List<GetImageUrlResponseDto> getAllSnapImageUrls(Long userId){
     User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
     List<SnapImage> images = snapImageRepository.findAllByUser(user);
@@ -291,6 +289,7 @@ public class ImageService {
       amazonS3Client.putObject(bucket, filename, file.getInputStream(), metadata);
       imageUrl = amazonS3Client.getUrl(bucket, filename).toString();
     }catch (Exception e){
+      log.error("S3 이미지 업로드 실패. bucket: {}, filename: {}, contentType: {}", bucket, filename, file.getContentType(), e);
       throw new RingoException("s3에 이미지 업로드 하는데 실패하였습니다.",  HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -311,7 +310,10 @@ public class ImageService {
     try {
       amazonS3Client.deleteObject(bucket, imageUrl);
     }catch (Exception e){
-      throw new RingoException("s3에 이미지를 삭제하는데 문제가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      log.error("s3에 이미지를 삭제하는데 실패하였습니다. bucket: {}, image_url: {}", bucket, imageUrl, e);
+      throw new RingoException("s3에 이미지를 삭제하는데 실패하였습니다." +
+          " bucket: " + bucket + ", image_url: " + imageUrl
+          , HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -337,7 +339,8 @@ public class ImageService {
     try {
       imageBytes = file.getBytes();
     }catch (Exception e){
-      throw new RingoException("파일을 바이트로 변환하지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      log.error("선정성 검사 중 이미지를 바이트로 변환하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
+      throw new RingoException("선정성 검사 중 파일을 바이트로 변환하지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     try {
       DetectModerationLabelsRequest request = new DetectModerationLabelsRequest()
@@ -358,6 +361,7 @@ public class ImageService {
                 || (parent != null && (parent.contains("Nudity") || parent.contains("Sexual") || parent.contains("Suggestive")));
       });
     }catch (Exception e){
+      log.error("이미지의 선정성 검사를 하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -371,6 +375,7 @@ public class ImageService {
 
       return isSamePerson(profileObject.getObjectContent().readAllBytes(), targetImage);
     }catch (Exception e){
+      log.error("프로필 사진을 인증하는데 실패하였습니다. userId: {}", user.getId(), e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -395,6 +400,7 @@ public class ImageService {
       return true;
 
     }catch (Exception e){
+      log.error("이미지 인증을 하는데 실패하였습니다.", e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -404,7 +410,8 @@ public class ImageService {
     try {
       imageBytes = file.getBytes();
     }catch (Exception e){
-      throw new RingoException("파일을 바이트로 변환하지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      log.error("이미지의 얼굴 여부 검수 중 파일을 바이트로 변환하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
+      throw new RingoException("파일을 바이트로 변환하는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     try {
       DetectFacesRequest request = new DetectFacesRequest()
@@ -413,6 +420,7 @@ public class ImageService {
       List<FaceDetail> faceDetails = result.getFaceDetails();
       return !faceDetails.isEmpty();
     }catch (Exception e){
+      log.error("이미지의 얼굴 존재여부를 검수하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

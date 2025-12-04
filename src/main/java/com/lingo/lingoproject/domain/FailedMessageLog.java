@@ -29,6 +29,8 @@ public class FailedMessageLog {
   private String errorMessage;
   private String errorCause;
   private String messageId;
+  private String destination;
+  private String userEmail;
 
   @CreationTimestamp
   @Column(updatable = false)

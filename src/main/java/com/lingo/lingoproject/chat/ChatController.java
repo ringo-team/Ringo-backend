@@ -25,7 +25,6 @@ import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +43,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -75,28 +73,46 @@ public class ChatController {
   @GetMapping("/chatrooms/{roomId}/messages")
   public ResponseEntity<JsonListWrapper<GetChatResponseDto>> getChattingMessages(
       @Parameter(description = "채팅방 id", example = "4")
-      @PathVariable(value = "roomId")@NotNull Long roomId,
+      @PathVariable(value = "roomId") Long roomId,
 
       @Parameter(description = "페이지 수", example = "2")
       @RequestParam(value = "page", defaultValue = "0") int page,
 
       @Parameter(description = "페이지 크기", example = "50")
-      @RequestParam(value = "size", defaultValue = "50") int size,
+      @RequestParam(value = "size", defaultValue = "100") int size,
 
       @AuthenticationPrincipal User user){
     if(!chatService.isMemberInChatroom(roomId, user.getId())){
       throw new RingoException("잘못된 접근입니다.", HttpStatus.FORBIDDEN);
     }
 
-    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.set("connect::" + user.getId() + "::" + roomId, true);
+    try {
+      // 유저 채팅방 레디스에 저장
+      log.info("userId={}, chatroomId={}, step=채팅방_입장, status=SUCCESS", user.getId(), roomId);
+      ValueOperations<String, Object> ops = redisTemplate.opsForValue();
+      ops.set("connect::" + user.getId() + "::" + roomId, true);
 
-    // 불러온 메세지들 중에 안 읽은 메세지를 읽음 처리한다.
-    chatService.changeNotReadToReadMessages(roomId, user.getId());
+      // 불러온 메세지들 중에 안 읽은 메세지를 읽음 처리한다.
+      log.info("userId={}, chatroomId={}, step=메세지_읽음_처리_시작, status=SUCCESS", user.getId(), roomId);
+      chatService.changeNotReadToReadMessages(roomId, user.getId());
+      log.info("userId={}, chatroomId={}, step=메세지_읽음_처리_완료, status=SUCCESS", user.getId(), roomId);
 
-    List<GetChatResponseDto> responses = chatService.getChatMessages(roomId, page, size);
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(responses));
+      // 채팅방 매세지 조회
+      log.info("userId={}, chatroomId={}, step=메세지_조회_시작, status=SUCCESS", user.getId(), roomId);
+      List<GetChatResponseDto> responses = chatService.getChatMessages(roomId, page, size);
+      log.info("userId={}, chatroomId={}, step=메세지_조회_완료, status=SUCCESS", user.getId(), roomId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(responses));
+
+    } catch (Exception e){
+      log.error("userId={}, chatroomId={}, step=채팅방_입장_실패, status=FAILED", user.getId(), roomId, e);
+      if (e instanceof RingoException re) {
+        throw re;
+      }
+      throw new RingoException("매세지 조회에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
+
   /**
    * 채팅방 생성
    */
@@ -105,10 +121,17 @@ public class ChatController {
       description = "채팅방과 채팅방 참여자 정보를 데이터베이스에 저장"
   )
   @PostMapping("/chatrooms")
-  public ResponseEntity<CreateChatroomResponseDto> createChatRoom(@Valid @RequestBody CreateChatroomDto dto){
-    Chatroom chatroom = chatService.createChatroom(dto);
-    log.info("채팅방을 생성하였습니다. 채팅방명: {}", chatroom.getChatroomName());
-    return ResponseEntity.status(HttpStatus.CREATED).body(new CreateChatroomResponseDto(chatroom.getId()));
+  public ResponseEntity<CreateChatroomResponseDto> createChatRoom(
+      @Valid @RequestBody CreateChatroomDto dto){
+    try {
+      Chatroom chatroom = chatService.createChatroom(dto);
+      return ResponseEntity.status(HttpStatus.CREATED).body(new CreateChatroomResponseDto(chatroom.getId()));
+    } catch (Exception e){
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("채팅방 생성에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Operation(
@@ -122,10 +145,22 @@ public class ChatController {
 
       @AuthenticationPrincipal User user){
     if (!userId.equals(user.getId())){
-      throw new RingoException("잘못된 경로입니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("채팅방 ", HttpStatus.FORBIDDEN);
     }
-    List<GetChatroomResponseDto> dtos = chatService.getAllChatroomByUserId(user);
-    return ResponseEntity.status(HttpStatus.OK).body(dtos);
+    try{
+
+      log.info("userId={}, step=채팅방_조회_시작, status=SUCCESS", user.getId());
+      List<GetChatroomResponseDto> dtos = chatService.getAllChatroomByUserId(user);
+      log.info("userId={}, step=채팅방_조회_완료, status=SUCCESS", user.getId());
+      return ResponseEntity.status(HttpStatus.OK).body(dtos);
+
+    } catch (Exception e){
+      log.error("userId={}, step=채팅방_조회_실패, status=FAILED", user.getId(), e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("채팅방 조회에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   /**
@@ -142,9 +177,21 @@ public class ChatController {
 
       @AuthenticationPrincipal User user
   ) {
-    chatService.deleteChatroom(roomId, user);
-    log.info("채팅방을 삭제했습니다. 삭제한 채팅방 id:  {}", roomId);
-    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("채팅방을 성공적으로 삭제했습니다."));
+    try {
+
+      log.info("userId={}, chatroomId={}, step=채팅방_삭제_시작, status=SUCCESS", user.getId(), roomId);
+      chatService.deleteChatroom(roomId, user);
+      log.info("userId={}, chatroomId={}, step=채팅방_삭제_완료, status=SUCCESS", user.getId(), roomId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("채팅방을 성공적으로 삭제했습니다."));
+
+    }catch (Exception e){
+      log.error("userId={}, chatroomId={}, step=채팅방_삭제_실패, status=FAILED", user.getId(), roomId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("채팅방 삭제에 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   /**
@@ -155,48 +202,80 @@ public class ChatController {
   public void sendMessage(@DestinationVariable Long roomId, GetChatResponseDto message)
       throws FirebaseMessagingException {
 
-    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-
-    List<String> userEmails = chatService.getUserEmailsInChatroom(roomId);
-    List<User> roomMember = userRepository.findAllByEmailIn(userEmails);
+    List<String> userEmails = null;
+    List<User> roomMembers = null;
     List<Long> existMemberIdList = new ArrayList<>();
+    Message savedMessage = null;
 
-    // 현재 접속해있는 채팅방 멤버의 유저 id를 구한다.
-    for (User user : roomMember) {
+    try {
 
-      if (ops.get("connect::" + user.getId() + "::" + roomId) != null) {
+      ValueOperations<String, Object> ops = redisTemplate.opsForValue();
 
-        existMemberIdList.add(user.getId());
+      userEmails = chatService.getUserEmailsInChatroom(roomId);
+      roomMembers = userRepository.findAllByEmailIn(userEmails);
+
+      // 현재 접속해있는 채팅방 멤버의 유저 id를 구한다.
+      for (User user : roomMembers) {
+
+        if (ops.get("connect::" + user.getId() + "::" + roomId) != null) {
+
+          existMemberIdList.add(user.getId());
+        }
       }
+      message.setReaderIds(existMemberIdList);
+      // 메세지 저장
+      savedMessage = chatService.saveMessage(message, roomId);
+
+    }catch (Exception e){
+      log.error("senderId={}, chatroomId={}, step=메세제_저장, status=FAILED",  message.getSenderId(), roomId, e);
+      return;
     }
-    message.setReaderIds(existMemberIdList);
-    // 메세지 저장
-    Message savedMessage = chatService.saveMessage(message, roomId);
 
 
     for (String userEmail : userEmails){
       try {
         // 해당 방에 메세지 전송
         simpMessagingTemplate.convertAndSendToUser(userEmail, "/topic/" + roomId, message);
-
-        // 채팅 미리보기 기능
-        simpMessagingTemplate.convertAndSendToUser(userEmail, "/room-list", message);
       } catch (Exception e) {
+        log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail, e);
         FailedMessageLog failedMessageLog = FailedMessageLog.builder()
             .roomId(roomId)
             .errorMessage(e.getMessage())
-            .errorCause(e.getCause().getMessage())
+            .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
             .messageId(savedMessage.getId())
+            .destination("/topic/" + roomId)
+            .userEmail(userEmail)
+            .build();
+        failedMessageLogRepository.save(failedMessageLog);
+      }
+      try{
+        // 채팅 미리보기 기능
+        simpMessagingTemplate.convertAndSendToUser(userEmail, "/room-list", message);
+      }catch(Exception e){
+        log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail, e);
+        FailedMessageLog failedMessageLog = FailedMessageLog.builder()
+            .roomId(roomId)
+            .errorMessage(e.getMessage())
+            .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
+            .messageId(savedMessage.getId())
+            .destination("/room-list")
+            .userEmail(userEmail)
             .build();
         failedMessageLogRepository.save(failedMessageLog);
       }
     }
 
     // 채팅방에 존재하지 않는 사람들은 fcm으로 알림을 보낸다.
-    List<User> notExistMember = roomMember.stream()
+    List<User> notExistMember = roomMembers.stream()
         .filter(u -> !existMemberIdList.contains(u.getId()))
         .toList();
-    List<String> fcmTokens = fcmTokenRepository.findByUserIn(notExistMember);
+    List<String> fcmTokens = null;
+    try {
+      fcmTokens = fcmTokenRepository.findByUserIn(notExistMember);
+    }catch (Exception e){
+      log.error("chatroomId={}, step=FCM_TOKEN_조회, status=FAILED", roomId, e);
+      return;
+    }
     if(!fcmTokens.isEmpty()) {
       /*
        * {
@@ -226,11 +305,13 @@ public class ChatController {
           if (!sendResponse.isSuccessful()){
             // 보내지지 않은 메세지의 세부 정보를 로깅하기
             FirebaseMessagingException exception = sendResponse.getException();
+            log.error("chatroomId={}, step=CHAT_FCM_MULTICAST, status=FAILED", roomId);
             FailedMessageLog log = FailedMessageLog.builder()
                 .roomId(roomId)
                 .errorMessage(exception.getMessage())
-                .errorCause(exception.getCause().getMessage())
+                .errorCause(exception.getCause() != null ? exception.getCause().getMessage() : null)
                 .messageId(savedMessage.getId())
+                .destination("fcm")
                 .build();
             errorLogList.add(log);
           }
@@ -256,15 +337,26 @@ public class ChatController {
       @Parameter(description = "채팅방 id", example = "5")
       @PathVariable(value = "roomId") Long roomId,
 
-
       @AuthenticationPrincipal User user
   ){
-    // 유저가 채팅방을 나가면 레디스에 저장했던 접속 정보를 삭제한다.
-    // Delete connect::userId::roomId
-    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.getAndDelete("connect::" + user.getId() + "::" + roomId);
+    try {
 
-    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("유저가 채팅방을 나갔습니다."));
+      // 유저가 채팅방을 나가면 레디스에 저장했던 접속 정보를 삭제한다.
+      // Delete connect::userId::roomId
+      ValueOperations<String, Object> ops = redisTemplate.opsForValue();
+      ops.getAndDelete("connect::" + user.getId() + "::" + roomId);
+      log.info("userId={}, chatroomId={}, step=채팅방_나가기 ,status=SUCCESS", user.getId(), roomId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("유저가 채팅방을 나갔습니다."));
+
+    }catch (Exception e){
+      log.error("userId={}, chatroomId={}, step=채팅방_나가기_실패 ,status=FAILED", user.getId(), roomId);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("채팅방을 나가기 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
   }
 
 }

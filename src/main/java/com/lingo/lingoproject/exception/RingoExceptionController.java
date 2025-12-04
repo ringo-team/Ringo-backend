@@ -22,14 +22,14 @@ public class RingoExceptionController {
 
   @ExceptionHandler(RingoException.class)
   public ResponseEntity<ResultMessageResponseDto> handleRingoException(RingoException e){
-    log.info(e.getMessage());
+    log.error(e.getMessage(), e);
     exceptionMessageRepository.save(new ExceptionMessage(e.getMessage()));
     return ResponseEntity.status(e.getStatus()).body(new ResultMessageResponseDto(e.getMessage()));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ResultMessageResponseDto> handleValidationException(MethodArgumentNotValidException e){
-    log.info(e.getMessage());
+    log.error(e.getMessage(), e);
     return  ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto("적절한 형식의 요청을 해주시길 바랍니다."));
   }
 }
