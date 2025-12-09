@@ -28,12 +28,7 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
 
   private final CustomAuthenticationManager customAuthenticationManager;
   private final ObjectMapper objectMapper;
-  private final String[] whiteList = {
-      "/signup", "/profiles", "/users/access", "/health",
-      "/swagger", "/v3/api-docs", "/swagger-resources",
-      "/ws", "/stomp",
-      "/actuator", "/error"
-  };
+
 
   public CustomAuthenticationFilter(CustomAuthenticationManager customAuthenticationManager,
       ObjectMapper objectMapper,
@@ -71,26 +66,7 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
 
     }
 
-    // 허용된 경로일 경우 인증
-    else if (isPermittedRequestUrl(request.getRequestURI())){
-      SecurityContextHolder.getContext().setAuthentication(
-          new UsernamePasswordAuthenticationToken(
-              new User(),
-              "password",
-              List.of(new SimpleGrantedAuthority("ROLE_USER"))
-          )
-      );
-    }
-
     filterChain.doFilter(request, response);
   }
 
-  public boolean isPermittedRequestUrl(String url){
-    for (String startUrl : whiteList){
-      if (url.startsWith(startUrl)){
-        return true;
-      }
-    }
-    return false;
-  }
 }

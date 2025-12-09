@@ -41,6 +41,13 @@ public class SecurityConfig {
   private final BlockedUserRepository blockedUserRepository;
   private final CustomUserDetailService customUserDetailService;
 
+  private final String[] whiteList = {
+      "/signup/**", "/users/access", "/health",
+      "/swagger-ui/**", "v3/api-docs/**",
+      "/ws", "/stomp/**",
+      "/actuator/**"
+  };
+
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
@@ -53,6 +60,7 @@ public class SecurityConfig {
         .cors((cors) -> cors.configurationSource(corsConfigurationSource()))
         .authorizeHttpRequests(authorize ->
             authorize
+                .requestMatchers(whiteList).permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/photographers/**").hasRole("PHOTOGRAPHER")
                 .anyRequest().authenticated())
