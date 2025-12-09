@@ -8,6 +8,8 @@ import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +43,8 @@ public class ImageController {
   )
   @ApiResponse(
       responseCode = "201",
-      description = "생성 성공"
+      description = "생성 성공",
+      content = @Content(schema = @Schema(implementation = GetImageUrlResponseDto.class))
   )
   @PostMapping(value = "profiles", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<?> uploadProfileImage(
@@ -108,9 +111,6 @@ public class ImageController {
 
       @AuthenticationPrincipal User user
   ){
-    if (user.getId() == null){
-      throw new RingoException("로그인 후 이용 부탁드립니다.", HttpStatus.FORBIDDEN);
-    }
     try {
 
       log.info("userId={}, profileId={}, step=프로필_업데이트_시작, status=SUCCESS", user.getId(), profileId);
@@ -139,9 +139,6 @@ public class ImageController {
 
       @AuthenticationPrincipal User user
   ){
-    if (user.getId() == null){
-      throw new RingoException("로그인 후 이용 부탁드립니다.", HttpStatus.FORBIDDEN);
-    }
     try {
 
       log.info("userId={}, profileId={}, step=프로필_삭제_시작, status=SUCCESS", user.getId(), profileId);
@@ -171,6 +168,7 @@ public class ImageController {
       @AuthenticationPrincipal User user
   ){
     if (!userId.equals(user.getId())){
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
       throw new RingoException("스냅사진을 업로드할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
     try {
@@ -307,9 +305,6 @@ public class ImageController {
       @RequestParam(value = "image") MultipartFile image,
       @AuthenticationPrincipal User user
   ){
-    if (user.getId() == null){
-      throw new RingoException("로그인 후 이용 부탁드립니다.", HttpStatus.FORBIDDEN);
-    }
     try {
 
       log.info("userId={}, step=프로필_얼굴인증_시작, status=SUCCESS", user.getId());

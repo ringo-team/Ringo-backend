@@ -1,7 +1,7 @@
 package com.lingo.lingoproject.chat;
 
 import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
-import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
+import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.ChatroomParticipant;
@@ -44,9 +44,12 @@ public class ChatService {
   private final MatchingRepository matchingRepository;
 
   public List<GetChatResponseDto> getChatMessages(Long chatroomId, int page, int size){
+    // 페이지네이션
     Pageable pageable = PageRequest.of(page, size);
 
+    // 메세지 조회
     Page<Message> messages = messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable);
+
     return messages.stream()
         .map(m ->
           GetChatResponseDto.builder()
@@ -72,7 +75,7 @@ public class ChatService {
     return messageRepository.save(messageEntity);
   }
 
-  public Chatroom createChatroom(CreateChatroomDto dto){
+  public Chatroom createChatroom(CreateChatroomRequestDto dto){
 
     // 채팅 타입 검사
     if(!genericUtils.isContains(ChatType.values(), dto.chatType())){
@@ -114,16 +117,23 @@ public class ChatService {
   }
 
   public List<GetChatroomResponseDto> getAllChatroomByUserId(User user){
-
+    // 채팅방 조회
     List<Chatroom> chatrooms = chatroomRepository.findAllByUser(user);
-    List<GetChatroomResponseDto> list = new ArrayList<>();
+
+    List<GetChatroomResponseDto> responseDtoList = new ArrayList<>();
+
     for(Chatroom chatroom : chatrooms){
-      // 채팅방에 초대된 유저들의 닉네임을 조회한다. 만약 유저가 탈퇴했다면 유저의 닉네임을 '알 수 없음' 으로 변환한다.
+
+      // 채팅방 참여자 닉네임 조회
       List<String> participants = chatroomParticipantRepository
           .findAllByChatroom(chatroom)
           .stream()
           .map(chatroomParticipant -> {
+
+            // 참여자가 앱을 탈퇴했으면 "알 수 없음" 으로 변경
             if(chatroomParticipant.getIsWithdrawn()) return "알 수 없음";
+
+            // 그 외의 경우 닉네임 조회
             else return chatroomParticipant.getParticipant().getNickname();
           })
           .toList();
@@ -131,10 +141,12 @@ public class ChatService {
       // 유저가 읽지 않은 메세지의 개수를 조회한다.
       int numberOfNotReadMessages = messageRepository.findNumberOfNotReadMessages(chatroom.getId(),
           user.getId());
+
       // 채팅방 마지막 메세지를 조회한다.
       Optional<Message> lastMessage = messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(
           chatroom.getId());
-      list.add(GetChatroomResponseDto.builder()
+
+      responseDtoList.add(GetChatroomResponseDto.builder()
           .chatroomId(chatroom.getId())
           .participants(participants)
           .lastChatMessage(lastMessage.map(Message::getContent).orElse(null))
@@ -142,7 +154,7 @@ public class ChatService {
           .chatroomSize(participants.size())
           .build());
     }
-    return list;
+    return responseDtoList;
   }
 
   @Transactional
@@ -152,7 +164,8 @@ public class ChatService {
         .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
 
     if (!isMemberInChatroom(chatroomId, user.getId())){
-      throw new RingoException("채팅방을 삭제할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+      log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
+      throw new RingoException("채팅방을 삭제할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
 
     chatroomParticipantRepository.deleteAllByChatroom(chatroom);
@@ -162,13 +175,16 @@ public class ChatService {
 
   public boolean isMemberInChatroom(Long roomId, Long userId){
     Chatroom chatroom = chatroomRepository.findById(roomId)
-        .orElseThrow(() -> new RingoException("Room not found", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+
+    // 채팅방 참여자 유저 id 조회
     List<Long> userIds = chatroomParticipantRepository.findAllByChatroom(chatroom)
         .stream()
         .filter(cp -> !cp.getIsWithdrawn())
         .map(ChatroomParticipant::getParticipant)
         .map(User::getId)
         .toList();
+
     return userIds.contains(userId);
   }
 
@@ -179,6 +195,7 @@ public class ChatService {
   public List<String> getUserEmailsInChatroom(Long roomId){
     Chatroom chatroom = chatroomRepository.findById(roomId)
         .orElseThrow(() -> new RingoException("채팅방에 초대된 유저를 찾는 중 채팅방가 존재하지 않습니다", HttpStatus.BAD_REQUEST));
+
     return chatroomParticipantRepository.findAllByChatroom(chatroom)
         .stream()
         .filter(participant -> !participant.getIsWithdrawn())

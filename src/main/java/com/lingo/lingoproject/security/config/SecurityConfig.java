@@ -72,7 +72,7 @@ public class SecurityConfig {
     CorsConfiguration config = new CorsConfiguration();
 
     //config.setAllowCredentials(true);
-    config.addAllowedOrigin("*");
+    config.addAllowedOrigin("*"); // https://ringo.linkgo.com 도 추가
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
     config.setAllowedHeaders(List.of("*"));
     config.setExposedHeaders(List.of("*"));

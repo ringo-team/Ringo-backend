@@ -17,7 +17,7 @@ public interface MatchingRepository extends JpaRepository<Matching, Long> {
 
   boolean existsByRequestUserAndRequestedUserAndMatchingStatus(User requestUser, User requestedUser, MatchingStatus matchingStatus);
 
-  List<Matching> findByRequestUser(User requestUser);
+  List<Matching> findAllByRequestUser(User requestUser);
 
-  List<Matching> findByRequestedUser(User requestedUser);
+  List<Matching> findAllByRequestedUser(User requestedUser);
 }

@@ -3,7 +3,7 @@ package com.lingo.lingoproject.snap;
 import com.lingo.lingoproject.image.ImageService;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.snap.dto.ApplySnapShootingRequestDto;
-import com.lingo.lingoproject.snap.dto.GetPhotographerInfosRequestDto;
+import com.lingo.lingoproject.snap.dto.GetPhotographerInfosResponseDto;
 import com.lingo.lingoproject.snap.dto.UpdatePhotographerExampleImagesInfoRequestDto;
 import com.lingo.lingoproject.snap.dto.SavePhotographerInfoRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
@@ -117,12 +117,16 @@ public class SnapController {
 
   @Operation(summary = "작가 정보 가져오기")
   @GetMapping("/photographer-infos")
-  public ResponseEntity<JsonListWrapper<GetPhotographerInfosRequestDto>> getPhotographerInfos(){
-    List<GetPhotographerInfosRequestDto> list;
+  public ResponseEntity<JsonListWrapper<GetPhotographerInfosResponseDto>> getPhotographerInfos(){
+    List<GetPhotographerInfosResponseDto> list;
     try {
+
       log.info("step=작가_정보_조회_시작, status=SUCCESS");
       list = snapService.getPhotographerInfos();
       log.info("step=작가_정보_조회_완료, status=SUCCESS");
+
+      return ResponseEntity.ok().body(new JsonListWrapper<>(list));
+
     } catch (Exception e) {
       log.error("step=작가_정보_조회_실패, status=FAILED", e);
       if (e instanceof RingoException re) {
@@ -130,6 +134,5 @@ public class SnapController {
       }
       throw new RingoException("작가 정보를 조회하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return ResponseEntity.ok().body(new JsonListWrapper<>(list));
   }
 }

@@ -50,7 +50,10 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.3")
 
     // s3 image
-    implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
+    implementation platform("software.amazon.awssdk:bom:2.25.0")
+    implementation "software.amazon.awssdk:s3"
+    implementation "software.amazon.awssdk:sqs"
+
 
     // swagger
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
@@ -76,10 +79,12 @@ dependencies {
     implementation 'com.google.firebase:firebase-admin:9.7.0'
 
     // aws rekognition
-    implementation("com.amazonaws:aws-java-sdk-rekognition:1.12.789")
+    implementation platform("software.amazon.awssdk:bom:2.25.0")
+    implementation "software.amazon.awssdk:rekognition"
 
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
+
 
 }
 dependencyManagement {

@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-public record CreateChatroomDto(
+public record CreateChatroomRequestDto(
     @Schema(description = "유저1 id", example = "12")
     @NotNull
     Long user1Id,

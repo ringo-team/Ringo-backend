@@ -3,8 +3,8 @@ package com.lingo.lingoproject.repository.impl;
 import com.lingo.lingoproject.domain.QPhotographerImage;
 import com.lingo.lingoproject.domain.QPhotographerInfo;
 import com.lingo.lingoproject.domain.QProfile;
-import com.lingo.lingoproject.snap.dto.GetPhotographerInfosRequestDto;
-import com.lingo.lingoproject.snap.dto.GetPhotographerInfosRequestDto.GetImageInfoRequestDto;
+import com.lingo.lingoproject.snap.dto.GetPhotographerInfosResponseDto;
+import com.lingo.lingoproject.snap.dto.GetPhotographerInfosResponseDto.GetImageInfoRequestDto;
 import com.querydsl.core.group.GroupBy;
 import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -22,15 +22,15 @@ public class PhotographerInfoRepositoryImpl {
   private final QPhotographerImage qPhotographerImage = QPhotographerImage.photographerImage;
   private final QProfile  qProfile = QProfile.profile;
 
-  public List<GetPhotographerInfosRequestDto> getPhotographerInfos(){
-    Map<Long, GetPhotographerInfosRequestDto> result = jpaQueryFactory
+  public List<GetPhotographerInfosResponseDto> getPhotographerInfos(){
+    Map<Long, GetPhotographerInfosResponseDto> result = jpaQueryFactory
         .from(qPhotographerInfo)
         .leftJoin(qPhotographerImage)
         .on(qPhotographerInfo.photographer.id.eq(qPhotographerImage.photographer.id))
         .leftJoin(qProfile)
         .on(qPhotographerInfo.photographer.id.eq(qProfile.user.id))
         .transform(GroupBy.groupBy(qPhotographerInfo.photographer.id).as(
-            Projections.constructor(GetPhotographerInfosRequestDto.class,
+            Projections.constructor(GetPhotographerInfosResponseDto.class,
                 qPhotographerInfo.photographer.id,
                 qProfile.imageUrl,
                 qPhotographerInfo.content,

@@ -9,7 +9,7 @@ import lombok.Data;
 @Builder
 @AllArgsConstructor
 @Data
-public class GetPhotographerInfosRequestDto {
+public class GetPhotographerInfosResponseDto {
   private Long photographerId;
   private String profileUrl;
   private String content;

@@ -7,7 +7,7 @@ import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
 import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
-import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
+import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
@@ -83,7 +83,8 @@ public class ChatController {
 
       @AuthenticationPrincipal User user){
     if(!chatService.isMemberInChatroom(roomId, user.getId())){
-      throw new RingoException("잘못된 접근입니다.", HttpStatus.FORBIDDEN);
+      log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
+      throw new RingoException("채팅방 메세지를 조회할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
 
     try {
@@ -122,7 +123,7 @@ public class ChatController {
   )
   @PostMapping("/chatrooms")
   public ResponseEntity<CreateChatroomResponseDto> createChatRoom(
-      @Valid @RequestBody CreateChatroomDto dto){
+      @Valid @RequestBody CreateChatroomRequestDto dto){
     try {
       Chatroom chatroom = chatService.createChatroom(dto);
       return ResponseEntity.status(HttpStatus.CREATED).body(new CreateChatroomResponseDto(chatroom.getId()));
@@ -145,7 +146,8 @@ public class ChatController {
 
       @AuthenticationPrincipal User user){
     if (!userId.equals(user.getId())){
-      throw new RingoException("채팅방 ", HttpStatus.FORBIDDEN);
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
+      throw new RingoException("채팅방 조회를 할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
     try{
 

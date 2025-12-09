@@ -29,7 +29,7 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
   private final CustomAuthenticationManager customAuthenticationManager;
   private final ObjectMapper objectMapper;
   private final String[] whiteList = {
-      "/signup", "/profiles", "/users/access",
+      "/signup", "/profiles", "/users/access", "/health",
       "/swagger", "/v3/api-docs", "/swagger-resources",
       "/ws", "/stomp",
       "/actuator", "/error"
@@ -48,25 +48,30 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
       FilterChain filterChain) throws ServletException, IOException {
     if (request.getRequestURI().equals("/login") && request.getMethod().equalsIgnoreCase("POST")){
+      // body 값 조회
       String requestBody = request.getReader()
           .lines()
           .collect(Collectors.joining(System.lineSeparator()));
-      LoginInfoDto info = null;
 
+      // body 값 역직렬화
+      LoginInfoDto info = null;
       try {
         info = objectMapper.readValue(requestBody, LoginInfoDto.class);
         request.setAttribute("requestBody", info);
       } catch (Exception e) {
-        log.error("AuthenticationFilter : 로그인 요청값을 역질렬화하는데 실패하였습니다. uri: {}", request.getRequestURI(), e);
+        log.error("uri={}, loc=AuthenticationFilter, step=로그인_요청_역직렬화, status=FAILED", request.getRequestURI(), e);
         throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
       }
 
+      // 아이디&비밀번호 인증
       Authentication authentication = customAuthenticationManager.authenticate(
           new UsernamePasswordAuthenticationToken(info.email(), info.password(), new ArrayList<>())
       );
       SecurityContextHolder.getContext().setAuthentication(authentication);
+
     }
 
+    // 허용된 경로일 경우 인증
     else if (isPermittedRequestUrl(request.getRequestURI())){
       SecurityContextHolder.getContext().setAuthentication(
           new UsernamePasswordAuthenticationToken(

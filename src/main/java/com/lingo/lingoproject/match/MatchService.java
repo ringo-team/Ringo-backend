@@ -4,7 +4,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
 import com.lingo.lingoproject.chat.ChatService;
-import com.lingo.lingoproject.chat.dto.CreateChatroomDto;
+import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
@@ -119,7 +119,8 @@ public class MatchService {
 
     Long requestedUserId = matching.getRequestedUser().getId();
     if (!requestedUserId.equals(user.getId())) {
-      throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestedUserId);
+      throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
 
     switch (decision) {
@@ -138,7 +139,7 @@ public class MatchService {
 
     // 채팅방 생성
     chatService.createChatroom(
-        new CreateChatroomDto(
+        new CreateChatroomRequestDto(
             matching.getRequestedUser().getId(),
             matching.getRequestUser().getId(),
             ChatType.USER.toString()
@@ -162,7 +163,7 @@ public class MatchService {
       try {
         FirebaseMessaging.getInstance().send(message);
       }catch (Exception e){
-        log.error("FCM 알림 전송 실패. requestUserId: {}, title: {}", requestUser.getId(), title, e);
+        log.error("step=FCM_알림_전송_실패, requestUserId={}, title={}, status=FAILED", requestUser.getId(), title, e);
         throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
       }
     });
@@ -291,6 +292,7 @@ public class MatchService {
         .stream()
         .map(BlockedUser::getBlockedUserId)
         .toList();
+    // 계정 중지된 유저
     List<Long> suspendedUserIds = redisUtils.getSuspendedUser()
         .stream()
         .map(s -> s.replace("suspension::", ""))
@@ -340,22 +342,28 @@ public class MatchService {
    * 내가 매칭 요청한 사람들의 정보
    */
   public List<GetUserProfileResponseDto> getUserIdWhoRequestedByMe(User requestUser){
-    List<Matching> matchings = matchingRepository.findByRequestUser(requestUser);
-    List<Long> matchingIds = matchings.stream()
-        .map(Matching::getId)
-        .toList();
+    // 매칭 조회
+    List<Matching> matchings = matchingRepository.findAllByRequestUser(requestUser);
+
+    // 매칭 id 조회
+    List<Long> matchingIds = matchings.stream().map(Matching::getId).toList();
+
+    // 매칭 요청 받은 유저들의 정보 조회
     List<GetUserProfileResponseDto> requestedUserProfileDtoList = profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
 
-    List<User> matchingRequestedUsers = matchings.stream()
-        .map(Matching::getRequestedUser)
-        .toList();
+    // 매칭 요청 받은 유저 객체 조회
+    List<User> matchingRequestedUsers = matchings.stream().map(Matching::getRequestedUser).toList();
+
+    // 유저id-해시태크 쌍 조회
     Map<Long, List<String>> userIdToHashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestedUsers));
+
+    // dto에 해시태그 값 추가
     requestedUserProfileDtoList.forEach(profile -> profile.setHashtags(userIdToHashtagMap.get(profile.getUserId())));
     return requestedUserProfileDtoList;
   }
 
   public List<GetUserProfileResponseDto> getUserIdWhoRequestToMe(User requestedUser){
-    List<Matching> matchings = matchingRepository.findByRequestedUser(requestedUser);
+    List<Matching> matchings = matchingRepository.findAllByRequestedUser(requestedUser);
 
     // id, age, gender, nickname, profileUrl 조회
     List<Long> matchingIds = matchings.stream()
@@ -388,6 +396,7 @@ public class MatchService {
     Long requestedUserId = match.getRequestedUser().getId();
     Long requestUserId = match.getRequestUser().getId();
     if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))){
+      log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
       throw new RingoException("매칭을 삭제할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
     }
 
@@ -401,6 +410,7 @@ public class MatchService {
 
     Long requestUserId = match.getRequestUser().getId();
     if (!requestUserId.equals(user.getId())){
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestUserId);
       throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
     }
 
@@ -417,6 +427,7 @@ public class MatchService {
     Long requestedUserId = match.getRequestedUser().getId();
     Long requestUserId = match.getRequestUser().getId();
     if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))){
+      log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
       throw new RingoException("해당 매칭의 요청 메세지를 확인할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
     }
 

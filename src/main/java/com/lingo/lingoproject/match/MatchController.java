@@ -58,6 +58,7 @@ public class MatchController {
     // 매칭 요청자 검증
     Long requestUserId = matchingRequestDto.requestId();
     if (!requestUserId.equals(user.getId())){
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestUserId);
       throw new RingoException("매칭 요청자와 요청 정보가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
     }
     Matching matching = null;
@@ -136,7 +137,8 @@ public class MatchController {
 
       @AuthenticationPrincipal User user) {
     if (!userId.equals(user.getId())) {
-      throw new RingoException("본인의 매칭 정보만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
+      throw new RingoException("본인의 매칭 정보만 확인할 수 있습니다.", HttpStatus.FORBIDDEN);
     }
     try {
 
@@ -170,6 +172,7 @@ public class MatchController {
       @PathVariable(value = "userId") Long userId,
       @AuthenticationPrincipal User user) {
     if (!userId.equals(user.getId())) {
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
     }
     try {
@@ -194,6 +197,7 @@ public class MatchController {
       @AuthenticationPrincipal User user
   ){
     if (!userId.equals(user.getId())) {
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", HttpStatus.BAD_REQUEST);
     }
     try {

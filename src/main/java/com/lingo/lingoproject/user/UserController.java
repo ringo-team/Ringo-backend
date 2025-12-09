@@ -52,7 +52,7 @@ public class UserController {
       @AuthenticationPrincipal User user){
     Long userId = user.getId();
     if(!userId.equals(id)){
-      throw new RingoException("쟐못된 접근입니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("유저를 탈퇴할 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
     log.info("userId={}, step=회원탈퇴_시작, status=SUCCESS", userId);
     try {

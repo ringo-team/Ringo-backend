@@ -11,7 +11,7 @@ import com.lingo.lingoproject.repository.SnapApplyRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.repository.impl.PhotographerInfoRepositoryImpl;
 import com.lingo.lingoproject.snap.dto.ApplySnapShootingRequestDto;
-import com.lingo.lingoproject.snap.dto.GetPhotographerInfosRequestDto;
+import com.lingo.lingoproject.snap.dto.GetPhotographerInfosResponseDto;
 import com.lingo.lingoproject.snap.dto.UpdatePhotographerExampleImagesInfoRequestDto;
 import com.lingo.lingoproject.snap.dto.SavePhotographerInfoRequestDto;
 import java.time.LocalDate;
@@ -87,7 +87,7 @@ public class SnapService {
     photographerImageRepository.save(image);
   }
 
-  public List<GetPhotographerInfosRequestDto> getPhotographerInfos(){
+  public List<GetPhotographerInfosResponseDto> getPhotographerInfos(){
     return photographerInfoRepositoryImpl.getPhotographerInfos();
   }
 }
