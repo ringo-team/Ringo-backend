@@ -15,6 +15,7 @@ import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.SnapImageRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -87,7 +88,7 @@ public class ImageService {
       return null;
     }
 
-    String imageUrl = uploadImageToS3(file);
+    String imageUrl = uploadImageToS3(file, "profiles");
 
     Profile profile = Profile.builder()
         .user(user)
@@ -140,7 +141,7 @@ public class ImageService {
     deleteImageInS3(imageUrl);
 
     // s3에 새로운 이미지 파일 업로드
-    imageUrl = uploadImageToS3(file);
+    imageUrl = uploadImageToS3(file, "profiles");
 
     // profiles 테이블에 변경된 이미지 url 저장
     profile.setImageUrl(imageUrl);
@@ -164,7 +165,7 @@ public class ImageService {
         continue;
       }
 
-      String imageUrl = uploadImageToS3(file);
+      String imageUrl = uploadImageToS3(file, "snaps");
       SnapImage snapImage = SnapImage.builder()
           .imageUrl(imageUrl)
           .user(user)
@@ -235,7 +236,7 @@ public class ImageService {
     deleteImageInS3(imageUrl);
 
     // s3에 새로운 이미지 업로드
-    imageUrl = uploadImageToS3(file);
+    imageUrl = uploadImageToS3(file, "snaps");
 
     // snap_images 테이블에 변경된 사진 url 저장
     snapImage.setImageUrl(imageUrl);
@@ -284,7 +285,7 @@ public class ImageService {
     List<PhotographerImage> photographerImages = new ArrayList<>();
 
     for (MultipartFile file : images){
-      String imageUrl = uploadImageToS3(file);
+      String imageUrl = uploadImageToS3(file, "photographers");
       PhotographerImage photographerImage = PhotographerImage.builder()
           .imageUrl(imageUrl)
           .photographer(photographer)
@@ -299,12 +300,18 @@ public class ImageService {
         .toList();
   }
 
-  public  String uploadImageToS3(MultipartFile file){
+  public  String uploadImageToS3(MultipartFile file, String type){
     String originalFilename = file.getOriginalFilename();
     if(originalFilename != null && originalFilename.contains(".")){
       originalFilename = originalFilename.substring(originalFilename.lastIndexOf("."));
     }
-    String filename = UUID.randomUUID().toString() + "_image_" + originalFilename;
+
+    LocalDate now = LocalDate.now();
+    String path = type + "/" + now.getYear() + "/" +
+                  now.getYear() + "-" + now.getMonthValue() + "/" +
+                  now + "/";
+
+    String filename = path + UUID.randomUUID().toString() + "_image_" + originalFilename;
 
     String imageUrl = null;
 
