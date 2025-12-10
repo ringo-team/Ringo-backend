@@ -1,10 +1,18 @@
 package com.lingo.lingoproject.chat;
 
+import com.google.firebase.messaging.BatchResponse;
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.MulticastMessage;
+import com.google.firebase.messaging.Notification;
+import com.google.firebase.messaging.SendResponse;
 import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.ChatroomParticipant;
+import com.lingo.lingoproject.domain.ExceptionMessage;
+import com.lingo.lingoproject.domain.FailedMessageLog;
 import com.lingo.lingoproject.domain.Message;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.ChatType;
@@ -13,6 +21,9 @@ import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.ChatroomRepository;
 import com.lingo.lingoproject.mongo_repository.MessageRepository;
+import com.lingo.lingoproject.repository.ExceptionMessageRepository;
+import com.lingo.lingoproject.repository.FailedMessageLogRepository;
+import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.GenericUtils;
@@ -28,7 +39,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -42,6 +56,11 @@ public class ChatService {
   private final ChatroomParticipantRepository chatroomParticipantRepository;
   private final GenericUtils genericUtils;
   private final MatchingRepository matchingRepository;
+  private final RedisTemplate<String, Object> redisTemplate;
+  private final SimpMessagingTemplate simpMessagingTemplate;
+  private final FailedMessageLogRepository failedMessageLogRepository;
+  private final FcmTokenRepository fcmTokenRepository;
+  private final ExceptionMessageRepository exceptionMessageRepository;
 
   public List<GetChatResponseDto> getChatMessages(Long chatroomId, int page, int size){
     // 페이지네이션
@@ -62,6 +81,149 @@ public class ChatService {
         )
         .toList();
   }
+
+  public void sendChatMessageAndNotification(Long roomId, GetChatResponseDto message) {
+
+    List<String> userEmails = null;
+    List<User> roomMembers = null;
+    List<Long> existMemberIdList = new ArrayList<>();
+    Message savedMessage = null;
+
+    try {
+      ValueOperations<String, Object> ops = redisTemplate.opsForValue();
+
+      userEmails = getUserEmailsInChatroom(roomId);
+      roomMembers = userRepository.findAllByEmailIn(userEmails);
+
+      // 현재 접속해있는 채팅방 멤버의 유저 id를 구한다.
+      for (User user : roomMembers) {
+
+        if (ops.get("connect::" + user.getId() + "::" + roomId) != null) {
+
+          existMemberIdList.add(user.getId());
+        }
+      }
+      message.setReaderIds(existMemberIdList);
+      // 메세지 저장
+      savedMessage = saveMessage(message, roomId);
+    }catch (Exception e){
+      log.error("senderId={}, chatroomId={}, step=메세제_저장, status=FAILED",  message.getSenderId(), roomId, e);
+      return;
+    }
+
+    sendMessage(userEmails, roomId, message, savedMessage);
+
+    sendMessageNotification(roomMembers, existMemberIdList, roomId, message, savedMessage);
+  }
+
+  public void sendMessage(List<String> userEmails, Long roomId, GetChatResponseDto message,
+      Message savedMessage) {
+    for (String userEmail : userEmails) {
+      try {
+        // 해당 방에 메세지 전송
+        simpMessagingTemplate.convertAndSendToUser(userEmail, "/topic/" + roomId, message);
+      } catch (Exception e) {
+        savedSimpMessagingError(roomId, savedMessage, userEmail, e, "/topic/");
+      }
+      try {
+        // 채팅 미리보기 기능
+        simpMessagingTemplate.convertAndSendToUser(userEmail, "/room-list", message);
+      } catch (Exception e) {
+        log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail,
+            e);
+        savedSimpMessagingError(roomId, savedMessage, userEmail, e, "/room-list/");
+      }
+    }
+  }
+
+  private void savedSimpMessagingError(Long roomId, Message savedMessage, String userEmail, Exception e, String destination) {
+    log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail,
+        e);
+    FailedMessageLog failedMessageLog = FailedMessageLog.builder()
+        .roomId(roomId)
+        .errorMessage(e.getMessage())
+        .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
+        .messageId(savedMessage.getId())
+        .destination(destination + roomId)
+        .userEmail(userEmail)
+        .build();
+    failedMessageLogRepository.save(failedMessageLog);
+  }
+
+  // 채팅방에 존재하지 않는 사람들은 fcm으로 알림을 보낸다.
+  /*
+   * {
+   *    "message":{
+   *      "notification":{
+   *        "title": "title",
+   *        "body": "message"
+   *        "image": "imageUrl"
+   *      }
+   *    }
+   * }
+   */
+  public void sendMessageNotification(List<User> roomMembers, List<Long> existMemberIdList,
+      Long roomId, GetChatResponseDto message, Message savedMessage) {
+
+    List<String> fcmTokens = null;
+    try{
+    List<User> notExistMember = roomMembers.stream()
+        .filter(u -> !existMemberIdList.contains(u.getId()))
+        .toList();
+    fcmTokens = fcmTokenRepository.findByUserIn(notExistMember);
+    } catch (Exception e) {
+      log.error("chatroomId={}, step=FCM_TOKEN_조회, status=FAILED", roomId, e);
+      return;
+    }
+    if (!fcmTokens.isEmpty()) {
+      try{
+        MulticastMessage multicastMessage = MulticastMessage.builder()
+            .addAllTokens(fcmTokens)
+            .setNotification(Notification.builder()
+                .setTitle("메세지가 도착했습니다.")
+                .setBody(message.getContent())
+                .setImage("imageUrl")
+                .build())
+            .build();
+        BatchResponse response = FirebaseMessaging.getInstance()
+            .sendEachForMulticast(multicastMessage);
+        if (response.getFailureCount() > 0) {
+          saveNotificationSendingError(response, roomId, savedMessage);
+        }
+      } catch (Exception e) {
+      log.error("chatroomId={}, step=FCM_SEND_ERROR, status=FAILED", roomId, e);
+      }
+    }
+  }
+
+  public void saveNotificationSendingError(BatchResponse response, Long roomId,
+      Message savedMessage) {
+    // 이미지가 전송되지 않으면 몇개의 이미지가 전송되지 않았는지 데이터베이스에 저장
+    if (response.getFailureCount() > 0) {
+      List<SendResponse> responses = response.getResponses();
+      List<FailedMessageLog> errorLogList = new ArrayList<>();
+      for (SendResponse sendResponse : responses) {
+        if (!sendResponse.isSuccessful()) {
+          // 보내지지 않은 메세지의 세부 정보를 로깅하기
+          FirebaseMessagingException exception = sendResponse.getException();
+          log.error("chatroomId={}, step=CHAT_FCM_MULTICAST, status=FAILED", roomId);
+          FailedMessageLog log = FailedMessageLog.builder()
+              .roomId(roomId)
+              .errorMessage(exception.getMessage())
+              .errorCause(exception.getCause() != null ? exception.getCause().getMessage() : null)
+              .messageId(savedMessage.getId())
+              .destination("fcm")
+              .build();
+          errorLogList.add(log);
+        }
+      }
+      failedMessageLogRepository.saveAll(errorLogList);
+      ExceptionMessage exceptionMessage = new ExceptionMessage(
+          roomId + "에 " + errorLogList.size() + "개의 메세지가 보내지지 않았습니다.");
+      exceptionMessageRepository.save(exceptionMessage);
+    }
+  }
+
 
   public Message saveMessage(GetChatResponseDto message, Long chatroomId){
     Message messageEntity = Message.builder()
