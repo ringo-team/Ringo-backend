@@ -16,13 +16,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-
+@Slf4j
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final JwtUtil jwtUtil;
@@ -67,6 +68,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           user.getStatus().equals(SignupStatus.COMPLETED))){
         throw new RingoException("회원가입을 마치고 요청 주시길 바랍니다.", HttpStatus.FORBIDDEN);
       }
+
+      log.info("userId={}, endpoint={}, step=api_요청", user.getId(), request.getRequestURI());
 
       SecurityContextHolder.getContext().setAuthentication(
           new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities())
