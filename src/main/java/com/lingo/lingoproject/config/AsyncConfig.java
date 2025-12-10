@@ -11,6 +11,6 @@ import org.springframework.scheduling.annotation.EnableAsync;
 public class AsyncConfig {
   @Bean
   public Executor asyncExecutor(){
-    return Executors.newFixedThreadPool(10);
+    return Executors.newFixedThreadPool(100);
   }
 }
