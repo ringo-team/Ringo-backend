@@ -353,14 +353,8 @@ public class MatchService {
     // 매칭 요청 받은 유저들의 정보 조회
     List<GetUserProfileResponseDto> requestedUserProfileDtoList = profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
 
-    // 매칭 요청 받은 유저 객체 조회
-    List<User> matchingRequestedUsers = matchings.stream().map(Matching::getRequestedUser).toList();
+    setHashtagInProfileDtoList(requestedUserProfileDtoList);
 
-    // 유저id-해시태크 쌍 조회
-    Map<Long, List<String>> userIdToHashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestedUsers));
-
-    // dto에 해시태그 값 추가
-    requestedUserProfileDtoList.forEach(profile -> profile.setHashtags(userIdToHashtagMap.get(profile.getUserId())));
     return requestedUserProfileDtoList;
   }
 
@@ -377,21 +371,21 @@ public class MatchService {
 
     List<GetUserProfileResponseDto> requestUserProfileDtoList = profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
 
-    List<User> matchingRequestUsers = matchings.stream().map(Matching::getRequestUser).toList();
-
-    Map<Long, List<String>> userIdToHashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestUsers));
-
-    requestUserProfileDtoList.forEach(profile -> profile.setHashtags(userIdToHashtagMap.get(profile.getUserId())));
+    setHashtagInProfileDtoList(requestUserProfileDtoList);
 
     return requestUserProfileDtoList;
   }
 
-  public Map<Long, List<String>> convertToMapFromHashtags(List<Hashtag> hashtags){
-    return hashtags.stream()
-        .collect(Collectors.groupingBy(
-            h -> h.getUser().getId(),
-            Collectors.mapping(Hashtag::getHashtag, Collectors.toList())
-        ));
+  private void setHashtagInProfileDtoList(List<GetUserProfileResponseDto> profiles){
+    profiles.forEach(profile -> {
+      User user = userRepository.findById(profile.getUserId())
+          .orElseThrow(() -> new RingoException("프로필에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+      List<String> hashtags = hashtagRepository.findAllByUser(user)
+          .stream()
+          .map(Hashtag::getHashtag)
+          .toList();
+      profile.setHashtags(hashtags);
+    });
   }
 
   @Transactional
