@@ -254,4 +254,8 @@ public class UserService {
       dormantAccountRepository.deleteByUser(user);
     }
   }
+
+  public List<User> findUserByEmailsIn(List<String> userEmails){
+    return userRepository.findAllByEmailIn(userEmails);
+  }
 }

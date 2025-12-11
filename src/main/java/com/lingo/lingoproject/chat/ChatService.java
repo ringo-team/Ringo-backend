@@ -42,7 +42,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -57,7 +56,6 @@ public class ChatService {
   private final GenericUtils genericUtils;
   private final MatchingRepository matchingRepository;
   private final RedisTemplate<String, Object> redisTemplate;
-  private final SimpMessagingTemplate simpMessagingTemplate;
   private final FailedMessageLogRepository failedMessageLogRepository;
   private final FcmTokenRepository fcmTokenRepository;
   private final ExceptionMessageRepository exceptionMessageRepository;
@@ -82,18 +80,12 @@ public class ChatService {
         .toList();
   }
 
-  public void sendChatMessageAndNotification(Long roomId, GetChatResponseDto message) {
+  public List<Long> findExistUserIdsInRoom(Long roomId, GetChatResponseDto message, List<User> roomMembers) {
 
-    List<String> userEmails = null;
-    List<User> roomMembers = null;
     List<Long> existMemberIdList = new ArrayList<>();
-    Message savedMessage = null;
 
     try {
       ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-
-      userEmails = getUserEmailsInChatroom(roomId);
-      roomMembers = userRepository.findAllByEmailIn(userEmails);
 
       // 현재 접속해있는 채팅방 멤버의 유저 id를 구한다.
       for (User user : roomMembers) {
@@ -103,40 +95,15 @@ public class ChatService {
           existMemberIdList.add(user.getId());
         }
       }
-      message.setReaderIds(existMemberIdList);
-      // 메세지 저장
-      savedMessage = saveMessage(message, roomId);
+
+      return existMemberIdList;
     }catch (Exception e){
       log.error("senderId={}, chatroomId={}, step=메세제_저장, status=FAILED",  message.getSenderId(), roomId, e);
-      return;
-    }
-
-    sendMessage(userEmails, roomId, message, savedMessage);
-
-    sendMessageNotification(roomMembers, existMemberIdList, roomId, message, savedMessage);
-  }
-
-  public void sendMessage(List<String> userEmails, Long roomId, GetChatResponseDto message,
-      Message savedMessage) {
-    for (String userEmail : userEmails) {
-      try {
-        // 해당 방에 메세지 전송
-        simpMessagingTemplate.convertAndSendToUser(userEmail, "/topic/" + roomId, message);
-      } catch (Exception e) {
-        savedSimpMessagingError(roomId, savedMessage, userEmail, e, "/topic/");
-      }
-      try {
-        // 채팅 미리보기 기능
-        simpMessagingTemplate.convertAndSendToUser(userEmail, "/room-list", message);
-      } catch (Exception e) {
-        log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail,
-            e);
-        savedSimpMessagingError(roomId, savedMessage, userEmail, e, "/room-list/");
-      }
+      return null;
     }
   }
 
-  private void savedSimpMessagingError(Long roomId, Message savedMessage, String userEmail, Exception e, String destination) {
+  public void savedSimpMessagingError(Long roomId, Message savedMessage, String userEmail, Exception e, String destination) {
     log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail,
         e);
     FailedMessageLog failedMessageLog = FailedMessageLog.builder()
@@ -162,13 +129,13 @@ public class ChatService {
    *    }
    * }
    */
-  public void sendMessageNotification(List<User> roomMembers, List<Long> existMemberIdList,
-      Long roomId, GetChatResponseDto message, Message savedMessage) {
+  public void sendMessageNotification(List<User> roomMembers, List<Long> existUserIdsInRoom,
+      Long roomId, Message savedMessage) {
 
     List<String> fcmTokens = null;
     try{
     List<User> notExistMember = roomMembers.stream()
-        .filter(u -> !existMemberIdList.contains(u.getId()))
+        .filter(u -> !existUserIdsInRoom.contains(u.getId()))
         .toList();
     fcmTokens = fcmTokenRepository.findByUserIn(notExistMember);
     } catch (Exception e) {
@@ -181,7 +148,7 @@ public class ChatService {
             .addAllTokens(fcmTokens)
             .setNotification(Notification.builder()
                 .setTitle("메세지가 도착했습니다.")
-                .setBody(message.getContent())
+                .setBody(savedMessage.getContent())
                 .setImage("imageUrl")
                 .build())
             .build();
@@ -199,23 +166,21 @@ public class ChatService {
   public void saveNotificationSendingError(BatchResponse response, Long roomId,
       Message savedMessage) {
     // 이미지가 전송되지 않으면 몇개의 이미지가 전송되지 않았는지 데이터베이스에 저장
-    if (response.getFailureCount() > 0) {
-      List<SendResponse> responses = response.getResponses();
-      List<FailedMessageLog> errorLogList = new ArrayList<>();
-      for (SendResponse sendResponse : responses) {
-        if (!sendResponse.isSuccessful()) {
-          // 보내지지 않은 메세지의 세부 정보를 로깅하기
-          FirebaseMessagingException exception = sendResponse.getException();
-          log.error("chatroomId={}, step=CHAT_FCM_MULTICAST, status=FAILED", roomId);
-          FailedMessageLog log = FailedMessageLog.builder()
-              .roomId(roomId)
-              .errorMessage(exception.getMessage())
-              .errorCause(exception.getCause() != null ? exception.getCause().getMessage() : null)
-              .messageId(savedMessage.getId())
-              .destination("fcm")
-              .build();
-          errorLogList.add(log);
-        }
+    List<SendResponse> responses = response.getResponses();
+    List<FailedMessageLog> errorLogList = new ArrayList<>();
+    for (SendResponse sendResponse : responses) {
+      if (!sendResponse.isSuccessful()) {
+        // 보내지지 않은 메세지의 세부 정보를 로깅하기
+        FirebaseMessagingException exception = sendResponse.getException();
+        log.error("chatroomId={}, step=CHAT_FCM_MULTICAST, status=FAILED", roomId);
+        FailedMessageLog log = FailedMessageLog.builder()
+            .roomId(roomId)
+            .errorMessage(exception.getMessage())
+            .errorCause(exception.getCause() != null ? exception.getCause().getMessage() : null)
+            .messageId(savedMessage.getId())
+            .destination("fcm")
+            .build();
+        errorLogList.add(log);
       }
       failedMessageLogRepository.saveAll(errorLogList);
       ExceptionMessage exceptionMessage = new ExceptionMessage(

@@ -6,12 +6,10 @@ import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
+import com.lingo.lingoproject.domain.Message;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.repository.ExceptionMessageRepository;
-import com.lingo.lingoproject.repository.FailedMessageLogRepository;
-import com.lingo.lingoproject.repository.FcmTokenRepository;
-import com.lingo.lingoproject.repository.UserRepository;
+import com.lingo.lingoproject.user.UserService;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -44,6 +42,8 @@ public class ChatController {
 
   private final ChatService chatService;
   private final RedisTemplate<String, Object> redisTemplate;
+  private final SimpMessagingTemplate simpMessagingTemplate;
+  private final UserService userService;
 
   /**
    * 메세지 내용 불러오는 api
@@ -187,9 +187,36 @@ public class ChatController {
    * prefix인 app이 빠져있음
    */
   @MessageMapping("/{roomId}")
-  public void sendMessage(@DestinationVariable Long roomId, GetChatResponseDto message)
-      throws FirebaseMessagingException {
-    chatService.sendChatMessageAndNotification(roomId, message);
+  public void sendMessage(@DestinationVariable Long roomId, GetChatResponseDto message) {
+    List<String> roomMemberEmails = chatService.getUserEmailsInChatroom(roomId);
+    List<User> roomMembers = userService.findUserByEmailsIn(roomMemberEmails);
+    List<Long> existUserIdsInRoom = chatService.findExistUserIdsInRoom(roomId, message, roomMembers);
+
+    // 메세지 저장
+    message.getReaderIds().addAll(existUserIdsInRoom);
+    Message savedMessage = chatService.saveMessage(message, roomId);
+
+    if (savedMessage == null) return;
+
+    for (String userEmail : roomMemberEmails) {
+      try {
+        // 해당 방에 메세지 전송
+        simpMessagingTemplate.convertAndSendToUser(userEmail, "/topic/" + roomId, message);
+      } catch (Exception e) {
+        chatService.savedSimpMessagingError(roomId, savedMessage, userEmail, e, "/topic/");
+      }
+      try {
+        // 채팅 미리보기 기능
+        simpMessagingTemplate.convertAndSendToUser(userEmail, "/room-list", message);
+      } catch (Exception e) {
+        log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail,
+            e);
+        chatService.savedSimpMessagingError(roomId, savedMessage, userEmail, e, "/room-list/");
+      }
+    }
+
+    // 방에 없는 유저에게 fcm 메세지 전달
+    chatService.sendMessageNotification(roomMembers, existUserIdsInRoom, roomId, savedMessage);
   }
 
   /**
