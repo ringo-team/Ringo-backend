@@ -6,14 +6,18 @@ import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
-import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
+import com.lingo.lingoproject.chat.dto.GetChatMessageResponseDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
+import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
+import com.lingo.lingoproject.chat.dto.GetChatroomMemberInfoResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.ChatroomParticipant;
 import com.lingo.lingoproject.domain.ExceptionMessage;
 import com.lingo.lingoproject.domain.FailedMessageLog;
+import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Message;
+import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
@@ -24,7 +28,9 @@ import com.lingo.lingoproject.mongo_repository.MessageRepository;
 import com.lingo.lingoproject.repository.ExceptionMessageRepository;
 import com.lingo.lingoproject.repository.FailedMessageLogRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
+import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
+import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.GenericUtils;
 import jakarta.transaction.Transactional;
@@ -59,17 +65,37 @@ public class ChatService {
   private final FailedMessageLogRepository failedMessageLogRepository;
   private final FcmTokenRepository fcmTokenRepository;
   private final ExceptionMessageRepository exceptionMessageRepository;
+  private final ProfileRepository profileRepository;
+  private final HashtagRepository hashtagRepository;
 
-  public List<GetChatResponseDto> getChatMessages(Long chatroomId, int page, int size){
+  public GetChatResponseDto getChatMessages(User user, Long chatroomId, int page, int size){
     // 페이지네이션
     Pageable pageable = PageRequest.of(page, size);
 
     // 메세지 조회
     Page<Message> messages = messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable);
 
-    return messages.stream()
+    Chatroom chatroom = chatroomRepository.findById(chatroomId).orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    List<User> participants = chatroomParticipantRepository.findAllByChatroom(chatroom)
+        .stream()
+        .map(ChatroomParticipant::getParticipant)
+        .filter(p -> !p.getId().equals(user.getId()))
+        .toList();
+    List<GetChatroomMemberInfoResponseDto> memberInfoDtos = new ArrayList<>();
+    participants.forEach(p -> {
+      Profile userProfile = profileRepository.findByUser(p).orElse(null);
+      List<String> hashtags = hashtagRepository.findAllByUser(p).stream().map(Hashtag::getHashtag).toList();
+      memberInfoDtos.add(GetChatroomMemberInfoResponseDto.builder()
+              .profileUrl(userProfile != null ? userProfile.getImageUrl() : null)
+              .userId(p.getId())
+              .nickname(p.getNickname())
+              .hashtag(hashtags)
+          .build());
+    });
+
+    List<GetChatMessageResponseDto> messagesDto = messages.stream()
         .map(m ->
-          GetChatResponseDto.builder()
+          GetChatMessageResponseDto.builder()
               .chatroomId(chatroomId)
               .senderId(m.getSenderId())
               .content(m.getContent())
@@ -78,9 +104,14 @@ public class ChatService {
               .build()
         )
         .toList();
+
+    return GetChatResponseDto.builder()
+        .memberInfos(memberInfoDtos)
+        .messages(messagesDto)
+        .build();
   }
 
-  public List<Long> findExistUserIdsInRoom(Long roomId, GetChatResponseDto message, List<User> roomMembers) {
+  public List<Long> findExistUserIdsInRoom(Long roomId, GetChatMessageResponseDto message, List<User> roomMembers) {
 
     List<Long> existMemberIdList = new ArrayList<>();
 
@@ -190,7 +221,7 @@ public class ChatService {
   }
 
 
-  public Message saveMessage(GetChatResponseDto message, Long chatroomId){
+  public Message saveMessage(GetChatMessageResponseDto message, Long chatroomId){
     Message messageEntity = Message.builder()
         .id(UUID.randomUUID().toString())
         .chatroomId(chatroomId)

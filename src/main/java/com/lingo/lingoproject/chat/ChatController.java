@@ -1,9 +1,9 @@
 package com.lingo.lingoproject.chat;
 
-import com.google.firebase.messaging.FirebaseMessagingException;
-import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
+import com.lingo.lingoproject.chat.dto.GetChatMessageResponseDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomResponseDto;
+import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.Message;
@@ -57,7 +57,7 @@ public class ChatController {
       description = "채팅방 메세지들을 불러오는 api"
   )
   @GetMapping("/chatrooms/{roomId}/messages")
-  public ResponseEntity<JsonListWrapper<GetChatResponseDto>> getChattingMessages(
+  public ResponseEntity<GetChatResponseDto> getChattingMessages(
       @Parameter(description = "채팅방 id", example = "4")
       @PathVariable(value = "roomId") Long roomId,
 
@@ -86,10 +86,10 @@ public class ChatController {
 
       // 채팅방 매세지 조회
       log.info("userId={}, chatroomId={}, step=메세지_조회_시작, status=SUCCESS", user.getId(), roomId);
-      List<GetChatResponseDto> responses = chatService.getChatMessages(roomId, page, size);
+      GetChatResponseDto responses = chatService.getChatMessages(user, roomId, page, size);
       log.info("userId={}, chatroomId={}, step=메세지_조회_완료, status=SUCCESS", user.getId(), roomId);
 
-      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(responses));
+      return ResponseEntity.status(HttpStatus.OK).body(responses);
 
     } catch (Exception e){
       log.error("userId={}, chatroomId={}, step=채팅방_입장_실패, status=FAILED", user.getId(), roomId, e);
@@ -187,7 +187,7 @@ public class ChatController {
    * prefix인 app이 빠져있음
    */
   @MessageMapping("/{roomId}")
-  public void sendMessage(@DestinationVariable Long roomId, GetChatResponseDto message) {
+  public void sendMessage(@DestinationVariable Long roomId, GetChatMessageResponseDto message) {
     List<String> roomMemberEmails = chatService.getUserEmailsInChatroom(roomId);
     List<User> roomMembers = userService.findUserByEmailsIn(roomMemberEmails);
     List<Long> existUserIdsInRoom = chatService.findExistUserIdsInRoom(roomId, message, roomMembers);
