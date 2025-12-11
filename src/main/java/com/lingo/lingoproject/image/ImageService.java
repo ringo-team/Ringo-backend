@@ -361,8 +361,8 @@ public class ImageService {
     }
   }
 
-  private String getOriginalFilename(String ImageUrl){
-    return  ImageUrl.substring(ImageUrl.lastIndexOf("amazonaws.com/") + 1);
+  public String getOriginalFilename(String ImageUrl){
+    return  ImageUrl.substring(ImageUrl.lastIndexOf("amazonaws.com/") + 14);
   }
 
   public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto, Long snapImageId, Long userId){
