@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.Update;
 
 
 public interface MessageRepository extends MongoRepository<Message, String> {
@@ -18,6 +19,10 @@ public interface MessageRepository extends MongoRepository<Message, String> {
 
   @Query(value = "{ 'chatroomId': ?0, 'readerIds':  { $ne:  ?1 }, 'senderId':  { $ne:  ?1 } }")
   List<Message> findNotReadMessages(Long chatroomId, Long userId);
+
+  @Query(value = "{ '_id':  { $in:  ?0 } } ")
+  @Update(value = "{ '$addToSet': { 'readerIds': ?1 } } ")
+  void insertMemberIdInMessage(List<String> messageIds, Long userId);
 
   Page<Message> findAllByChatroomIdOrderByCreatedAtDesc(Long chatroomId, Pageable pageable);
 

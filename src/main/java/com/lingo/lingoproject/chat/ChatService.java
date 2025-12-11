@@ -332,16 +332,12 @@ public class ChatService {
   }
 
   /**
-   * 안읽은 메세지를 읽은 메세지로 전부 변환하는 함수
+   * 안읽은 메세지를 읽은 메세지로 전부 변환하는 함수ㅌ
    */
+  @Transactional
   public void changeNotReadToReadMessages(Long roomId, Long userId){
-    List<Message> messages = messageRepository.findNotReadMessages(roomId, userId);
-    messages.forEach( message -> {
-      List<Long> readerIds = message.getReaderIds();
-      if(!readerIds.contains(userId)){
-        readerIds.add(userId);
-      }
-    });
-    messageRepository.saveAll(messages);
+    List<String> messageIdList = messageRepository.findNotReadMessages(roomId, userId)
+        .stream().map(Message::getId).toList();
+    messageRepository.insertMemberIdInMessage(messageIdList, userId);
   }
 }
