@@ -3,6 +3,7 @@ package com.lingo.lingoproject.user;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.FriendInvitationLog;
+import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.UserAccessLog;
 import com.lingo.lingoproject.domain.Withdrawer;
@@ -20,6 +21,7 @@ import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.FriendInvitationLogRepository;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
+import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserAccessLogRepository;
 import com.lingo.lingoproject.repository.UserPointRepository;
 import com.lingo.lingoproject.repository.UserRepository;
@@ -65,6 +67,7 @@ public class UserService {
   private final FriendInvitationLogRepository friendInvitationLogRepository;
   private final UserPointRepository userPointRepository;
   private final FcmTokenRepository fcmTokenRepository;
+  private final ProfileRepository profileRepository;
 
   @Transactional
   public void deleteUser(Long userId, String reason) {
@@ -200,6 +203,13 @@ public class UserService {
         .username(user.getUsername())
         .gender(user.getGender())
         .build());
+  }
+
+  public void updateUserProfileVerification(User user){
+    Profile profile = profileRepository.findByUser(user)
+        .orElseThrow(() -> new RingoException("프로필 검증 업데이트 중 프로필을 찾을 수 없는 오류가 발생했습니다.", HttpStatus.BAD_REQUEST));
+    profile.setIsVerified(true);
+    profileRepository.save(profile);
   }
 
   /**
