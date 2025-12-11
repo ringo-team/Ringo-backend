@@ -362,7 +362,7 @@ public class ImageService {
   }
 
   private String getOriginalFilename(String ImageUrl){
-    return  ImageUrl.substring(ImageUrl.lastIndexOf("/") + 1);
+    return  ImageUrl.substring(ImageUrl.lastIndexOf("amazonaws.com/") + 1);
   }
 
   public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto, Long snapImageId, Long userId){

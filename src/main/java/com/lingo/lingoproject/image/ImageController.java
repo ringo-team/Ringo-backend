@@ -4,6 +4,7 @@ import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
+import com.lingo.lingoproject.user.UserService;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ImageController {
 
   private final ImageService imageService;
+  private final UserService userService;
 
   @Operation(
       summary = "프로필 이미지 업로드",
@@ -312,6 +314,7 @@ public class ImageController {
         log.info("userId={}, step=프로필_얼굴인증_미통과_완료, status=SUCCESS", user.getId());
         return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ResultMessageResponseDto("얼굴이 인증되지 않았습니다."));
       }
+      userService.updateUserProfileVerification(user);
       log.info("userId={}, step=프로필_얼굴인증_통과_완료, status=SUCCESS", user.getId());
       return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("얼굴이 성공적으로 인증되었습니다."));
 

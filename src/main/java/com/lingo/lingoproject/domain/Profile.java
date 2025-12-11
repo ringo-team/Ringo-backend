@@ -43,7 +43,7 @@ public class Profile extends Timestamp {
   private String description;
 
   @ColumnDefault(value = "false")
-  private Boolean isAuth;
+  private Boolean isVerified;
 
   @Enumerated(EnumType.STRING)
   private InspectStatus status;
