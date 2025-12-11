@@ -30,8 +30,6 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
 
   long countByUser(User user);
 
-  List<AnsweredSurvey> findAllByUserAndCreatedAtBetween(User user, LocalDateTime createdAtAfter, LocalDateTime createdAtBefore);
-
   List<AnsweredSurvey> findAllByUserNotInAndAnswerAndSurveyNum(Collection<User> users, Integer answer, Integer surveyNum);
 
   @Query(value = "select new com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto"
@@ -39,4 +37,6 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
       + "from Survey s join AnsweredSurvey a on s.surveyNum = a.surveyNum "
       + "where a.user.id = :userId")
   List<GetUserSurveyResponseDto> getUserSurveyResponseDto(Long userId);
+
+  List<AnsweredSurvey> findAllByUserAndCreatedAtAfter(User user, LocalDateTime createdAtAfter);
 }

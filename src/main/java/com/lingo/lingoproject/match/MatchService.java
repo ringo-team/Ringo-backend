@@ -219,10 +219,9 @@ public class MatchService {
     }
 
     // 오늘 응답한 설문 조회
-    List<AnsweredSurvey> todayAnsweredSurveys = answeredSurveyRepository.findAllByUserAndCreatedAtBetween(
+    List<AnsweredSurvey> todayAnsweredSurveys = answeredSurveyRepository.findAllByUserAndCreatedAtAfter(
         user,
-        LocalDate.now().atStartOfDay(),
-        LocalDateTime.now()
+        LocalDate.now().atStartOfDay()
     );
 
     // 만약 설문을 완료하지 않았다면 추천받을 수 없음.

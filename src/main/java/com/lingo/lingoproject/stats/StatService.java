@@ -21,7 +21,7 @@ public class StatService {
 
   public long getTodayNumberOfVisitor(){
     LocalDateTime todayDateTime = LocalDate.now().atStartOfDay();
-    return userAccessLogRepository.countByCreateAtBetween(todayDateTime, LocalDateTime.now());
+    return userAccessLogRepository.countByCreateAtAfter(todayDateTime);
   }
 
   public float getTodayMaleRatioOfVisitor(){
@@ -34,14 +34,14 @@ public class StatService {
     LocalDate startDate = LocalDate.now().minusDays(6);
     LocalDateTime startDateTime = startDate.atStartOfDay();
 
-    Map<String, Long> userAccessMap = userAccessLogRepository.findAllByCreateAtBetween(startDateTime, LocalDateTime.now())
+    Map<String, Long> userAccessMap = userAccessLogRepository.findAllByCreateAtAfter(startDateTime)
         .stream()
         .collect(Collectors.groupingBy(
             log -> log.getCreateAt().toLocalDate().toString(),
             Collectors.counting()
         ));
 
-    Map<String, Long> userSignupMap = userRepository.findAllByCreatedAtBetween(startDateTime, LocalDateTime.now())
+    Map<String, Long> userSignupMap = userRepository.findAllByCreatedAtAfter(startDateTime)
         .stream()
         .collect(Collectors.groupingBy(
             user -> user.getCreatedAt().toLocalDate().toString(),

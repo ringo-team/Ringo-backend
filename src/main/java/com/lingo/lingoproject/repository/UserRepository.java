@@ -15,9 +15,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   Optional<User> findByFriendInvitationCode(String friendInvitationCode);
 
-  List<User> findAllByCreatedAtBetween(LocalDateTime createdAtAfter, LocalDateTime createdAtBefore);
-
   List<User> findAllByIdIn(Collection<Long> ids);
 
   boolean existsByEmail(String email);
+
+  List<User> findAllByCreatedAtAfter(LocalDateTime createdAtAfter);
 }
