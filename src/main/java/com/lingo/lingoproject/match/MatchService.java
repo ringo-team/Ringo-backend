@@ -65,9 +65,9 @@ public class MatchService {
   private final FcmTokenRepository fcmTokenRepository;
   private final UserRepositoryImpl userRepositoryImpl;
 
-  private final int MAX_RECOMMEND_PROFILE_SIZE = 4;
+  private final int MAX_PROFILE_RECOMMENDATION_SIZE = 4;
   private final int MAX_NUMBER_OF_LOOP = 10;
-  private final int NUMBER_OF_DAILY_RECOMMENDATION = 4;
+  private final int MAX_DAILY_RECOMMENDATION_SIZE = 4;
   private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
 
   @Value("${ringo.config.survey.space_weight}")
@@ -82,25 +82,23 @@ public class MatchService {
   public Matching matchRequest(MatchingRequestDto dto){
 
     // 유저 검증
-    User requestedUser = userRepository.findById(dto.requestedId())
-        .orElseThrow(() -> new RingoException("매칭을 요청 받은 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
     User requestUser = userRepository.findById(dto.requestId())
         .orElseThrow(() -> new RingoException("매칭을 요청한 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    User requestedUser = userRepository.findById(dto.requestedId())
+        .orElseThrow(() -> new RingoException("매칭을 요청 받은 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
 
     // 매칭 점수 계산
     Float matchingScore = calcMatchScore(requestedUser.getId(), requestUser.getId());
+    log.info("requestUserId={}, requestedUserId={}, matchingScore={}, step=매칭요청, status=SUCCESS", requestUser.getId(), requestedUser.getId(), matchingScore);
     if(!isMatch(matchingScore)){
       return null;
     }
-
-    // 유저 알림
-    sendFcmNotification(requestedUser, "누군가 매칭을 요청했어요");
 
     // 매칭 내용 저장
     Matching matching = Matching.builder()
         .requestedUser(requestedUser)
         .requestUser(requestUser)
-        .matchingStatus(MatchingStatus.PENDING)
+        .matchingStatus(MatchingStatus.PRE_REQUESTED)
         .matchingScore(calcMatchScore(requestedUser.getId(), requestUser.getId()))
         .build();
     return matchingRepository.save(matching);
@@ -174,7 +172,8 @@ public class MatchService {
 
     // 캐시 조회
     if(redisUtils.containsRecommendUser(userId.toString())){
-      return redisUtils.getRecommendUser(userId.toString());
+      List<GetUserProfileResponseDto> responses = redisUtils.getRecommendUser(userId.toString());
+      if (responses.size() == MAX_PROFILE_RECOMMENDATION_SIZE) return responses;
     }
 
     // 유저 조회
@@ -188,10 +187,10 @@ public class MatchService {
     int whileLoopCount =  0;
     int recommendationSize = 0;
 
-    while(recommendationSize < MAX_RECOMMEND_PROFILE_SIZE && whileLoopCount < MAX_NUMBER_OF_LOOP){
+    while(recommendationSize < MAX_PROFILE_RECOMMENDATION_SIZE && whileLoopCount < MAX_NUMBER_OF_LOOP){
       List<User> randomCandidates = userRepositoryImpl.findRandomRecommendationCandidates(currentUser.getGender(), excludedUserIds);
       for(User candidateUser : randomCandidates){
-        if(recommendationSize >= MAX_RECOMMEND_PROFILE_SIZE) break;
+        if(recommendationSize >= MAX_PROFILE_RECOMMENDATION_SIZE) break;
         Float matchingScore = calcMatchScore(userId, candidateUser.getId());
         if(isMatch(matchingScore)){
           addUserProfileToCollection(recommendUserProfileSet, candidateUser);
@@ -215,7 +214,8 @@ public class MatchService {
 
     //캐시 조회
     if (redisUtils.containsRecommendUserForDailySurvey(userId.toString())){
-      return redisUtils.getRecommendUserForDailySurvey(userId.toString());
+      List<GetUserProfileResponseDto> responses = redisUtils.getRecommendUserForDailySurvey(userId.toString());
+      if (responses.size() == MAX_DAILY_RECOMMENDATION_SIZE) return responses;
     }
 
     // 오늘 응답한 설문 조회
@@ -232,7 +232,7 @@ public class MatchService {
 
     // 4개의 설문에 대해서만 추천해줌
     Random randomGenerator = new Random(System.currentTimeMillis());
-    while(todayAnsweredSurveys.size() > NUMBER_OF_DAILY_RECOMMENDATION){
+    while(todayAnsweredSurveys.size() > MAX_DAILY_RECOMMENDATION_SIZE){
       int index = randomGenerator.nextInt(todayAnsweredSurveys.size());
       todayAnsweredSurveys.remove(index);
     }
@@ -346,7 +346,10 @@ public class MatchService {
     List<Matching> matchings = matchingRepository.findAllByRequestUser(requestUser);
 
     // 매칭 id 조회
-    List<Long> matchingIds = matchings.stream().map(Matching::getId).toList();
+    List<Long> matchingIds = matchings.stream()
+        .filter(m -> m.getMatchingStatus() != MatchingStatus.PRE_REQUESTED)
+        .map(Matching::getId)
+        .toList();
 
     // 매칭 요청 받은 유저들의 정보 조회
     List<GetUserProfileResponseDto> requestedUserProfileDtoList = profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
@@ -365,17 +368,20 @@ public class MatchService {
   public List<GetUserProfileResponseDto> getUserIdWhoRequestToMe(User requestedUser){
     List<Matching> matchings = matchingRepository.findAllByRequestedUser(requestedUser);
 
-    // id, age, gender, nickname, profileUrl 조회
     List<Long> matchingIds = matchings.stream()
+        .filter(m ->
+              (m.getMatchingStatus() == MatchingStatus.PENDING) ||
+              (m.getMatchingStatus() == MatchingStatus.ACCEPTED)
+        )
         .map(Matching::getId)
         .toList();
+
     List<GetUserProfileResponseDto> requestUserProfileDtoList = profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
 
-    // hashtags 조회
-    List<User> matchingRequestUsers = matchings.stream()
-        .map(Matching::getRequestUser)
-        .toList();
+    List<User> matchingRequestUsers = matchings.stream().map(Matching::getRequestUser).toList();
+
     Map<Long, List<String>> userIdToHashtagMap = convertToMapFromHashtags(hashtagRepository.findAllByUserIn(matchingRequestUsers));
+
     requestUserProfileDtoList.forEach(profile -> profile.setHashtags(userIdToHashtagMap.get(profile.getUserId())));
 
     return requestUserProfileDtoList;
@@ -389,6 +395,7 @@ public class MatchService {
         ));
   }
 
+  @Transactional
   public void deleteMatching(Long matchingId, User user){
 
     Matching match = matchingRepository.findById(matchingId).orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
@@ -403,6 +410,7 @@ public class MatchService {
     matchingRepository.deleteById(matchingId);
   }
 
+  @Transactional
   public void saveMatchingRequestMessage(SaveMatchingRequestMessageRequestDto dto, Long matchingId, User user){
 
     Matching match = matchingRepository.findById(matchingId)
@@ -413,10 +421,13 @@ public class MatchService {
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestUserId);
       throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
     }
-
+    match.setMatchingStatus(MatchingStatus.PENDING);
     match.setMatchingRequestMessage(dto.message());
+
     matchingRepository.save(match);
 
+    // 유저 알림
+    sendFcmNotification(match.getRequestedUser(), "누군가 매칭을 요청했어요");
   }
 
   public String getMatchingRequestMessage(Long matchingId, User user){
