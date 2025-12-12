@@ -8,6 +8,8 @@ import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
+import com.lingo.lingoproject.domain.FailedFcmMessageLog;
+import com.lingo.lingoproject.domain.FcmToken;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
@@ -23,24 +25,23 @@ import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.BlockedFriendRepository;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.DormantAccountRepository;
+import com.lingo.lingoproject.repository.FailedFcmMessageLogRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.repository.impl.UserRepositoryImpl;
+import com.lingo.lingoproject.retry.RedisRetryQueueService;
 import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,6 +70,8 @@ public class MatchService {
   private final int MAX_NUMBER_OF_LOOP = 10;
   private final int MAX_DAILY_RECOMMENDATION_SIZE = 4;
   private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
+  private final FailedFcmMessageLogRepository failedFcmMessageLogRepository;
+  private final RedisRetryQueueService redisRetryQueueService;
 
   @Value("${ringo.config.survey.space_weight}")
   private float SURVEY_SPACE_WEIGHT;
@@ -149,22 +152,33 @@ public class MatchService {
   }
 
   private void sendFcmNotification(User requestUser, String title) {
-    fcmTokenRepository.findByUser(requestUser).ifPresent(token -> {
-      Message message = Message.builder()
-          .setNotification(
-              Notification.builder()
-                  .setTitle(title)
-                  .setImage("ImageUrl")
-                  .build()
-          )
+    FcmToken token = fcmTokenRepository.findByUser(requestUser)
+        .orElseThrow(() -> new RingoException("fcm 토큰을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    Message message = Message.builder()
+        .setToken(token.getToken())
+        .setNotification(
+            Notification.builder()
+                .setTitle(title)
+                .setImage("ImageUrl")
+                .build()
+        )
+        .build();
+    try {
+      FirebaseMessaging.getInstance().send(message);
+    }catch (Exception e){
+      log.error("step=FCM_알림_전송_실패, requestUserId={}, title={}, status=FAILED", requestUser.getId(), title, e);
+      FailedFcmMessageLog log = FailedFcmMessageLog.builder()
+          .token(token.getToken())
+          .errorMessage(e.getMessage())
+          .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
+          .message(null)
+          .title(title)
+          .retryCount(0)
           .build();
-      try {
-        FirebaseMessaging.getInstance().send(message);
-      }catch (Exception e){
-        log.error("step=FCM_알림_전송_실패, requestUserId={}, title={}, status=FAILED", requestUser.getId(), title, e);
-        throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
-      }
-    });
+      failedFcmMessageLogRepository.save(log);
+      redisRetryQueueService.pushToQueue(log);
+      throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Transactional

@@ -14,7 +14,8 @@ import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.ChatroomParticipant;
 import com.lingo.lingoproject.domain.ExceptionMessage;
-import com.lingo.lingoproject.domain.FailedMessageLog;
+import com.lingo.lingoproject.domain.FailedChatMessageLog;
+import com.lingo.lingoproject.domain.FailedFcmMessageLog;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Message;
 import com.lingo.lingoproject.domain.Profile;
@@ -26,12 +27,14 @@ import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.ChatroomRepository;
 import com.lingo.lingoproject.mongo_repository.MessageRepository;
 import com.lingo.lingoproject.repository.ExceptionMessageRepository;
-import com.lingo.lingoproject.repository.FailedMessageLogRepository;
+import com.lingo.lingoproject.repository.FailedChatMessageLogRepository;
+import com.lingo.lingoproject.repository.FailedFcmMessageLogRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
+import com.lingo.lingoproject.retry.RedisRetryQueueService;
 import com.lingo.lingoproject.utils.GenericUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
@@ -62,11 +65,13 @@ public class ChatService {
   private final GenericUtils genericUtils;
   private final MatchingRepository matchingRepository;
   private final RedisTemplate<String, Object> redisTemplate;
-  private final FailedMessageLogRepository failedMessageLogRepository;
+  private final FailedFcmMessageLogRepository failedFcmMessageLogRepository;
   private final FcmTokenRepository fcmTokenRepository;
   private final ExceptionMessageRepository exceptionMessageRepository;
   private final ProfileRepository profileRepository;
   private final HashtagRepository hashtagRepository;
+  private final FailedChatMessageLogRepository failedChatMessageLogRepository;
+  private final RedisRetryQueueService redisRetryQueueService;
 
   public GetChatResponseDto getChatMessages(User user, Long chatroomId, int page, int size){
     // 페이지네이션
@@ -137,7 +142,7 @@ public class ChatService {
   public void savedSimpMessagingError(Long roomId, Message savedMessage, String userEmail, Exception e, String destination) {
     log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail,
         e);
-    FailedMessageLog failedMessageLog = FailedMessageLog.builder()
+    FailedChatMessageLog failedFcmMessageLog = FailedChatMessageLog.builder()
         .roomId(roomId)
         .errorMessage(e.getMessage())
         .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
@@ -145,7 +150,7 @@ public class ChatService {
         .destination(destination + roomId)
         .userEmail(userEmail)
         .build();
-    failedMessageLogRepository.save(failedMessageLog);
+    failedChatMessageLogRepository.save(failedFcmMessageLog);
   }
 
   // 채팅방에 존재하지 않는 사람들은 fcm으로 알림을 보낸다.
@@ -186,7 +191,7 @@ public class ChatService {
         BatchResponse response = FirebaseMessaging.getInstance()
             .sendEachForMulticast(multicastMessage);
         if (response.getFailureCount() > 0) {
-          saveNotificationSendingError(response, roomId, savedMessage);
+          saveNotificationSendingError(response, fcmTokens, savedMessage);
         }
       } catch (Exception e) {
       log.error("chatroomId={}, step=FCM_SEND_ERROR, status=FAILED", roomId, e);
@@ -194,28 +199,32 @@ public class ChatService {
     }
   }
 
-  public void saveNotificationSendingError(BatchResponse response, Long roomId,
+  public void saveNotificationSendingError(
+      BatchResponse response,
+      List<String> fcmTokens,
       Message savedMessage) {
     // 이미지가 전송되지 않으면 몇개의 이미지가 전송되지 않았는지 데이터베이스에 저장
     List<SendResponse> responses = response.getResponses();
-    List<FailedMessageLog> errorLogList = new ArrayList<>();
-    for (SendResponse sendResponse : responses) {
-      if (!sendResponse.isSuccessful()) {
+    List<FailedFcmMessageLog> errorLogList = new ArrayList<>();
+    for (int i = 0; i < responses.size(); i++) {
+      if (!responses.get(i).isSuccessful()) {
         // 보내지지 않은 메세지의 세부 정보를 로깅하기
-        FirebaseMessagingException exception = sendResponse.getException();
-        log.error("chatroomId={}, step=CHAT_FCM_MULTICAST, status=FAILED", roomId);
-        FailedMessageLog log = FailedMessageLog.builder()
-            .roomId(roomId)
+        FirebaseMessagingException exception = responses.get(i).getException();
+        log.error("step=CHAT_FCM_MULTICAST, status=FAILED");
+        FailedFcmMessageLog log = FailedFcmMessageLog.builder()
+            .token(fcmTokens.get(i))
             .errorMessage(exception.getMessage())
             .errorCause(exception.getCause() != null ? exception.getCause().getMessage() : null)
-            .messageId(savedMessage.getId())
-            .destination("fcm")
+            .message(savedMessage.getContent())
+            .title("메세지가 도착했습니다.")
+            .retryCount(0)
             .build();
         errorLogList.add(log);
+        redisRetryQueueService.pushToQueue(log);
       }
-      failedMessageLogRepository.saveAll(errorLogList);
+      failedFcmMessageLogRepository.saveAll(errorLogList);
       ExceptionMessage exceptionMessage = new ExceptionMessage(
-          roomId + "에 " + errorLogList.size() + "개의 메세지가 보내지지 않았습니다.");
+           errorLogList.size() + "개의 fcm 메세지가 보내지지 않았습니다.");
       exceptionMessageRepository.save(exceptionMessage);
     }
   }
