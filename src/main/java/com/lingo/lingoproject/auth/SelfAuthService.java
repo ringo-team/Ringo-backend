@@ -21,6 +21,7 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
 import javax.crypto.BadPaddingException;
@@ -33,28 +34,25 @@ import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SelfAuthService {
 
-  private final RestTemplate restTemplate;
   private final ObjectMapper objectMapper;
   private final UserRepository userRepository;
   private final RedisUtils redisUtils;
+  private final WebClient selfAuthWebClient;
 
-  @Value("${self-auth.url}")
-  private String apiUrl;
 
   @Value("${self-auth.client_id}")
   private String clientId;
@@ -69,17 +67,12 @@ public class SelfAuthService {
   private String productId;
 
   public String getAccessToken(){
-    apiUrl += "/digital/niceid/oauth/oauth/token";
+    String apiUri = "/digital/niceid/oauth/oauth/token";
     String auth = "Basic " + Base64.getEncoder().encodeToString((clientId+":"+clientSecret).getBytes());
-
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-    headers.add("Authorization", auth);
 
     MultiValueMap<String, Object> params = new LinkedMultiValueMap<>();
     params.add("grant_type", "client_credentials");
     params.add("scope", "default");
-    HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(params, headers);
 
     /*
      *  Authorization : Basic + Base64(clientId:clientSecret)
@@ -87,19 +80,27 @@ public class SelfAuthService {
      */
     GetAccessTokenResponseDto response = null;
     try{
-      response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, GetAccessTokenResponseDto.class).getBody();
+      response = selfAuthWebClient
+          .post()
+          .uri(apiUri)
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .header(HttpHeaders.AUTHORIZATION, auth)
+          .body(BodyInserters.fromValue(params))
+          .retrieve()
+          .bodyToMono(GetAccessTokenResponseDto.class)
+          .timeout(Duration.ofSeconds(5))
+          .block();
     } catch (Exception e) {
-      log.error("POST : " + apiUrl + ":: 요청을 보내는데 실패하였습니다.");
-      log.error("request_body : {}", request.getBody());
+      log.error("POST : " + apiUri + ":: 요청을 보내는데 실패하였습니다.");
       log.error("액세스 토큰 조회 중 예외 발생", e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if (response == null) {
-      log.error("POST : {} :: 응답값이 null입니다.", apiUrl);
+      log.error("POST : {} :: 응답값이 null입니다.", apiUri);
       throw new RingoException("본인인증 api response의 값이 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     else if(!response.getDataHeader().resultCd().equals("1200")){
-      log.error("POST : " + apiUrl + ":: response:result_cd : " +  response.getDataHeader().resultCd());
+      log.error("POST : " + apiUri + ":: response:result_cd : " +  response.getDataHeader().resultCd());
       throw new RingoException("본인인증 api의 응답값에서 정상 토큰을 얻지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -110,15 +111,10 @@ public class SelfAuthService {
    * access token으로 메세지를 암호화 및 복호화하는데 필요한 토큰을 얻는다.
    */
   public CryptoTokenInfo getCryptoTokenInfo(String accessToken) throws NoSuchAlgorithmException {
-    apiUrl += "digital/niceid/api/v1.0/common/crypto/token";
+    String apiUri = "digital/niceid/api/v1.0/common/crypto/token";
 
     long timestamp = System.currentTimeMillis()/1000;
     String auth = "bearer " + Base64.getEncoder().encodeToString((accessToken +":" + timestamp + ":" + clientId).getBytes());
-
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-    headers.add("Authorization", auth);
-    headers.add("ProductId", productId);
 
     String createCryptoTokenInfoRequestTransactionId = UUID.randomUUID().toString();
 
@@ -139,7 +135,7 @@ public class SelfAuthService {
      *    }
      *  }
      */
-    GetCryptoTokenRequestDto requestDto = GetCryptoTokenRequestDto
+    GetCryptoTokenRequestDto request = GetCryptoTokenRequestDto
         .builder()
         .dataHeader(
             GetCryptoTokenRequestDto.DataHeader
@@ -156,18 +152,27 @@ public class SelfAuthService {
                 .build()
         )
         .build();
-    HttpEntity<GetCryptoTokenRequestDto> request = new HttpEntity<>(requestDto, headers);
 
     /*
      *  암호화 토큰 요청
      */
     GetCryptoTokenResponseDto response = null;
     try{
-      log.info("POST : " + apiUrl + "암호화 토큰 생성 정보 요청을 진행합니다.");
-      response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, GetCryptoTokenResponseDto.class).getBody();
+      log.info("POST : " + apiUri + "암호화 토큰 생성 정보 요청을 진행합니다.");
+      response = selfAuthWebClient
+          .post()
+          .uri(apiUri)
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .header(HttpHeaders.AUTHORIZATION, auth)
+          .header("ProductId", productId)
+          .bodyValue(request)
+          .retrieve()
+          .bodyToMono(GetCryptoTokenResponseDto.class)
+          .timeout(Duration.ofSeconds(5))
+          .block();
+
     }catch (Exception e){
-      log.error("POST : " + apiUrl + ":: 요청을 보내는데 실패하였습니다.");
-      log.error("request_body : {}", request.getBody());
+      log.error("POST : " + apiUri + ":: 요청을 보내는데 실패하였습니다.");
       log.error("암호화 토큰 정보 요청 중 예외 발생", e);
       throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -177,7 +182,7 @@ public class SelfAuthService {
         || response.getDataBody().responseMsg().startsWith("EAPI")
         || !response.getDataBody().resultCd().equals("0000")
     ){
-      log.error("POST : " + apiUrl + ":: response:result_cd : " +  response.getDataHeader().resultCd());
+      log.error("POST : " + apiUri + ":: response:result_cd : " +  response.getDataHeader().resultCd());
       throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
     /*
