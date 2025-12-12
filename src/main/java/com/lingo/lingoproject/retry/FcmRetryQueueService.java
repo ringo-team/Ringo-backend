@@ -3,58 +3,40 @@ package com.lingo.lingoproject.retry;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
+import com.lingo.lingoproject.discord.DiscordService;
 import com.lingo.lingoproject.domain.DeadLetterFcmMessage;
 import com.lingo.lingoproject.domain.FailedFcmMessageLog;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.DeadLetterFcmMessageRepository;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
-public class RedisRetryQueueService {
+public class FcmRetryQueueService extends RedisQueueService{
 
-  private static final String key = "fcm::retry-queue";
-  private final RedisTemplate<String, Object> redisTemplate;
-  private final DeadLetterFcmMessageRepository deadLetterFcmMessageRepository;
 
-  public void pushToQueue(FailedFcmMessageLog failedFcmMessageLog){
-    redisTemplate.opsForList().leftPush(key, failedFcmMessageLog);
-  }
+  private final DiscordService discordService;
 
-  public Optional<FailedFcmMessageLog> pollFromQueue(){
-    try{
-      FailedFcmMessageLog log = (FailedFcmMessageLog) redisTemplate.opsForList().rightPop(key);
-      if (log == null){
-        return Optional.empty();
-      }
-      return Optional.of(log);
-    }catch (Exception e){
-      throw new RingoException("fcm 오류 메세지를 cast하는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  public boolean isEmpty(){
-    Long size = redisTemplate.opsForList().size(key);
-    if (size == null){
-      return false;
-    }
-    return size == 0;
+  public FcmRetryQueueService(
+      RedisTemplate<String, Object> redisTemplate,
+      DeadLetterFcmMessageRepository deadLetterFcmMessageRepository, DiscordService discordService){
+    super(redisTemplate, deadLetterFcmMessageRepository);
+    this.discordService = discordService;
   }
 
   @Scheduled(fixedDelay = 60000)
   public void processRetry(){
-    while(!this.isEmpty()){
-      Optional<FailedFcmMessageLog> retryEntity = this.pollFromQueue();
+    while(!super.isEmpty("FCM")){
+      Optional<?> retryEntity = super.pollFromQueue("FCM");
       if (retryEntity.isEmpty()){
         break;
       }
-      FailedFcmMessageLog log = retryEntity.get();
+      FailedFcmMessageLog log = null;
       try{
+        log = (FailedFcmMessageLog) retryEntity.get();
         Message message = Message.builder()
             .setToken(log.getToken())
             .setNotification(
@@ -68,11 +50,12 @@ public class RedisRetryQueueService {
       }catch (Exception e){
         if (log.getRetryCount() >= 3){
           DeadLetterFcmMessage letter = DeadLetterFcmMessage.from(log);
-          deadLetterFcmMessageRepository.save(letter);
+          super.deadLetterFcmMessageRepository.save(letter);
+          discordService.sendMessageToDiscordChannel("webhook", "데드레터 큐에 fcm 엔티티가 쌓였습니다.");
           throw new RingoException("데드레터큐에 fcm 엔티티가 쌓였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
         log.setRetryCount(log.getRetryCount() + 1);
-        pushToQueue(log);
+        pushToQueue("FCM", log);
       }
     }
   }

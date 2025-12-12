@@ -18,6 +18,9 @@ public class WebConfig {
   @Value("${self-auth.url}")
   private String apiUrl;
 
+  @Value("${discord.webhook.alert.url}")
+  private String discordWebhookAlertUrl;
+
   @Bean
   public RestTemplate restTemplate(RestTemplateBuilder builder) {
     return builder.connectTimeout(Duration.ofSeconds(5))
@@ -29,6 +32,12 @@ public class WebConfig {
   public WebClient selfAuthWebClient(WebClient.Builder builder) {
     return builder
         .baseUrl(apiUrl)
+        .build();
+  }
+
+  @Bean WebClient discordWebClient(WebClient.Builder builder) {
+    return builder
+        .baseUrl(discordWebhookAlertUrl)
         .build();
   }
 

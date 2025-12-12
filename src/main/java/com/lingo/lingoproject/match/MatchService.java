@@ -32,7 +32,7 @@ import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.repository.impl.UserRepositoryImpl;
-import com.lingo.lingoproject.retry.RedisRetryQueueService;
+import com.lingo.lingoproject.retry.FcmRetryQueueService;
 import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
@@ -71,7 +71,7 @@ public class MatchService {
   private final int MAX_DAILY_RECOMMENDATION_SIZE = 4;
   private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
   private final FailedFcmMessageLogRepository failedFcmMessageLogRepository;
-  private final RedisRetryQueueService redisRetryQueueService;
+  private final FcmRetryQueueService fcmRetryQueueService;
 
   @Value("${ringo.config.survey.space_weight}")
   private float SURVEY_SPACE_WEIGHT;
@@ -176,7 +176,7 @@ public class MatchService {
           .retryCount(0)
           .build();
       failedFcmMessageLogRepository.save(log);
-      redisRetryQueueService.pushToQueue(log);
+      fcmRetryQueueService.pushToQueue("FCM", log);
       throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

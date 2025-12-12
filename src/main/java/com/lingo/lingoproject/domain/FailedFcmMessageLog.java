@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.domain;
 
+import com.lingo.lingoproject.retry.RedisQueueMessagePayLoad;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -13,18 +14,19 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @Getter
 @Setter
-@Builder
-@AllArgsConstructor
+@SuperBuilder
 @NoArgsConstructor
 @Table(name = "FAILED_MESSAGE_LOG")
 @EntityListeners(AuditingEntityListener.class)
-public class FailedFcmMessageLog {
+public class FailedFcmMessageLog extends RedisQueueMessagePayLoad {
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -32,9 +34,7 @@ public class FailedFcmMessageLog {
   private String token;
   private String errorMessage;
   private String errorCause;
-  private String message;
   private String userEmail;
-  private Integer retryCount;
   private String title;
 
   @CreationTimestamp

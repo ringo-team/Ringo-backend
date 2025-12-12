@@ -34,7 +34,7 @@ import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
-import com.lingo.lingoproject.retry.RedisRetryQueueService;
+import com.lingo.lingoproject.retry.FcmRetryQueueService;
 import com.lingo.lingoproject.utils.GenericUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
@@ -71,7 +71,7 @@ public class ChatService {
   private final ProfileRepository profileRepository;
   private final HashtagRepository hashtagRepository;
   private final FailedChatMessageLogRepository failedChatMessageLogRepository;
-  private final RedisRetryQueueService redisRetryQueueService;
+  private final FcmRetryQueueService fcmRetryQueueService;
 
   public GetChatResponseDto getChatMessages(User user, Long chatroomId, int page, int size){
     // 페이지네이션
@@ -220,7 +220,7 @@ public class ChatService {
             .retryCount(0)
             .build();
         errorLogList.add(log);
-        redisRetryQueueService.pushToQueue(log);
+        fcmRetryQueueService.pushToQueue("FCM", log);
       }
       failedFcmMessageLogRepository.saveAll(errorLogList);
       ExceptionMessage exceptionMessage = new ExceptionMessage(
