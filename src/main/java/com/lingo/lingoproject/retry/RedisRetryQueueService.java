@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 public class RedisRetryQueueService {
 
   private static final String key = "fcm::retry-queue";
-  private final RedisTemplate<Object, Object> redisTemplate;
+  private final RedisTemplate<String, Object> redisTemplate;
   private final DeadLetterFcmMessageRepository deadLetterFcmMessageRepository;
 
   public void pushToQueue(FailedFcmMessageLog failedFcmMessageLog){
