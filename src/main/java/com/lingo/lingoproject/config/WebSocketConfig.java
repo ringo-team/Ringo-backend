@@ -18,16 +18,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
   @Override
   public void configureMessageBroker(MessageBrokerRegistry config){
-//    /*
-//     * 해당 경로(/topic/{roomId})로
-//     * 토픽을 구독하는 클라이언트에게
-//     * 메세지 전달
-//     */
-//    config.enableSimpleBroker("/broker");
 
     /*
      *  메세지를 받을 경로 (메세지의 목적지)
-     *  /app/message-room-id/~
+     *  /app/{roomId}
+     *
+     *  웹소켓 구독 경로
+     *  /user/queue/topic/{roomId}
      */
     config.setApplicationDestinationPrefixes("/app");
 

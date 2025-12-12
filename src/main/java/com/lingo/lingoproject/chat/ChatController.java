@@ -74,10 +74,6 @@ public class ChatController {
     }
 
     try {
-      // 유저 채팅방 레디스에 저장
-      log.info("userId={}, chatroomId={}, step=채팅방_입장, status=SUCCESS", user.getId(), roomId);
-      ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-      ops.set("connect::" + user.getId() + "::" + roomId, true);
 
       // 불러온 메세지들 중에 안 읽은 메세지를 읽음 처리한다.
       log.info("userId={}, chatroomId={}, step=메세지_읽음_처리_시작, status=SUCCESS", user.getId(), roomId);
@@ -140,6 +136,7 @@ public class ChatController {
       log.info("userId={}, step=채팅방_조회_시작, status=SUCCESS", user.getId());
       List<GetChatroomResponseDto> dtos = chatService.getAllChatroomByUserId(user);
       log.info("userId={}, step=채팅방_조회_완료, status=SUCCESS", user.getId());
+
       return ResponseEntity.status(HttpStatus.OK).body(dtos);
 
     } catch (Exception e){
@@ -217,41 +214,6 @@ public class ChatController {
 
     // 방에 없는 유저에게 fcm 메세지 전달
     chatService.sendMessageNotification(roomMembers, existUserIdsInRoom, roomId, savedMessage);
-  }
-
-  /**
-   *  레디스의 접속 정보를 삭제한다.
-   * @param roomId
-   */
-  @Operation(
-      summary = "채팅방 나가기",
-      description = "유저가 채팅방을 나갈 때 호출하는 api"
-  )
-  @PatchMapping("/chatrooms/{roomId}/leave")
-  public ResponseEntity<ResultMessageResponseDto> disconnect(
-      @Parameter(description = "채팅방 id", example = "5")
-      @PathVariable(value = "roomId") Long roomId,
-
-      @AuthenticationPrincipal User user
-  ){
-    try {
-
-      // 유저가 채팅방을 나가면 레디스에 저장했던 접속 정보를 삭제한다.
-      // Delete connect::userId::roomId
-      ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-      ops.getAndDelete("connect::" + user.getId() + "::" + roomId);
-      log.info("userId={}, chatroomId={}, step=채팅방_나가기 ,status=SUCCESS", user.getId(), roomId);
-
-      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("유저가 채팅방을 나갔습니다."));
-
-    }catch (Exception e){
-      log.error("userId={}, chatroomId={}, step=채팅방_나가기_실패 ,status=FAILED", user.getId(), roomId);
-      if (e instanceof RingoException re){
-        throw re;
-      }
-      throw new RingoException("채팅방을 나가기 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
   }
 
 }
