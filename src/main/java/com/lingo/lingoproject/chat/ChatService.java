@@ -194,7 +194,24 @@ public class ChatService {
           saveNotificationSendingError(response, fcmTokens, savedMessage);
         }
       } catch (Exception e) {
-      log.error("chatroomId={}, step=FCM_SEND_ERROR, status=FAILED", roomId, e);
+        log.error("chatroomId={}, step=FCM_SEND_ERROR, status=FAILED", roomId, e);
+        List<FailedFcmMessageLog> errorLogList = new ArrayList<>();
+        for (String fcmToken : fcmTokens) {
+          FailedFcmMessageLog log = FailedFcmMessageLog.builder()
+              .title("메세지가 도착했습니다.")
+              .errorMessage(e.getMessage())
+              .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
+              .message(savedMessage.getContent())
+              .token(fcmToken)
+              .retryCount(0)
+              .build();
+          errorLogList.add(log);
+          fcmRetryQueueService.pushToQueue("FCM", log);
+        }
+        failedFcmMessageLogRepository.saveAll(errorLogList);
+        ExceptionMessage exceptionMessage = new ExceptionMessage(
+            errorLogList.size() + "개의 fcm 메세지가 보내지지 않았습니다.");
+        exceptionMessageRepository.save(exceptionMessage);
       }
     }
   }
@@ -220,6 +237,7 @@ public class ChatService {
             .retryCount(0)
             .build();
         errorLogList.add(log);
+        // 재전송 로직
         fcmRetryQueueService.pushToQueue("FCM", log);
       }
       failedFcmMessageLogRepository.saveAll(errorLogList);
@@ -372,7 +390,7 @@ public class ChatService {
   }
 
   /**
-   * 안읽은 메세지를 읽은 메세지로 전부 변환하는 함수ㅌ
+   * 안읽은 메세지를 읽은 메세지로 전부 변환하는 함수
    */
   @Transactional
   public void changeNotReadToReadMessages(Long roomId, Long userId){
