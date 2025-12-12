@@ -41,7 +41,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatController {
 
   private final ChatService chatService;
-  private final RedisTemplate<String, Object> redisTemplate;
   private final SimpMessagingTemplate simpMessagingTemplate;
   private final UserService userService;
 
