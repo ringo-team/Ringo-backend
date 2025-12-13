@@ -4,6 +4,7 @@ package com.lingo.lingoproject.security.controller;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.security.controller.dto.LoginInfoDto;
+import com.lingo.lingoproject.security.controller.dto.SignupResponseDto;
 import com.lingo.lingoproject.security.controller.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.security.dto.RegenerateTokenResponseDto;
@@ -104,12 +105,12 @@ public class LoginController {
 
   @PostMapping("/signup")
   @Operation(summary = "회원 가입", description = "회원 가입에 필요한 정보로 계정을 생성합니다.")
-  public ResponseEntity<ResultMessageResponseDto> signup(@Valid @RequestBody LoginInfoDto dto) {
+  public ResponseEntity<SignupResponseDto> signup(@Valid @RequestBody LoginInfoDto dto) {
     try {
       log.info("step=회원가입_시작, status=SUCCESS");
-      loginService.signup(dto);
+      User user = loginService.signup(dto);
       log.info("step=회원가입_완료, status=SUCCESS");
-      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto("회원가입이 완료되었습니다."));
+      return ResponseEntity.status(HttpStatus.OK).body(new SignupResponseDto(user.getId(), "회원가입이 완료되었습니다."));
     } catch (Exception e) {
       log.error("step=회원가입_실패, status=FAILED", e);
       if (e instanceof RingoException re){

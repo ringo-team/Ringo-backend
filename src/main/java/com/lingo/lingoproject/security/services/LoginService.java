@@ -9,6 +9,7 @@ import com.lingo.lingoproject.domain.UserPoint;
 import com.lingo.lingoproject.domain.enums.Drinking;
 import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
+import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.domain.enums.Smoking;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
@@ -110,7 +111,7 @@ public class LoginService {
     return new  RegenerateTokenResponseDto(user.getId(), accessToken, refresh);
   }
 
-  public void signup(LoginInfoDto dto){
+  public User signup(LoginInfoDto dto){
     if(!dto.email().matches("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]+$")){
       throw new RingoException("적절하지 않은 입력값입니다.", HttpStatus.NOT_ACCEPTABLE);
     }
@@ -124,8 +125,9 @@ public class LoginService {
         .email(dto.email())
         .password(passwordEncoder.encode(dto.password()))
         .role(Role.USER)
+        .status(SignupStatus.BEFORE)
         .build();
-    userRepository.save(user);
+    return  userRepository.save(user);
   }
 
   public boolean verifyDuplicatedLoginId(String email){
