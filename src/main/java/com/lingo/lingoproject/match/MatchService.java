@@ -16,6 +16,7 @@ import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
@@ -86,9 +87,11 @@ public class MatchService {
 
     // 유저 검증
     User requestUser = userRepository.findById(dto.requestId())
-        .orElseThrow(() -> new RingoException("매칭을 요청한 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException(
+            "매칭을 요청한 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
     User requestedUser = userRepository.findById(dto.requestedId())
-        .orElseThrow(() -> new RingoException("매칭을 요청 받은 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException(
+            "매칭을 요청 받은 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     // 매칭 점수 계산
     Float matchingScore = calcMatchScore(requestedUser.getId(), requestUser.getId());
@@ -110,24 +113,22 @@ public class MatchService {
   /**
    * 연결 수락시 채팅방 생성 및 status를 ACCEPTED로 변경
    * 거절시 status만 REJECTED로 변경
-   * @param decision
-   * @param matchingId
    */
   public void responseToRequest(String decision, Long matchingId, User user) {
 
     Matching matching = matchingRepository.findById(matchingId)
-        .orElseThrow(() -> new RingoException("적절하지 않은 매칭 id 입니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("적절하지 않은 매칭 id 입니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     Long requestedUserId = matching.getRequestedUser().getId();
     if (!requestedUserId.equals(user.getId())) {
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestedUserId);
-      throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
     switch (decision) {
       case "ACCEPTED" -> handleAcceptedMatching(matching);
       case "REJECTED" -> matching.setMatchingStatus(MatchingStatus.REJECTED);
-      default -> throw new RingoException("decision 값이 적절하지 않습니다.", HttpStatus.BAD_REQUEST);
+      default -> throw new RingoException("decision 값이 적절하지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
 
     matchingRepository.save(matching);
@@ -153,7 +154,7 @@ public class MatchService {
 
   private void sendFcmNotification(User requestUser, String title) {
     FcmToken token = fcmTokenRepository.findByUser(requestUser)
-        .orElseThrow(() -> new RingoException("fcm 토큰을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("fcm 토큰을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
     Message message = Message.builder()
         .setToken(token.getToken())
         .setNotification(
@@ -177,12 +178,14 @@ public class MatchService {
           .build();
       failedFcmMessageLogRepository.save(log);
       fcmRetryQueueService.pushToQueue("FCM", log);
-      throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Transactional
-  public List<GetUserProfileResponseDto> recommend(Long userId){
+  public List<GetUserProfileResponseDto> recommend(User user){
+
+    Long userId = user.getId();
 
     // 캐시 조회
     if(redisUtils.containsRecommendUser(userId.toString())){
@@ -190,19 +193,15 @@ public class MatchService {
       if (responses.size() == MAX_PROFILE_RECOMMENDATION_SIZE) return responses;
     }
 
-    // 유저 조회
-    User currentUser = userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-
     Set<GetUserProfileResponseDto> recommendUserProfileSet = new HashSet<>();
 
-    List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(currentUser.getId());
+    List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(user.getId());
 
     int whileLoopCount =  0;
     int recommendationSize = 0;
 
     while(recommendationSize < MAX_PROFILE_RECOMMENDATION_SIZE && whileLoopCount < MAX_NUMBER_OF_LOOP){
-      List<User> randomCandidates = userRepositoryImpl.findRandomRecommendationCandidates(currentUser.getGender(), excludedUserIds);
+      List<User> randomCandidates = userRepositoryImpl.findRandomRecommendationCandidates(user.getGender(), excludedUserIds);
       for(User candidateUser : randomCandidates){
         if(recommendationSize >= MAX_PROFILE_RECOMMENDATION_SIZE) break;
         Float matchingScore = calcMatchScore(userId, candidateUser.getId());
@@ -259,6 +258,7 @@ public class MatchService {
           todayAnsweredSurvey.getAnswer(),
           todayAnsweredSurvey.getSurveyNum()
       );
+      if (matchingAnsweredSurveyList.isEmpty()){ continue; }
       int randomIndex = randomGenerator.nextInt(matchingAnsweredSurveyList.size());
       AnsweredSurvey matchingAnsweredSurvey = matchingAnsweredSurveyList.get(randomIndex);
       User recommendedUser = matchingAnsweredSurvey.getUser();
@@ -272,7 +272,7 @@ public class MatchService {
 
   public void addUserProfileToCollection(Collection<GetUserProfileResponseDto> collection, User user){
     Profile profile = profileRepository.findByUser(user)
-        .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
+        .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
     List<String> hashtags = hashtagRepository.findAllByUser(user)
         .stream()
         .map(Hashtag::getHashtag)
@@ -392,8 +392,8 @@ public class MatchService {
 
   private void setHashtagInProfileDtoList(List<GetUserProfileResponseDto> profiles){
     profiles.forEach(profile -> {
-      User user = userRepository.findById(profile.getUserId())
-          .orElseThrow(() -> new RingoException("프로필에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+      User user = userRepository.findById(profile.getUserId()).orElse(null);
+      if (user == null) return;
       List<String> hashtags = hashtagRepository.findAllByUser(user)
           .stream()
           .map(Hashtag::getHashtag)
@@ -405,13 +405,14 @@ public class MatchService {
   @Transactional
   public void deleteMatching(Long matchingId, User user){
 
-    Matching match = matchingRepository.findById(matchingId).orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    Matching match = matchingRepository.findById(matchingId)
+        .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     Long requestedUserId = match.getRequestedUser().getId();
     Long requestUserId = match.getRequestUser().getId();
     if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))){
       log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
-      throw new RingoException("매칭을 삭제할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("매칭을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
 
     matchingRepository.deleteById(matchingId);
@@ -421,12 +422,12 @@ public class MatchService {
   public void saveMatchingRequestMessage(SaveMatchingRequestMessageRequestDto dto, Long matchingId, User user){
 
     Matching match = matchingRepository.findById(matchingId)
-        .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     Long requestUserId = match.getRequestUser().getId();
     if (!requestUserId.equals(user.getId())){
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestUserId);
-      throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
     match.setMatchingStatus(MatchingStatus.PENDING);
     match.setMatchingRequestMessage(dto.message());
@@ -440,13 +441,13 @@ public class MatchService {
   public String getMatchingRequestMessage(Long matchingId, User user){
 
     Matching match = matchingRepository.findById(matchingId)
-        .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     Long requestedUserId = match.getRequestedUser().getId();
     Long requestUserId = match.getRequestUser().getId();
     if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))){
       log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
-      throw new RingoException("해당 매칭의 요청 메세지를 확인할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("해당 매칭의 요청 메세지를 확인할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
 
     return match.getMatchingRequestMessage();

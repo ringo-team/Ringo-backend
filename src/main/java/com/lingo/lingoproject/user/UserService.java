@@ -10,6 +10,7 @@ import com.lingo.lingoproject.domain.Withdrawer;
 import com.lingo.lingoproject.domain.enums.Drinking;
 import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Smoking;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.ImageService;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
@@ -70,17 +71,15 @@ public class UserService {
   private final ProfileRepository profileRepository;
 
   @Transactional
-  public void deleteUser(Long userId, String reason) {
-
-    User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("User not found", HttpStatus.BAD_REQUEST));
-    withdrawerRepository.save(Withdrawer
-        .builder()
-        .joinPeriod(ChronoUnit.DAYS.between(user.getCreatedAt(), LocalDate.now()))
-        .reason(reason)
-        .build());
+  public void deleteUser(User user, String reason) {
 
     try {
+      withdrawerRepository.save(Withdrawer
+          .builder()
+          .joinPeriod(ChronoUnit.DAYS.between(user.getCreatedAt(), LocalDate.now()))
+          .reason(reason)
+          .build());
+
       answeredSurveyRepository.deleteAllByUser(user);
       blockedFriendRepository.deleteByUser(user);
       dormantAccountRepository.deleteByUser(user);
@@ -92,42 +91,44 @@ public class UserService {
       chatroomParticipantRepository.disconnectChatroomParticipantWithUser(user);
       userPointRepository.deleteAllByUser(user);
       jwtRefreshTokenRepository.deleteByUser(user);
-      userRepository.deleteById(userId);
+      userRepository.delete(user);
     } catch (Exception e) {
-      log.error("유저 데이터 삭제 실패. userId: {}, reason: {}", userId, reason, e);
+      log.error("유저 데이터 삭제 실패. userId: {}, reason: {}", user.getId(), reason, e);
       throw new RingoException("유저 정보를 삭제하는데 실패하였습니다." + e.getMessage(),
-          HttpStatus.INTERNAL_SERVER_ERROR);
+          ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  public String findUserEmail(Long userId) {
+  public String findUserEmail(User user) {
+    Long userId = user.getId();
     boolean isAuthenticated = redisUtils.isCompleteSelfAuth(userId.toString());
     if (isAuthenticated) {
-      User user = userRepository.findById(userId)
-          .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
       return user.getUsername();
     } else {
-      throw new RingoException("인증되지 않았습니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("아이디를 얻을 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
   }
 
-  public void resetPassword(String password, Long userId) {
+  public void resetPassword(String password, User user) {
+    Long userId = user.getId();
+
     boolean isAuthenticated = redisUtils.isCompleteSelfAuth(userId.toString());
     if (isAuthenticated) {
-      User user = userRepository.findById(userId)
-          .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
       user.setPassword(password);
       userRepository.save(user);
     } else {
-      throw new RingoException("인증되지 않았습니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("비밀번호를 재설정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
   }
 
-  public GetUserInfoResponseDto getUserInfo(Long userId) {
-    User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("id에 해당하는 유저가 없습니다.", HttpStatus.BAD_REQUEST));
+  public GetUserInfoResponseDto getUserInfo(User user) {
+
+    Profile profile = profileRepository.findByUser(user)
+        .orElseThrow(() -> new RingoException("유저 정보 조회 중 프로필을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+
     return GetUserInfoResponseDto.builder()
-        .id(user.getId())
+        .userId(user.getId())
+        .profile(profile.getImageUrl())
         .gender(user.getGender().toString())
         .height(user.getHeight())
         .isDrinking(user.getIsDrinking().toString())
@@ -139,20 +140,19 @@ public class UserService {
         .build();
   }
 
-  public void updateUserInfo(Long userId, UpdateUserInfoRequestDto dto) {
-    User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("id에 해당하는 유저가 없습니다.", HttpStatus.BAD_REQUEST));
-    if (dto.height() != null && !dto.height().isEmpty())
-      user.setHeight(dto.height());
+  public void updateUserInfo(User user, UpdateUserInfoRequestDto dto) {
+
     if (dto.isDrinking() != null && genericUtils.isContains(Drinking.values(), dto.isDrinking()))
       user.setIsDrinking(Drinking.valueOf(dto.isDrinking()));
     if (dto.isSmoking() != null && genericUtils.isContains(Smoking.values(), dto.isSmoking()))
       user.setIsSmoking(Smoking.valueOf(dto.isSmoking()));
     if (dto.religion() != null && genericUtils.isContains(Religion.values(), dto.religion()))
       user.setReligion(Religion.valueOf(dto.religion()));
-    if (dto.job() != null && !dto.job().isEmpty())
+    if (!dto.height().isBlank())
+      user.setHeight(dto.height());
+    if (!dto.job().isBlank())
       user.setJob(dto.job());
-    if (dto.biography() != null && !dto.biography().isEmpty())
+    if (!dto.biography().isBlank())
       user.setBiography(dto.biography());
 
     userRepository.save(user);
@@ -165,7 +165,7 @@ public class UserService {
     return users.stream()
         .map(user ->
           GetUserInfoResponseDto.builder()
-              .id(user.getId())
+              .userId(user.getId())
               .gender(user.getGender().toString())
               .height(user.getHeight())
               .isDrinking(user.getIsDrinking().toString())
@@ -181,9 +181,9 @@ public class UserService {
 
   public void blockUser(Long userId, Long adminId) {
     User admin = userRepository.findById(adminId)
-        .orElseThrow(() -> new RingoException("id 에 해당하는 관리자가 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("id 에 해당하는 관리자가 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("id에 해당하는 유저가 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("id에 해당하는 유저가 없습니다.", ErrorCode.NOT_FOUND_ADMIN, HttpStatus.BAD_REQUEST));
     BlockedUser blockedUser = BlockedUser.builder()
         .blockedUserId(user.getId())
         .phoneNumber(user.getPhoneNumber())
@@ -192,12 +192,12 @@ public class UserService {
     blockedUserRepository.save(blockedUser);
   }
 
-  public UserAccessLog saveUserAccessLog(User user) {
+  public void saveUserAccessLog(User user) {
     // 오늘 유저가 접속했으면 접속 정보를 추가로 저장하지 않는다.
     if (userAccessLogRepository.existsByUserIdAndCreateAtAfter(user.getId(), LocalDate.now().atStartOfDay())){
-      return null;
+      return;
     }
-    return userAccessLogRepository.save(UserAccessLog.builder()
+    userAccessLogRepository.save(UserAccessLog.builder()
         .age(user.getAge())
         .userId(user.getId())
         .username(user.getUsername())
@@ -207,17 +207,15 @@ public class UserService {
 
   public void updateUserProfileVerification(User user){
     Profile profile = profileRepository.findByUser(user)
-        .orElseThrow(() -> new RingoException("프로필 검증 업데이트 중 프로필을 찾을 수 없는 오류가 발생했습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException(
+            "userId=" + user.getId() + "프로필 검증 업데이트 중 프로필을 찾을 수 없는 오류가 발생했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
     profile.setIsVerified(true);
     profileRepository.save(profile);
   }
 
   /**
-   * 친구초대 코드를 입력했을 때 보상을 제공하는 함수이다. 만약 친구초대로 보상을 이미 받았거나 5번 이상 친구초대코드 입력에 실패했을 경우 예외를 발생시킨다. 만약
-   * 친구초대코드가 정말 존재하는 코드라면 host id와 friend Id를 db에 저장한 후 리워드를 제공한다.
-   *
-   * @param user
-   * @param code
+   * 친구초대 코드를 입력했을 때 보상을 제공하는 함수이다. 만약 친구초대로 보상을 이미 받았거나 5번 이상 친구초대코드 입력에 실패했을 경우 예외를 발생시킨다.
+   * 만약 친구초대코드가 정말 존재하는 코드라면 host id와 friend id를 db에 저장한 후 리워드를 제공한다.
    */
   @Transactional
   public void checkFriendInvitationCodeAndProvideReward(User user, String code) {
@@ -227,7 +225,7 @@ public class UserService {
     if (friendInvitationLogRepository.getNumberOfParticipation(user.getId(), true) > 0 ||
         friendInvitationLogRepository.getNumberOfParticipation(user.getId(), false)
             > MAX_NUMBER_OF_INPUT) {
-      throw new RingoException("이미 완료한 이벤트거나 입력횟수를 초과하였습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("이미 완료한 이벤트거나 입력횟수를 초과하였습니다.", ErrorCode.DUPLICATED, HttpStatus.BAD_REQUEST);
     }
     Optional<User> host = userRepository.findByFriendInvitationCode(code);
     // 친구초대코드를 잘못 입력하였을 경우
@@ -238,7 +236,7 @@ public class UserService {
           .friendId(user.getId())
           .isRealCode(false)
           .build());
-      throw new RingoException("친구초대코드를 잘못 입력하였습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("친구초대코드를 잘못 입력하였습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
     } else {
       friendInvitationLogRepository.save(FriendInvitationLog.builder()
           .hostId(host.get().getId())
@@ -250,19 +248,15 @@ public class UserService {
     }
   }
 
-  public void updateDormantAccount(User user, String request){
-    if(request.equals("DORMANT")){
-      if(dormantAccountRepository.existsByUser(user)){
-        throw new RingoException("이미 휴면 중인 계정입니다.", HttpStatus.BAD_REQUEST);
-      }
-      DormantAccount dormantAccount = DormantAccount.builder()
-          .user(user)
-          .build();
-      dormantAccountRepository.save(dormantAccount);
-    }
-    else{
+  public void updateDormantAccount(User user){
+    if(dormantAccountRepository.existsByUser(user)){
       dormantAccountRepository.deleteByUser(user);
+      return;
     }
+    DormantAccount dormantAccount = DormantAccount.builder()
+        .user(user)
+        .build();
+    dormantAccountRepository.save(dormantAccount);
   }
 
   public List<User> findUserByEmailsIn(List<String> userEmails){

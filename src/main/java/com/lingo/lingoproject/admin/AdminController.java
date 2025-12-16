@@ -2,6 +2,7 @@ package com.lingo.lingoproject.admin;
 
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.report.ReportService;
 import com.lingo.lingoproject.report.dto.GetReportInfoRequestDto;
 import com.lingo.lingoproject.report.dto.GetReportInfoResponseDto;
@@ -54,7 +55,7 @@ public class AdminController {
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("관리자 유저 정보 조회에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("관리자 유저 정보 조회에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -136,13 +137,13 @@ public class AdminController {
           userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt
       ));
       log.info("count={}, step=신고정보_조회_완료, status=SUCCESS", list.size());
-      return ResponseEntity.ok().body(new JsonListWrapper<>(list));
+      return ResponseEntity.ok().body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
     } catch (Exception e) {
       log.error("step=신고정보_조회_실패, status=FAILED", e);
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("신고 정보를 조회하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("신고 정보를 조회하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -178,7 +179,7 @@ public class AdminController {
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("신고 조치에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("신고 조치에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

@@ -7,6 +7,7 @@ import com.lingo.lingoproject.domain.SnapImage;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.SignupStatus;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
@@ -72,15 +73,21 @@ public class ImageService {
    * profile 이미지 crud
    */
   @Transactional
-  public GetImageUrlResponseDto uploadProfileImage(MultipartFile file, User  user) {
+  public GetImageUrlResponseDto uploadProfileImage(MultipartFile file, Long  userId) {
+
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new RingoException("프로필을 업로드하던 중 유저를 찾을 수 없습니다.",
+            ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     if (!existsFaceInImage(file)){
-      throw new RingoException("프로필에 얼굴이 존재하지 않습니다.", HttpStatus.NOT_ACCEPTABLE);
+      throw new RingoException("프로필에 얼굴이 존재하지 않습니다.",
+          ErrorCode.FACE_NOT_FOUND, HttpStatus.NOT_ACCEPTABLE);
     }
 
     if (isUnmoderateImage(file)){
       log.error("userId={}, step=부적절한_이미지_업로드, status=FAILED", user.getId());
-      throw new RingoException("적절하지 않은 사진을 업로드 하였습니다.", HttpStatus.NOT_ACCEPTABLE);
+      throw new RingoException("적절하지 않은 사진을 업로드 하였습니다.",
+          ErrorCode.UNMODERATE, HttpStatus.NOT_ACCEPTABLE);
     }
 
     // 이미 프로필 사진이 존재할 경우 업로드 할 수 없다.
@@ -101,14 +108,23 @@ public class ImageService {
     user.setStatus(SignupStatus.COMPLETED);
     userRepository.save(user);
 
-    return new GetImageUrlResponseDto(savedProfile.getImageUrl(), savedProfile.getId());
+    return new GetImageUrlResponseDto(
+        ErrorCode.SUCCESS.getCode(),
+        savedProfile.getImageUrl(),
+        savedProfile.getId()
+    );
   }
 
   public GetImageUrlResponseDto getProfileImageUrl(Long userId){
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
-    Profile profile = profileRepository.findByUser(user)
-        .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
-    return new GetImageUrlResponseDto(profile.getImageUrl(), profile.getId());
+    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException(
+        "유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+    Profile profile = profileRepository.findByUser(user).orElseThrow(() -> new RingoException(
+        "유저가 프로필을 가지지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+    return new GetImageUrlResponseDto(
+        ErrorCode.SUCCESS.getCode(),
+        profile.getImageUrl(),
+        profile.getId()
+    );
   }
 
   @Transactional
@@ -116,22 +132,23 @@ public class ImageService {
 
     // 프로필은 얼굴이 나와야함
     if (!existsFaceInImage(file)){
-      throw new RingoException("프로필에 얼굴이 존재하지 않습니다.", HttpStatus.NOT_ACCEPTABLE);
+      throw new RingoException("프로필에 얼굴이 존재하지 않습니다.", ErrorCode.FACE_NOT_FOUND, HttpStatus.NOT_ACCEPTABLE);
     }
 
     // 선정적인 사진은 업로드 하지 못함
     if (isUnmoderateImage(file)){
       log.error("userId={}, step=부적절한_이미지_업로드, status=FAILED", userId);
-      throw new RingoException("적절하지 않은 사진을 업로드 하였습니다.", HttpStatus.NOT_ACCEPTABLE);
+      throw new RingoException("적절하지 않은 사진을 업로드 하였습니다.", ErrorCode.UNMODERATE, HttpStatus.NOT_ACCEPTABLE);
     }
 
     // 프로필 조회
-    Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException("프로필을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException(
+        "프로필을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     // 업데이트 권한 확인
     if(!hasPermissionOnImage(profile.getUser(), userId)){
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, profile.getUser().getId());
-      throw new RingoException("이미지를 업데이트할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("이미지를 업데이트할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
 
     // 업데이트 key 얻기
@@ -146,7 +163,12 @@ public class ImageService {
     // profiles 테이블에 변경된 이미지 url 저장
     profile.setImageUrl(imageUrl);
     profileRepository.save(profile);
-    return new GetImageUrlResponseDto(imageUrl, profileId);
+
+    return new GetImageUrlResponseDto(
+        ErrorCode.SUCCESS.getCode(),
+        imageUrl,
+        profileId
+    );
   }
 
   @Transactional
@@ -154,7 +176,7 @@ public class ImageService {
 
     List<SnapImage> existedSnapImages = snapImageRepository.findAllByUser(user);
     if (existedSnapImages.size() + images.size() > MAX_NUMBER_OF_SNAP_IMAGES){
-      throw new RingoException("최대 업로드 개수를 초과하였습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("최대 업로드 개수를 초과하였습니다.", ErrorCode.OVERFLOW, HttpStatus.BAD_REQUEST);
     }
 
     List<SnapImage> snapImages = new ArrayList<>();
@@ -175,21 +197,26 @@ public class ImageService {
     List<SnapImage> savedSnapImages = snapImageRepository.saveAll(snapImages);
 
     return savedSnapImages.stream()
-        .map(image -> {
-          return new GetImageUrlResponseDto(image.getImageUrl(), image.getId());
-        })
+        .map(image ->
+            new GetImageUrlResponseDto(
+                ErrorCode.SUCCESS.getCode(),
+                image.getImageUrl(),
+                image.getId()
+            )
+        )
         .toList();
   }
 
   @Transactional
   public void deleteProfile(Long profileId, Long userId){
     // 프로필 조회
-    Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException("프로필을 조회할 수 없습니다.", HttpStatus.BAD_REQUEST));
+    Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException(
+        "프로필을 조회할 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     // 삭제 권한 확인
     if(!hasPermissionOnImage(profile.getUser(), userId)){
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, profile.getUser().getId());
-      throw new RingoException("프로필을 삭제할 권한이 없습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("프로필을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
     // db 삭제
     profileRepository.delete(profile);
@@ -201,7 +228,8 @@ public class ImageService {
 
   @Transactional
   public void deleteProfileImageByUser(User user){
-    Profile profile = profileRepository.findByUser(user).orElseThrow(() -> new RingoException("프로필을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    Profile profile = profileRepository.findByUser(user).orElseThrow(() -> new RingoException(
+        "프로필을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
     profileRepository.delete(profile);
 
     deleteImageInS3(profile.getImageUrl());
@@ -211,10 +239,17 @@ public class ImageService {
    * snap 이미지 crud
    */
   public List<GetImageUrlResponseDto> getAllSnapImageUrls(Long userId){
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException(
+        "유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
     List<SnapImage> images = snapImageRepository.findAllByUser(user);
     return images.stream()
-        .map(image -> new GetImageUrlResponseDto(image.getImageUrl(), image.getId()))
+        .map(image ->
+            new GetImageUrlResponseDto(
+                ErrorCode.SUCCESS.getCode(),
+                image.getImageUrl(),
+                image.getId()
+            )
+        )
         .toList();
   }
 
@@ -225,10 +260,11 @@ public class ImageService {
       return null;
     }
 
-    SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException("스냅 사진을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException(
+        "스냅 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
     if(!hasPermissionOnImage(snapImage.getUser(), userId)){
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, snapImage.getUser().getId());
-      throw new RingoException("업데이트 할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("업데이트 할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
     String imageUrl = getOriginalFilename(snapImage.getImageUrl());
 
@@ -243,13 +279,18 @@ public class ImageService {
     snapImage.setDescription(description);
     snapImageRepository.save(snapImage);
 
-    return new GetImageUrlResponseDto(imageUrl, snapImage.getId());
+    return new GetImageUrlResponseDto(
+        ErrorCode.SUCCESS.getCode(),
+        imageUrl,
+        snapImage.getId()
+    );
   }
 
   @Transactional
   public void deleteSnapImage(Long snapImageId, Long userId){
     // 스냅 사진 조회
-    SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException("스냅사진을 조회할 수 없습니다.", HttpStatus.BAD_REQUEST));
+    SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException(
+        "스냅사진을 조회할 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     // 삭제 권한 확인
     if (!hasPermissionOnImage(snapImage.getUser(), userId)){
@@ -280,7 +321,8 @@ public class ImageService {
 
   @Transactional
   public List<GetImageUrlResponseDto> uploadPhotographerExampleImages(List<MultipartFile> images, Long photographerId){
-    User photographer = userRepository.findById(photographerId).orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    User photographer = userRepository.findById(photographerId).orElseThrow(() -> new RingoException(
+        "유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     List<PhotographerImage> photographerImages = new ArrayList<>();
 
@@ -294,9 +336,13 @@ public class ImageService {
     }
     List<PhotographerImage> savedPhotographerImages = photographerImageRepository.saveAll(photographerImages);
     return savedPhotographerImages.stream()
-        .map(image -> {
-          return new GetImageUrlResponseDto(image.getImageUrl(), image.getId());
-        })
+        .map(image ->
+            new GetImageUrlResponseDto(
+                ErrorCode.SUCCESS.getCode(),
+                image.getImageUrl(),
+                image.getId()
+            )
+        )
         .toList();
   }
 
@@ -311,9 +357,9 @@ public class ImageService {
                   now.getYear() + "-" + now.getMonthValue() + "/" +
                   now + "/";
 
-    String filename = path + UUID.randomUUID().toString() + "_image_" + originalFilename;
+    String filename = path + UUID.randomUUID() + "_image_" + originalFilename;
 
-    String imageUrl = null;
+    String imageUrl;
 
     try {
       PutObjectRequest putObjectRequest = PutObjectRequest.builder()
@@ -332,7 +378,7 @@ public class ImageService {
       imageUrl = "https://" + bucket + ".s3." + region + ".amazonaws.com/" + filename;
     }catch (Exception e){
       log.error("S3 이미지 업로드 실패. bucket: {}, filename: {}, contentType: {}", bucket, filename, file.getContentType(), e);
-      throw new RingoException("s3에 이미지 업로드 하는데 실패하였습니다.",  HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("s3에 이미지 업로드 하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     return imageUrl;
@@ -340,7 +386,8 @@ public class ImageService {
 
   public boolean hasPermissionOnImage(User user, Long accessUserId){
     Long userId = user.getId();
-    User accessUser = userRepository.findById(accessUserId).orElseThrow(() -> new RingoException("Token not found", HttpStatus.BAD_REQUEST));
+    User accessUser = userRepository.findById(accessUserId).orElseThrow(() -> new RingoException(
+        "Token not found", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
     if(accessUser.getRole().equals(Role.ADMIN)){
       return true;
     }
@@ -357,7 +404,7 @@ public class ImageService {
       amazonS3Client.deleteObject(deleteObjectRequest);
     }catch (Exception e){
       log.error("s3에 이미지를 삭제하는데 실패하였습니다. bucket: {}, image_url: {}", bucket, imageUrl, e);
-      throw new RingoException("s3에 이미지를 삭제하는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("s3에 이미지를 삭제하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -367,12 +414,16 @@ public class ImageService {
 
   public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto, Long snapImageId, Long userId){
 
+    if (dto == null || dto.description().isBlank()){
+      return;
+    }
+
     SnapImage image = snapImageRepository.findById(snapImageId)
-        .orElseThrow(() -> new RingoException("스냅 이미지를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("스냅 이미지를 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     if (!hasPermissionOnImage(image.getUser(), userId)){
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, image.getUser().getId());
-      throw new RingoException("스냅 이미지에 글을 수정할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("스냅 이미지에 글을 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
     image.setDescription(dto.description());
@@ -380,12 +431,12 @@ public class ImageService {
   }
 
   public boolean isUnmoderateImage(MultipartFile file) {
-    byte[] imageBytes = null;
+    byte[] imageBytes;
     try {
       imageBytes = file.getBytes();
     }catch (Exception e){
       log.error("선정성 검사 중 이미지를 바이트로 변환하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
-      throw new RingoException("선정성 검사 중 파일을 바이트로 변환하지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("선정성 검사 중 파일을 바이트로 변환하지 못하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     try {
       DetectModerationLabelsRequest request = DetectModerationLabelsRequest.builder()
@@ -411,14 +462,14 @@ public class ImageService {
       });
     }catch (Exception e){
       log.error("이미지의 선정성 검사를 하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   public boolean verifyProfileImage(MultipartFile targetImage, User user){
     try {
       Profile profile = profileRepository.findByUser(user)
-          .orElseThrow(() -> new RingoException("유저의 프로필이 존재하지 않습니다.", HttpStatus.BAD_REQUEST));
+          .orElseThrow(() -> new RingoException("유저의 프로필이 존재하지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
       String profileUrl = getOriginalFilename(profile.getImageUrl());
       GetObjectRequest getObjectRequest = GetObjectRequest.builder()
           .bucket(bucket)
@@ -429,7 +480,7 @@ public class ImageService {
       return isSamePerson(objectStream.readAllBytes(), targetImage);
     }catch (Exception e){
       log.error("프로필 사진을 인증하는데 실패하였습니다. userId: {}", user.getId(), e);
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -455,7 +506,7 @@ public class ImageService {
 
     }catch (Exception e){
       log.error("이미지 인증을 하는데 실패하였습니다.", e);
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -466,7 +517,7 @@ public class ImageService {
       image = Image.builder().bytes(SdkBytes.fromByteArray(imageBytes)).build();
     }catch (Exception e){
       log.error("이미지의 얼굴 여부 검수 중 파일을 바이트로 변환하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
-      throw new RingoException("파일을 바이트로 변환하는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("파일을 바이트로 변환하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     try {
       DetectFacesRequest request = DetectFacesRequest.builder().image(image).build();
@@ -475,7 +526,7 @@ public class ImageService {
       return !faceDetails.isEmpty();
     }catch (Exception e){
       log.error("이미지의 얼굴 존재여부를 검수하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

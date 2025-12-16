@@ -2,6 +2,7 @@ package com.lingo.lingoproject.security.oauth.google;
 
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.oauth.OAuthUtils;
@@ -55,10 +56,10 @@ public class GoogleLoginService {
     try{
       response = restTemplate.exchange(GOOGLE_TOKEN_URL, HttpMethod.POST, request, GoogleTokenResponseDto.class).getBody();
     }catch (Exception e){
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if (response == null){
-      throw new RingoException("Invalid Google Access Token", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("Invalid Google Access Token", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return response.accessToken();
   }
@@ -82,10 +83,10 @@ public class GoogleLoginService {
       response = restTemplate.exchange(GOOGLE_GMAIL_URL, HttpMethod.GET,
           request, GoogleUserInfoResponseDto.class).getBody();
     }catch (Exception e){
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if(response == null){
-      throw new RingoException("Google user info response is null", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("Google user info response is null", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     // 3

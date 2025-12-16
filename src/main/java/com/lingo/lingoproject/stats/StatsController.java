@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.stats;
 
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.stats.dto.GetDailyNumberOfVisitorRequestDto;
 import com.lingo.lingoproject.stats.dto.GetTodayVisitorStatsRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
@@ -38,7 +39,7 @@ public class StatsController {
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("일일 방문자 수 조회에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("일일 방문자 수 조회에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -49,13 +50,14 @@ public class StatsController {
       log.info("step=주간_방문자수_조회_시작, status=SUCCESS");
       List<GetDailyNumberOfVisitorRequestDto> visitors = statService.getDailyNumberOfVisitor();
       log.info("count={}, step=주간_방문자수_조회_완료, status=SUCCESS", visitors.size());
-      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(visitors));
+      return ResponseEntity.status(HttpStatus.OK)
+          .body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), visitors));
     } catch (Exception e) {
       log.error("step=주간_방문자수_조회_실패, status=FAILED", e);
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("주간 방문자 수 조회에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("주간 방문자 수 조회에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

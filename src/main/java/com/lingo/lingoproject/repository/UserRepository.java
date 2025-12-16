@@ -20,4 +20,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
   boolean existsByEmail(String email);
 
   List<User> findAllByCreatedAtAfter(LocalDateTime createdAtAfter);
+
+  boolean existsByNickname(String nickname);
 }

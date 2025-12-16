@@ -8,7 +8,10 @@ import lombok.Builder;
 public record GetUserInfoResponseDto(
 
     @Schema(description = "유저 id", example = "4")
-    Long id,
+    Long userId,
+
+    @Schema(description = "프로필 url", example = "url")
+    String profile,
 
     @Schema(description = "성별", example = "MALE", allowableValues = {"MALE", "FEMALE"})
     String gender,

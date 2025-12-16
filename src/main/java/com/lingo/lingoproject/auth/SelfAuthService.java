@@ -11,6 +11,7 @@ import com.lingo.lingoproject.auth.dto.PlainRequestData;
 import com.lingo.lingoproject.auth.dto.AuthWindowRequestDto;
 import com.lingo.lingoproject.auth.dto.UserSelfAuthInfo;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.RedisUtils;
@@ -78,7 +79,7 @@ public class SelfAuthService {
      *  Authorization : Basic + Base64(clientId:clientSecret)
      *  URL?grant_type=client_credentials&scope=default
      */
-    GetAccessTokenResponseDto response = null;
+    GetAccessTokenResponseDto response;
     try{
       response = selfAuthWebClient
           .post()
@@ -93,15 +94,15 @@ public class SelfAuthService {
     } catch (Exception e) {
       log.error("POST : " + apiUri + ":: 요청을 보내는데 실패하였습니다.");
       log.error("액세스 토큰 조회 중 예외 발생", e);
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if (response == null) {
       log.error("POST : {} :: 응답값이 null입니다.", apiUri);
-      throw new RingoException("본인인증 api response의 값이 없습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("본인인증 api response의 값이 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     else if(!response.getDataHeader().resultCd().equals("1200")){
       log.error("POST : " + apiUri + ":: response:result_cd : " +  response.getDataHeader().resultCd());
-      throw new RingoException("본인인증 api의 응답값에서 정상 토큰을 얻지 못하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("본인인증 api의 응답값에서 정상 토큰을 얻지 못하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     return response.getDataBody().accessToken();
@@ -156,7 +157,7 @@ public class SelfAuthService {
     /*
      *  암호화 토큰 요청
      */
-    GetCryptoTokenResponseDto response = null;
+    GetCryptoTokenResponseDto response;
     try{
       log.info("POST : " + apiUri + "암호화 토큰 생성 정보 요청을 진행합니다.");
       response = selfAuthWebClient
@@ -174,7 +175,7 @@ public class SelfAuthService {
     }catch (Exception e){
       log.error("POST : " + apiUri + ":: 요청을 보내는데 실패하였습니다.");
       log.error("암호화 토큰 정보 요청 중 예외 발생", e);
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if(response == null
         || !response.getDataHeader().resultCd().equals("1200")
@@ -182,8 +183,8 @@ public class SelfAuthService {
         || response.getDataBody().responseMsg().startsWith("EAPI")
         || !response.getDataBody().resultCd().equals("0000")
     ){
-      log.error("POST : " + apiUri + ":: response:result_cd : " +  response.getDataHeader().resultCd());
-      throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      if (response != null ) log.error("POST : " + apiUri + ":: response:result_cd : " +  response.getDataHeader().resultCd());
+      throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     /*
      *  응답으로부터 토큰을 생성
@@ -201,13 +202,11 @@ public class SelfAuthService {
     byte[] cryptoTokenByHashing = hashFunction.digest();
     String base64EncodedCryptoToken = Base64.getEncoder().encodeToString(cryptoTokenByHashing);
 
-    CryptoTokenInfo info = CryptoTokenInfo.builder()
+    return CryptoTokenInfo.builder()
         .siteCode(siteCode)
         .tokenVersionId(responseCryptoTokenVersionId)
         .token(base64EncodedCryptoToken)
         .build();
-
-    return info;
   }
 
 
@@ -292,10 +291,6 @@ public class SelfAuthService {
 
   /**
    * 데이터의 무결성을 확인하고 데이터를 복호화한다.
-   * @param tokenVersionId
-   * @param encryptedData
-   * @param originalIntegrityValue
-   * @return
    */
   public String validateIntegrityAndDecryptData(String tokenVersionId, String encryptedData, String originalIntegrityValue)
       throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException {
@@ -315,7 +310,7 @@ public class SelfAuthService {
     /* pass 서버로부터 받은 originalIntegrityValue와 방금 생성한 integrityValue가 동일한지 확인 */
     if(!integrityValue.equals(originalIntegrityValue)){
       log.error("메세지가 위조되었거나 무결성 검증 과정에서 오류가 발생하였습니다.");
-      throw new RingoException("잘못된 암호문이 도달했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("잘못된 암호문이 도달했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     /* 데이터를 복호화하여 리턴함 */
@@ -332,12 +327,13 @@ public class SelfAuthService {
       userSelfAuthInfo = objectMapper.readValue(data, UserSelfAuthInfo.class);
     } catch (Exception e) {
       log.error("본인인증 api에서 유저 정보를 역질렬화하던 중 오류가 발생하였습니다.", e);
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     /* 유저를 찾아서 유저 정보를 저장함*/
     User user = userRepository.findById(Long.parseLong(userSelfAuthInfo.getUserId()))
-        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        .orElseThrow(() -> new RingoException("유저 인증 정보 저장 중 유저를 찾을 수 없습니다.",
+            ErrorCode.NOT_FOUND_USER, HttpStatus.NOT_FOUND));
 
     if (userSelfAuthInfo.getGender().equals("1")) {
       userSelfAuthInfo.setGender("MALE");

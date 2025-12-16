@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.chat;
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import java.util.Locale;
@@ -30,7 +31,8 @@ public class StompConnectionListener {
       StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
       String username = accessor.getUser() != null ? accessor.getUser().getName() : null;
       User user = userRepository.findByEmail(username)
-          .orElseThrow(() -> new RingoException("세션에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+          .orElseThrow(() -> new RingoException(
+              "세션에 해당하는 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
       String destination = accessor.getDestination();
       if (destination == null) {
         return;
@@ -49,7 +51,7 @@ public class StompConnectionListener {
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("웹소켓 연결 상태를 레디스에 저장하던 중 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("웹소켓 연결 상태를 레디스에 저장하던 중 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
   }
@@ -60,7 +62,7 @@ public class StompConnectionListener {
       StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
       String username = accessor.getUser() != null ? accessor.getUser().getName() : null;
       User user = userRepository.findByEmail(username)
-          .orElseThrow(() -> new RingoException("세션에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+          .orElseThrow(() -> new RingoException("세션에 해당하는 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
       Set<String> keyset = redisTemplate.keys("connect::" + user.getId());
       for (String key : keyset) {
         redisTemplate.delete(key);
@@ -70,7 +72,8 @@ public class StompConnectionListener {
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("웹소켓 연결을 끊고 레디스에 연결 정보를 삭제하던 중 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("웹소켓 연결을 끊고 레디스에 연결 정보를 삭제하던 중 오류가 발생하였습니다.",
+          ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

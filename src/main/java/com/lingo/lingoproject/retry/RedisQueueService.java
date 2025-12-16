@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.retry;
 
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.DeadLetterFcmMessageRepository;
 import java.util.Optional;
@@ -26,7 +27,7 @@ public class RedisQueueService {
     switch (key) {
       case "FCM" -> redisTemplate.opsForList().leftPush(keyForFcm, payload);
       case "DISCORD" -> redisTemplate.opsForList().rightPush(keyForDiscord, payload);
-      default -> throw new RingoException("적절하지 않은 키 값입니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      default -> throw new RingoException("적절하지 않은 키 값입니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -40,7 +41,7 @@ public class RedisQueueService {
       if (log == null) return Optional.empty();
       return Optional.of(log);
     }catch (Exception e){
-      throw new RingoException("오류 메세지를 cast하는데 실패하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("오류 메세지를 cast하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

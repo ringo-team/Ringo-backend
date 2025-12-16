@@ -7,12 +7,14 @@ import org.springframework.http.HttpStatus;
 public class RingoException extends RuntimeException{
 
   private HttpStatus status;
+  private ErrorCode errorCode;
 
-  public RingoException(String message, HttpStatus status){
+  public RingoException(String message, ErrorCode errorCode, HttpStatus status){
     super(message);
     this.status = status;
+    this.errorCode = errorCode;
   }
   public RingoException(String message, Throwable cause){
-    super(message,cause);
+    super(message, cause);
   }
 }

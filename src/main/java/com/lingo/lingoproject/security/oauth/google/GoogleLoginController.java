@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.security.oauth.google;
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.security.TokenType;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
@@ -30,13 +31,13 @@ public class GoogleLoginController {
       String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);
       jwtUtil.saveRefreshToken(refreshToken, user);
       log.info("userId={}, step=구글_로그인_콜백_완료, status=SUCCESS", user.getId());
-      return ResponseEntity.ok(new LoginResponseDto(user.getId(), accessToken, refreshToken));
+      return ResponseEntity.ok(new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refreshToken));
     } catch (Exception e) {
       log.error("step=구글_로그인_콜백_실패, status=FAILED", e);
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("구글 로그인 처리에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("구글 로그인 처리에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

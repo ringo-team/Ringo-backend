@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.chat;
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
@@ -40,13 +41,13 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
 
     /*------------------------------------토큰 검증-----------------------------------------*/
     if (token == null || !token.startsWith("Bearer ")) {
-      throw new RingoException("토큰이 없습니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("토큰이 없습니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN);
     }
     token = token.substring(7);
 
     Claims claims = jwtUtil.getClaims(token);
     User user = userRepository.findByEmail(claims.getSubject())
-            .orElseThrow(() -> new RingoException("유효한 토큰이 아닙니다.", HttpStatus.FORBIDDEN));
+            .orElseThrow(() -> new RingoException("유효한 토큰이 아닙니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN));
     /*-------------------------------------------------------------------------------------*/
 
     /*------------------------------------토큰으로 인증----------------------------------------*/
@@ -64,16 +65,16 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     Long roomId = extractRoomId(destination);
 
     if (roomId == null) {
-      throw new RingoException("채팅방에 관한 정보가 없습니다.", HttpStatus.BAD_REQUEST);
+      return message;
     }
     if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())){
       if(!chatService.isMemberInChatroom(roomId, user.getId())){
-        throw new RingoException("구독 권한이 없습니다.", HttpStatus.FORBIDDEN);
+        throw new RingoException("구독 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
       }
     }
     else if (StompCommand.SEND.equals(accessor.getCommand())){
       if(!chatService.isMemberInChatroom(roomId, user.getId())){
-        throw new RingoException("메세지 전달 권한이 없습니다.", HttpStatus.FORBIDDEN);
+        throw new RingoException("메세지 전달 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
       }
     }
     return message;
@@ -86,7 +87,7 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     if (parts.length == 0) return null;
     try {
       return Long.valueOf(parts[parts.length - 1]);
-    } catch (NumberFormatException e) {
+    } catch (Exception e) {
       return null;
     }
   }

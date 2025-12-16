@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.auth;
 
 
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +35,9 @@ public class SelfAuthController {
       log.info("step=유저_정보_역직렬화_완료, status=SUCCESS");
 
     }catch (Exception e){
-      log.info("step=유저_정보_역직렬화_실패, status=FAILED", e);
-      throw new RingoException("본인인증 api 콜백 데이터를 복호화하거나 정보를 저장하는데 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      log.error("step=유저_정보_역직렬화_실패, status=FAILED", e);
+      throw new RingoException("본인인증 api 콜백 데이터를 복호화하거나 정보를 저장하는데 오류가 발생하였습니다.",
+          ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return ResponseEntity.ok().build();
   }

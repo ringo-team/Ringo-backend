@@ -3,6 +3,7 @@ package com.lingo.lingoproject.security.form;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.security.controller.dto.LoginInfoDto;
 import jakarta.servlet.FilterChain;
@@ -55,7 +56,7 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
         request.setAttribute("requestBody", info);
       } catch (Exception e) {
         log.error("uri={}, loc=AuthenticationFilter, step=로그인_요청_역직렬화, status=FAILED", request.getRequestURI(), e);
-        throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
       }
 
       // 아이디&비밀번호 인증

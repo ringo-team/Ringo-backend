@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.security.form;
 
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,7 +23,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
   public Authentication authenticate(Authentication authentication) throws AuthenticationException {
     UserDetails user = customUserDetailService.loadUserByUsername(authentication.getName());
     if(!passwordEncoder.matches(authentication.getCredentials().toString(), user.getPassword())){
-      throw new RingoException("패스워드가 옳지 않습니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("패스워드가 옳지 않습니다.", ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN);
     }
     return  new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities());
   }

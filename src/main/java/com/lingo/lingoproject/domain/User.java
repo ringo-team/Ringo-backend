@@ -8,6 +8,7 @@ import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.domain.enums.Smoking;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.security.controller.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.utils.Timestamp;
@@ -159,7 +160,7 @@ public class User extends Timestamp implements UserDetails {
       this.birthday = dateFormat.parse(dto.getBirthday());
       this.gender = Gender.valueOf(dto.getGender());
     } catch (Exception e) {
-      throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

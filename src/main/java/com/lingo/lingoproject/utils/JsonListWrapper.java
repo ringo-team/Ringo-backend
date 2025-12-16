@@ -9,9 +9,11 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class JsonListWrapper<T> {
+  private String result;
   private List<T> list;
 
-  public JsonListWrapper(List<T> list) {
+  public JsonListWrapper(String result, List<T> list) {
+    this.result = result;
     this.list = list;
   }
 }

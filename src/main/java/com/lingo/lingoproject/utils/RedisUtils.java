@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.utils;
 
 import com.lingo.lingoproject.auth.dto.DecryptKeyObject;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
@@ -36,7 +37,7 @@ public class RedisUtils {
     } catch (Exception e) {
       log.error("본인인증 api에서 복호화 정보를 역질렬화하던 중 오류가 발생하였습니다.");
       log.error("key: {}", key, e);
-      throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return savedDecryptedKey;
   }
@@ -59,8 +60,9 @@ public class RedisUtils {
     return redisTemplate.hasKey("logoutUser::" + key);
   }
 
-  public void saveRecommendUser(String key, Object value){
-    cacheUntilMidnight("recommend::" + key, value);
+  public void saveRecommendUser(String key, List<GetUserProfileResponseDto> value){
+    cacheUntilMidnight("recommend::" + key,
+        new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), value));
   }
 
   public boolean containsRecommendUser(String key){
@@ -73,13 +75,14 @@ public class RedisUtils {
       savedRecommendUserList = (JsonListWrapper<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);
     } catch (Exception e) {
       log.error("추천 유저 캐시 역직렬화 실패. key: {}", key, e);
-      throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return savedRecommendUserList.getList();
   }
 
-  public void saveRecommendUserForDailySurvey(String key, Object value){
-    cacheUntilMidnight("recommend-for-daily-survey::" + key, value);
+  public void saveRecommendUserForDailySurvey(String key, List<GetUserProfileResponseDto> value){
+    cacheUntilMidnight("recommend-for-daily-survey::" + key,
+        new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), value));
   }
 
   public boolean containsRecommendUserForDailySurvey(String key){
@@ -92,13 +95,13 @@ public class RedisUtils {
       savedRecommendUserList = (JsonListWrapper<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend-for-daily-survey::" + key);
     } catch (Exception e) {
       log.error("일일 설문 추천 캐시 역직렬화 실패. key: {}", key, e);
-      throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return savedRecommendUserList.getList();
   }
 
   public void saveUserDailySurvey(String key, List<GetSurveyResponseDto> value){
-    cacheUntilMidnight("dailySurvey::" + key, new JsonListWrapper<>(value));
+    cacheUntilMidnight("dailySurvey::" + key, new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), value));
   }
 
   public boolean containsUserDailySurvey(String key){
@@ -111,7 +114,7 @@ public class RedisUtils {
       savedUserDailySurveyList = (JsonListWrapper<GetSurveyResponseDto>) redisTemplate.opsForValue().get("dailySurvey::" + key);
     }catch (Exception e){
       log.error("일일 설문 캐시 역직렬화 실패. key: {}", key, e);
-      throw new RingoException("cast 도중에 오류가 발생하였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return savedUserDailySurveyList.getList();
   }

@@ -1,5 +1,5 @@
 package com.lingo.lingoproject.utils;
 
-public record ResultMessageResponseDto(String result) {
+public record ResultMessageResponseDto(String result, String message) {
 
 }

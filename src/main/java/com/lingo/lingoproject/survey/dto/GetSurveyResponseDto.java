@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.survey.dto;
 
+import com.lingo.lingoproject.domain.Survey;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
@@ -16,5 +17,13 @@ public record GetSurveyResponseDto(
     @Schema(description = "질문 목적", example = "전통적 미학을 선호하는 경향을 파악")
     String purpose
 ) {
-
+  public static GetSurveyResponseDto from(Survey survey){
+    return  GetSurveyResponseDto.builder()
+        .surveyNum(survey.getSurveyNum())
+        .confrontSurveyNum(survey.getConfrontSurveyNum())
+        .category(survey.getCategory().toString())
+        .content(survey.getContent())
+        .purpose(survey.getPurpose())
+        .build();
+  }
 }

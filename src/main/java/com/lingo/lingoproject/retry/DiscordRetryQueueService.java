@@ -2,6 +2,7 @@ package com.lingo.lingoproject.retry;
 
 import com.lingo.lingoproject.discord.DiscordService;
 import com.lingo.lingoproject.discord.dto.DiscordWebhookPayload;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.DeadLetterFcmMessageRepository;
 import java.util.Optional;
@@ -36,7 +37,7 @@ public class DiscordRetryQueueService extends RedisQueueService{
         discordService.sendMessageToDiscordChannel("webhook", payload.getMessage());
       } catch (Exception e) {
         if (payload.getRetryCount() >= 3){
-          throw new RingoException("디스코드 알림이 보내지지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+          throw new RingoException("디스코드 알림이 보내지지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
         payload.setRetryCount(payload.getRetryCount() + 1);
         super.pushToQueue("DISCORD", payload);

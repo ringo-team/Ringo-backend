@@ -6,6 +6,7 @@ import com.google.firebase.messaging.Notification;
 import com.lingo.lingoproject.discord.DiscordService;
 import com.lingo.lingoproject.domain.DeadLetterFcmMessage;
 import com.lingo.lingoproject.domain.FailedFcmMessageLog;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.DeadLetterFcmMessageRepository;
 import java.util.Optional;
@@ -52,7 +53,8 @@ public class FcmRetryQueueService extends RedisQueueService{
           DeadLetterFcmMessage letter = DeadLetterFcmMessage.from(log);
           super.deadLetterFcmMessageRepository.save(letter);
           discordService.sendMessageToDiscordChannel("webhook", "데드레터 큐에 fcm 엔티티가 쌓였습니다.");
-          throw new RingoException("데드레터큐에 fcm 엔티티가 쌓였습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+          throw new RingoException("데드레터큐에 fcm 엔티티가 쌓였습니다.",
+              ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
         log.setRetryCount(log.getRetryCount() + 1);
         pushToQueue("FCM", log);

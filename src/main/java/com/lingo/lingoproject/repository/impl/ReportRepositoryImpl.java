@@ -5,6 +5,7 @@ import com.lingo.lingoproject.domain.QReport;
 import com.lingo.lingoproject.domain.enums.ReportIntensity;
 import com.lingo.lingoproject.domain.enums.ReportOrdering;
 import com.lingo.lingoproject.domain.enums.ReportStatus;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.report.dto.GetReportInfoRequestDto;
 import com.lingo.lingoproject.report.dto.GetReportInfoResponseDto;
@@ -49,7 +50,7 @@ public class ReportRepositoryImpl{
         builder.and(report.createdAt.loe(finishedAt));
       }catch (Exception e){
         log.error("신고 조회 기간 파싱 실패. startedAt: {}, finishedAt: {}", dto.startedAt(), dto.finishedAt(), e);
-        throw new RingoException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
       }
     }
 

@@ -3,6 +3,7 @@ package com.lingo.lingoproject.report;
 import com.lingo.lingoproject.domain.Report;
 import com.lingo.lingoproject.domain.enums.ReportIntensity;
 import com.lingo.lingoproject.domain.enums.ReportStatus;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.report.dto.GetReportInfoRequestDto;
 import com.lingo.lingoproject.report.dto.GetReportInfoResponseDto;
@@ -33,7 +34,7 @@ public class ReportService {
     if (reportRepository.existsByReportUserIdAndReportedUserIdAndReportedUserStatus(
         dto.reportUserId(), dto.reportedUserId(), ReportStatus.PENDING
     )){
-      throw new RingoException("이미 접수된 신고입니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("이미 접수된 신고입니다.", ErrorCode.DUPLICATED, HttpStatus.BAD_REQUEST);
     }
     Report report = Report.builder()
         .reportUserId(dto.reportUserId())
@@ -51,7 +52,7 @@ public class ReportService {
 
   public void suspendUser(Long reportId, String reportedUserStatus, Long adminId){
     Report report = reportRepository.findById(reportId)
-        .orElseThrow(() -> new RingoException("해당 신고가 존재하지 않습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 신고가 존재하지 않습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
     report.setAdminId(adminId);
     switch (reportedUserStatus){
       case "INNOCENT_REPORT":
@@ -79,7 +80,7 @@ public class ReportService {
         report.setReportedUserStatus(ReportStatus.LEGAL_REVIEW);
         break;
       default:
-        throw new RingoException("적절하지 못한 조치가 입력되었습니다.", HttpStatus.BAD_REQUEST);
+        throw new RingoException("적절하지 못한 조치가 입력되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
     reportRepository.save(report);
   }

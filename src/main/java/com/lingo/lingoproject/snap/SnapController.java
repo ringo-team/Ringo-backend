@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.snap;
 
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.image.ImageService;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.snap.dto.ApplySnapShootingRequestDto;
@@ -42,14 +43,15 @@ public class SnapController {
       log.info("step=스냅_촬영_신청_시작, status=SUCCESS");
       snapService.applySnapShooting(dto);
       log.info("step=스냅_촬영_신청_완료, status=SUCCESS");
+
+      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 촬영 날짜가 저장되었습니다."));
     } catch (Exception e) {
       log.error("step=스냅_촬영_신청_실패, status=FAILED", e);
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("스냅 촬영 신청에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("스냅 촬영 신청에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return ResponseEntity.ok().body(new ResultMessageResponseDto("성공적으로 촬영 날짜가 저장되었습니다."));
   }
 
   @Operation(summary = "사진 작가 정보 저장")
@@ -62,14 +64,16 @@ public class SnapController {
       log.info("photographerId={}, step=작가_정보_저장_시작, status=SUCCESS", photographerId);
       snapService.savePhotographerInfo(dto, photographerId);
       log.info("photographerId={}, step=작가_정보_저장_완료, status=SUCCESS", photographerId);
+
+      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 작가 정보가 저장되었습니다."));
+
     } catch (Exception e) {
       log.error("photographerId={}, step=작가_정보_저장_실패, status=FAILED", photographerId, e);
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("작가 정보를 저장하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("작가 정보를 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return ResponseEntity.ok().body(new ResultMessageResponseDto("성공적으로 작가 정보가 저장되었습니다."));
   }
 
   @Operation(summary = "촬영 예시 사진 업로드")
@@ -86,14 +90,17 @@ public class SnapController {
       log.info("photographerId={}, step=작가_예시사진_업로드_시작, status=SUCCESS", photographerId);
       dtos = imageService.uploadPhotographerExampleImages(images, photographerId);
       log.info("photographerId={}, step=작가_예시사진_업로드_완료, status=SUCCESS", photographerId);
+
+      return ResponseEntity.status(HttpStatus.CREATED)
+          .body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), dtos));
+
     } catch (Exception e) {
       log.error("photographerId={}, step=작가_예시사진_업로드_실패, status=FAILED", photographerId, e);
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("작가 예시 사진 업로드에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("작가 예시 사진 업로드에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return ResponseEntity.status(HttpStatus.CREATED).body(new JsonListWrapper<>(dtos));
   }
 
   @Operation(summary = "촬영 예시 사진 정보 저장 또는 수정")
@@ -105,14 +112,16 @@ public class SnapController {
       log.info("step=작가_예시사진_정보_저장_시작, status=SUCCESS");
       snapService.updatePhotographerExampleImagesInfo(dto);
       log.info("step=작가_예시사진_정보_저장_완료, status=SUCCESS");
+
+      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "정상적으로 사진 정보가 저장되었습니다."));
+
     } catch (Exception e) {
       log.error("step=작가_예시사진_정보_저장_실패, status=FAILED", e);
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("작가 예시사진 정보를 저장하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("작가 예시사진 정보를 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return ResponseEntity.ok().body(new ResultMessageResponseDto("정상적으로 사진 정보가 저장되었습니다."));
   }
 
   @Operation(summary = "작가 정보 가져오기")
@@ -125,14 +134,14 @@ public class SnapController {
       list = snapService.getPhotographerInfos();
       log.info("step=작가_정보_조회_완료, status=SUCCESS");
 
-      return ResponseEntity.ok().body(new JsonListWrapper<>(list));
+      return ResponseEntity.ok().body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
 
     } catch (Exception e) {
       log.error("step=작가_정보_조회_실패, status=FAILED", e);
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("작가 정보를 조회하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("작가 정보를 조회하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

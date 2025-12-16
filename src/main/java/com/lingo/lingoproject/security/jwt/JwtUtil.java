@@ -4,6 +4,7 @@ package com.lingo.lingoproject.security.jwt;
 
 import com.lingo.lingoproject.domain.JwtRefreshToken;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.security.TokenType;
@@ -40,16 +41,12 @@ public class JwtUtil {
   private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
 
   public String generateToken(TokenType tokenType, User user){
-    Long expiration = null;
-    if (tokenType == TokenType.ACCESS) {
-      expiration = Long.parseLong(accessTokenExpiration);
-    }
-    else if(tokenType == TokenType.REFRESH){
-      expiration = Long.parseLong(refreshTokenExpiration);
-    }
-    else{
-      throw new RingoException("토큰 타입은 access, refresh 둘 중 하나입니다.", HttpStatus.BAD_REQUEST);
-    }
+    Long expiration = switch (tokenType) {
+      case TokenType.ACCESS -> Long.parseLong(accessTokenExpiration);
+      case TokenType.REFRESH -> Long.parseLong(refreshTokenExpiration);
+      default -> throw new RingoException(
+          "토큰 타입은 access, refresh 둘 중 하나입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+    };
     return Jwts.builder()
         .issuer(issuer)
         .issuedAt(new Date())
@@ -72,10 +69,10 @@ public class JwtUtil {
           .getPayload();
     } catch (ExpiredJwtException e){
       log.error("유효기간이 지난 토큰입니다", e);
-      throw new RingoException("유효기간이 지난 토큰입니다.", HttpStatus.UNAUTHORIZED);
+      throw new RingoException("유효기간이 지난 토큰입니다.", ErrorCode.TOKEN_EXPIRED, HttpStatus.UNAUTHORIZED);
     } catch (Exception e){
       log.error("토큰이 유효하지 않습니다.", e);
-      throw new RingoException("토큰이 유효하지 않습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("토큰이 유효하지 않습니다.", ErrorCode.TOKEN_INVALID, HttpStatus.BAD_REQUEST);
     }
   }
 

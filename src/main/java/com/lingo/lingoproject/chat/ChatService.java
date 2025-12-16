@@ -22,6 +22,7 @@ import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
+import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.ChatroomRepository;
@@ -80,7 +81,8 @@ public class ChatService {
     // 메세지 조회
     Page<Message> messages = messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable);
 
-    Chatroom chatroom = chatroomRepository.findById(chatroomId).orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+    Chatroom chatroom = chatroomRepository.findById(chatroomId)
+        .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
     List<User> participants = chatroomParticipantRepository.findAllByChatroom(chatroom)
         .stream()
         .map(ChatroomParticipant::getParticipant)
@@ -111,6 +113,7 @@ public class ChatService {
         .toList();
 
     return GetChatResponseDto.builder()
+        .result(ErrorCode.SUCCESS.getCode())
         .memberInfos(memberInfoDtos)
         .messages(messagesDto)
         .build();
@@ -264,20 +267,20 @@ public class ChatService {
 
     // 채팅 타입 검사
     if(!genericUtils.isContains(ChatType.values(), dto.chatType())){
-      throw new RingoException("적절하지 않은 채팅타입이 입력되었습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("적절하지 않은 채팅타입이 입력되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
 
     // 유저 조회
     User user1 = userRepository.findById(dto.user1Id())
-        .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
     User user2 = userRepository.findById(dto.user2Id())
-        .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("id에 해당하는 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     // 매칭된 유저가 아니면 채팅방을 생성할 수 없다.
     if (!(matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(user1, user2, MatchingStatus.ACCEPTED)
         || matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(user2, user1, MatchingStatus.ACCEPTED))
     ){
-      throw new RingoException("매칭되지 않은 쌍은 채팅방을 생성할 수 없습니다.", HttpStatus.BAD_REQUEST);
+      throw new RingoException("매칭되지 않은 쌍은 채팅방을 생성할 수 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
 
     // 채팅방 생성 및 저장
@@ -310,7 +313,7 @@ public class ChatService {
     for(Chatroom chatroom : chatrooms){
 
       // 채팅방 참여자 닉네임 조회
-      List<String> participants = chatroomParticipantRepository
+      List<String> roomMemberNicknames = chatroomParticipantRepository
           .findAllByChatroom(chatroom)
           .stream()
           .map(chatroomParticipant -> {
@@ -333,10 +336,10 @@ public class ChatService {
 
       responseDtoList.add(GetChatroomResponseDto.builder()
           .chatroomId(chatroom.getId())
-          .participants(participants)
+          .participants(roomMemberNicknames)
           .lastChatMessage(lastMessage.map(Message::getContent).orElse(null))
           .NumberOfNotReadMessages(numberOfNotReadMessages)
-          .chatroomSize(participants.size())
+          .chatroomSize(roomMemberNicknames.size())
           .build());
     }
     return responseDtoList;
@@ -346,11 +349,11 @@ public class ChatService {
   public void deleteChatroom(Long chatroomId, User user){
 
     Chatroom chatroom = chatroomRepository.findById(chatroomId)
-        .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     if (!isMemberInChatroom(chatroomId, user.getId())){
       log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
-      throw new RingoException("채팅방을 삭제할 권한이 없습니다.", HttpStatus.FORBIDDEN);
+      throw new RingoException("채팅방을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
     chatroomParticipantRepository.deleteAllByChatroom(chatroom);
@@ -360,7 +363,7 @@ public class ChatService {
 
   public boolean isMemberInChatroom(Long roomId, Long userId){
     Chatroom chatroom = chatroomRepository.findById(roomId)
-        .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     // 채팅방 참여자 유저 id 조회
     List<Long> userIds = chatroomParticipantRepository.findAllByChatroom(chatroom)
@@ -379,7 +382,7 @@ public class ChatService {
    */
   public List<String> getUserEmailsInChatroom(Long roomId){
     Chatroom chatroom = chatroomRepository.findById(roomId)
-        .orElseThrow(() -> new RingoException("채팅방에 초대된 유저를 찾는 중 채팅방가 존재하지 않습니다", HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("채팅방에 초대된 유저를 찾는 중 채팅방가 존재하지 않습니다", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     return chatroomParticipantRepository.findAllByChatroom(chatroom)
         .stream()
