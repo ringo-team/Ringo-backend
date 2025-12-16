@@ -28,6 +28,6 @@ public class UserPoint {
   @JoinColumn(name = "user_id")
   private User user;
 
-  @ColumnDefault("0")
+  @ColumnDefault(value = "0")
   private int point;
 }

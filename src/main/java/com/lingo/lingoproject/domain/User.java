@@ -30,6 +30,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.DynamicInsert;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -41,6 +43,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 @Getter
 @Setter
 @Builder
+@DynamicInsert
 @Table(name = "USERS")
 public class User extends Timestamp implements UserDetails {
 
@@ -133,6 +136,10 @@ public class User extends Timestamp implements UserDetails {
   private SignupStatus status;
 
   private String friendInvitationCode;
+
+  // 마케팅 수신 동의 여부
+  @ColumnDefault(value = "false")
+  private Boolean isMarketingReceptionConsent;
 
   public void setUserInfo(SignupUserInfoDto dto){
     this.nickname = dto.nickname();

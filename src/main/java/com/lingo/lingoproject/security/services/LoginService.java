@@ -127,6 +127,7 @@ public class LoginService {
     User user = User.builder()
         .loginId(dto.email())
         .password(passwordEncoder.encode(dto.password()))
+        .isMarketingReceptionConsent(dto.isMarketingReceptionConsent())
         .role(Role.USER)
         .status(SignupStatus.IN_PROGRESS)
         .build();
