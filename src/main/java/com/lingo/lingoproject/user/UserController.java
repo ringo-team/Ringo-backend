@@ -82,7 +82,7 @@ public class UserController {
       userService.deleteUser(user, reason);
       log.info("userId={}, step=회원탈퇴_완료, status=SUCCESS", userId);
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
           ErrorCode.SUCCESS.getCode(), "유저를 성공적으로 삭제하였습니다."));
     } catch (Exception e) {
       log.error("userId={}, step=회원탈퇴_실패, status=FAILED", userId, e);
@@ -123,7 +123,7 @@ public class UserController {
       String username = userService.findUserEmail(user);
       log.info("userId={}, step=유저_ID찾기_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(new GetUserLoginIdResponseDto(username));
+      return ResponseEntity.status(HttpStatus.OK).body(new GetUserLoginIdResponseDto(username));
     } catch (Exception e) {
       log.error("userId={}, step=유저_ID찾기_실패, status=FAILED", user.getId(), e);
       if (e instanceof RingoException re){
@@ -163,7 +163,7 @@ public class UserController {
       userService.resetPassword(dto.password(), user);
       log.info("userId={}, step=비밀번호_재설정_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
           ErrorCode.SUCCESS.getCode(), "password를 성공적으로 변경하였습니다."));
     } catch (Exception e) {
       log.error("userId={}, step=비밀번호_재설정_실패, status=FAILED", user.getId(), e);
@@ -199,7 +199,7 @@ public class UserController {
       GetUserInfoResponseDto dto = userService.getUserInfo(user);
       log.info("userId={}, step=유저정보_조회_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(dto);
+      return ResponseEntity.status(HttpStatus.OK).body(dto);
     } catch (Exception e) {
       log.error("userId={}, step=유저정보_조회_실패, status=FAILED", user.getId(), e);
       if (e instanceof RingoException re){
@@ -234,7 +234,7 @@ public class UserController {
       userService.updateUserInfo(user, dto);
       log.info("userId={}, step=유저정보_수정_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
           ErrorCode.SUCCESS.getCode(), "정상적으로 수정되었습니다."));
     } catch (Exception e) {
       log.error("userId={}, step=유저정보_수정_실패, status=FAILED", user.getId(), e);
@@ -264,7 +264,7 @@ public class UserController {
   public ResponseEntity<GetFriendInvitationCodeResponseDto> getInvitationCode(@AuthenticationPrincipal User user){
     try {
       log.info("userId={}, step=친구초대코드_조회_시작, status=SUCCESS", user.getId());
-      return ResponseEntity.ok().body(new GetFriendInvitationCodeResponseDto(user.getFriendInvitationCode()));
+      return ResponseEntity.status(HttpStatus.OK).body(new GetFriendInvitationCodeResponseDto(user.getFriendInvitationCode()));
     } catch (Exception e) {
       log.error("userId={}, step=친구초대코드_조회_실패, status=FAILED", user.getId(), e);
       if (e instanceof RingoException re){
@@ -306,7 +306,7 @@ public class UserController {
       userService.checkFriendInvitationCodeAndProvideReward(user, code);
       log.info("userId={}, step=친구초대코드_입력_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
           ErrorCode.SUCCESS.getCode(), "친구와 본인 모두 보상을 획득하였습니다."));
     } catch (Exception e) {
       log.error("userId={}, step=친구초대코드_입력_실패, status=FAILED", user.getId(), e);
@@ -342,7 +342,7 @@ public class UserController {
       userService.updateDormantAccount(user);
       log.info("userId={}, step=휴면계정_상태변경_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
           ErrorCode.SUCCESS.getCode(), "휴면 계정 정보를 업데이트 하였습니다."));
     } catch (Exception e) {
       log.error("userId={}, step=휴면계정_상태변경_실패, status=FAILED", user.getId(), e);
@@ -376,8 +376,8 @@ public class UserController {
       userService.saveUserAccessLog(user);
       log.info("userId={}, step=유저_접근로그_저장_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(
-          ErrorCode.SUCCESS.getCode(), "유저 접속 정보가 저장되었습니다."));
+      return ResponseEntity.status(HttpStatus.OK)
+          .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "유저 접속 정보가 저장되었습니다."));
     } catch (Exception e) {
       log.error("userId={}, step=유저_접근로그_저장_실패, status=FAILED", user.getId(), e);
       if (e instanceof RingoException re){

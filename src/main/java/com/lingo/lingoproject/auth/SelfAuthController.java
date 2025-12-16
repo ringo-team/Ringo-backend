@@ -39,6 +39,6 @@ public class SelfAuthController {
       throw new RingoException("본인인증 api 콜백 데이터를 복호화하거나 정보를 저장하는데 오류가 발생하였습니다.",
           ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return ResponseEntity.ok().build();
+    return ResponseEntity.status(HttpStatus.OK).build();
   }
 }

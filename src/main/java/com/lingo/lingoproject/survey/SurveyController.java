@@ -176,7 +176,7 @@ public class SurveyController {
       surveyService.saveSurveyResponse(responses, user);
       log.info("userId={}, step=설문_응답_저장_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
           ErrorCode.SUCCESS.getCode(), "정상적으로 설문지 응답이 저장되었습니다."));
     } catch (Exception e) {
       log.error("userId={}, step=설문_응답_저장_실패, status=FAILED", user.getId(), e);

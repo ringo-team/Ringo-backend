@@ -59,8 +59,8 @@ public class FcmController {
       fcmService.refreshFcmToken(dto, user);
       log.info("userId={}, step=리프레시_토큰_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(
-          new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "토큰이 정상적으로 저장되었습니다.")
+      return ResponseEntity.status(HttpStatus.OK)
+          .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "토큰이 정상적으로 저장되었습니다.")
       );
 
     }catch (Exception e){

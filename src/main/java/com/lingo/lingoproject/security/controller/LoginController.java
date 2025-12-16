@@ -233,7 +233,8 @@ public class LoginController {
       loginService.saveUserInfo(dto);
       log.info("step=회원_정보_저장_완료, status=SUCCESS");
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "유저 정보 저장이 완료되었습니다."));
+      return ResponseEntity.status(HttpStatus.OK)
+          .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "유저 정보 저장이 완료되었습니다."));
     }catch (Exception e) {
       log.error("step=회원_정보_저장_실패, status=FAILED", e);
       if (e instanceof RingoException re){

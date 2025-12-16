@@ -49,7 +49,7 @@ public class AdminController {
       log.info("page={}, size={}, step=관리자_유저정보_조회_시작, status=SUCCESS", page, size);
       List<GetUserInfoResponseDto> dtos = userService.getPageableUserInfo(page, size);
       log.info("page={}, size={}, count={}, step=관리자_유저정보_조회_완료, status=SUCCESS", page, size, dtos.size());
-      return ResponseEntity.ok().body(dtos);
+      return ResponseEntity.status(HttpStatus.OK).body(dtos);
     } catch (Exception e) {
       log.error("page={}, size={}, step=관리자_유저정보_조회_실패, status=FAILED", page, size, e);
       if (e instanceof RingoException re){
@@ -137,7 +137,7 @@ public class AdminController {
           userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt
       ));
       log.info("count={}, step=신고정보_조회_완료, status=SUCCESS", list.size());
-      return ResponseEntity.ok().body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
+      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
     } catch (Exception e) {
       log.error("step=신고정보_조회_실패, status=FAILED", e);
       if (e instanceof RingoException re){
@@ -173,7 +173,7 @@ public class AdminController {
       reportService.suspendUser(reportId, reportedUserStatus, admin.getId());
       log.info("adminId={}, reportId={}, step=신고조치_완료, status=SUCCESS", admin.getId(), reportId);
 
-      return ResponseEntity.ok().body("성공적으로 신고조치가 완료되었습니다.");
+      return ResponseEntity.status(HttpStatus.OK).body("성공적으로 신고조치가 완료되었습니다.");
     } catch (Exception e) {
       log.error("adminId={}, reportId={}, step=신고조치_실패, status=FAILED", admin.getId(), reportId, e);
       if (e instanceof RingoException re){

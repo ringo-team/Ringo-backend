@@ -241,7 +241,7 @@ public class ImageController {
       imageService.deleteProfile(profileId, user.getId());
       log.info("userId={}, profileId={}, step=프로필_삭제_완료, status=SUCCESS", user.getId(), profileId);
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
           ErrorCode.SUCCESS.getCode(), "이미지를 성공적으로 삭제했습니다."));
 
     }catch (Exception e){

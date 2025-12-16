@@ -98,7 +98,7 @@ public class MatchController {
             new ResultMessageResponseDto(ErrorCode.INADEQUATE.getCode(), "매칭 점수가 기준 이하로 매칭되지 않았습니다."));
       }
 
-      return ResponseEntity.ok().body(new RequestMatchingResponseDto(ErrorCode.SUCCESS.getCode(), matching.getId()));
+      return ResponseEntity.status(HttpStatus.OK).body(new RequestMatchingResponseDto(ErrorCode.SUCCESS.getCode(), matching.getId()));
     }
     catch (Exception e){
       log.error("requestId={}, requestedId={}, step=매칭_요청_실패, status=SUCCESS",
@@ -154,7 +154,7 @@ public class MatchController {
       matchService.responseToRequest(decision, matchingId, user);
       log.info("userId={}, matchingId={}, decision={}, step=매칭_응답_완료, status=SUCCESS", user.getId(), matchingId, decision);
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "매칭 상태가 변경되었습니다."));
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "매칭 상태가 변경되었습니다."));
 
     } catch (Exception e) {
       log.error("userId={}, matchingId={}, decision={}, step=매칭_응답_실패, status=FAILED",
@@ -265,7 +265,7 @@ public class MatchController {
       List<GetUserProfileResponseDto> rtnList = matchService.recommend(user);
       log.info("userId={}, step=이성_추천_시작, status=SUCCESS", userId);
 
-      return ResponseEntity.ok()
+      return ResponseEntity.status(HttpStatus.OK)
           .body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), rtnList));
     }catch (Exception e){
       log.error("userId={}, step=이성_추천_실패, status=FAILED", userId);
@@ -304,7 +304,7 @@ public class MatchController {
       List<GetUserProfileResponseDto> rtnList = matchService.recommendUserByDailySurvey(user);
       log.info("userId={}, step=설문_기반_이성_추천_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok().body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), rtnList));
+      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), rtnList));
     } catch (Exception e) {
       log.error("userId={}, step=설문_기반_이성_추천_실패, status=FAILED", user.getId());
       if (e instanceof RingoException re){
@@ -349,7 +349,8 @@ public class MatchController {
       matchService.deleteMatching(matchingId, user);
       log.info("userId={}, matchingId={}, step=매칭_삭제_완료, status=SUCCESS", user.getId(), matchingId);
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 매칭을 삭제하였습니다."));
+      return ResponseEntity.status(HttpStatus.OK)
+          .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 매칭을 삭제하였습니다."));
     } catch (Exception e) {
       log.error("userId={}, matchingId={}, step=매칭_삭제_실패, status=FAILED", user.getId(), matchingId, e);
       if (e instanceof RingoException re){
@@ -394,7 +395,8 @@ public class MatchController {
       matchService.saveMatchingRequestMessage(dto, matchingId, user);
       log.info("userId={}, matchingId={}, step=매칭_요청_메세지_저장_완료, status=SUCCESS", user.getId(), matchingId);
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "매칭 메세지가 성공적으로 저장되었습니다."));
+      return ResponseEntity.status(HttpStatus.OK)
+          .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "매칭 메세지가 성공적으로 저장되었습니다."));
     } catch (Exception e) {
       log.error("userId={}, matchingId={}, step=매칭_요청_메세지_저장_실패, status=FAILED", user.getId(), matchingId, e);
       if (e instanceof RingoException re){
@@ -440,7 +442,7 @@ public class MatchController {
       log.info("userId={}, matchingId={}, step=매칭_요청_메세지_조회_완료, status=SUCCESS", user.getId(),
           matchingId);
 
-      return ResponseEntity.ok().body(new GetMatchingRequestMessageResponseDto(ErrorCode.SUCCESS.getCode(), message));
+      return ResponseEntity.status(HttpStatus.OK).body(new GetMatchingRequestMessageResponseDto(ErrorCode.SUCCESS.getCode(), message));
     } catch (Exception e) {
       log.error("userId={}, matchingId={}, step=매칭_요청_메세지_조화_실패, status=FAILED", user.getId(),
           matchingId, e);

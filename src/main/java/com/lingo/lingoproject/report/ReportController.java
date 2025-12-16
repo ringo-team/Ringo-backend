@@ -36,8 +36,8 @@ public class ReportController {
     try {
       reportService.report(dto);
       log.info("userId={}, reportedUserId={}, step=신고_요청_완료, status=SUCCESS", user.getId(), dto.reportedUserId());
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(
-          ErrorCode.SUCCESS.getCode(), "신고가 성공적으로 접수되었습니다."));
+      return ResponseEntity.status(HttpStatus.OK)
+          .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "신고가 성공적으로 접수되었습니다."));
     } catch (Exception e) {
       log.error("userId={}, reportedUserId={}, step=신고_요청_실패, status=FAILED", user.getId(), dto.reportedUserId(), e);
       if (e instanceof RingoException re){

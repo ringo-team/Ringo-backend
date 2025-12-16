@@ -44,7 +44,7 @@ public class SnapController {
       snapService.applySnapShooting(dto);
       log.info("step=스냅_촬영_신청_완료, status=SUCCESS");
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 촬영 날짜가 저장되었습니다."));
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 촬영 날짜가 저장되었습니다."));
     } catch (Exception e) {
       log.error("step=스냅_촬영_신청_실패, status=FAILED", e);
       if (e instanceof RingoException re) {
@@ -65,7 +65,7 @@ public class SnapController {
       snapService.savePhotographerInfo(dto, photographerId);
       log.info("photographerId={}, step=작가_정보_저장_완료, status=SUCCESS", photographerId);
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 작가 정보가 저장되었습니다."));
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 작가 정보가 저장되었습니다."));
 
     } catch (Exception e) {
       log.error("photographerId={}, step=작가_정보_저장_실패, status=FAILED", photographerId, e);
@@ -113,7 +113,7 @@ public class SnapController {
       snapService.updatePhotographerExampleImagesInfo(dto);
       log.info("step=작가_예시사진_정보_저장_완료, status=SUCCESS");
 
-      return ResponseEntity.ok().body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "정상적으로 사진 정보가 저장되었습니다."));
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "정상적으로 사진 정보가 저장되었습니다."));
 
     } catch (Exception e) {
       log.error("step=작가_예시사진_정보_저장_실패, status=FAILED", e);
@@ -134,7 +134,7 @@ public class SnapController {
       list = snapService.getPhotographerInfos();
       log.info("step=작가_정보_조회_완료, status=SUCCESS");
 
-      return ResponseEntity.ok().body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
+      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
 
     } catch (Exception e) {
       log.error("step=작가_정보_조회_실패, status=FAILED", e);
