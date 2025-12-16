@@ -29,7 +29,7 @@ public class DeadLetterFcmMessage {
   private String errorMessage;
   private String errorCause;
   private String message;
-  private String userEmail;
+  private String userLoginId;
   private Integer retryCount;
   private String title;
 

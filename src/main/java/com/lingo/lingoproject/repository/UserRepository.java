@@ -9,15 +9,13 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<User, Long> {
-  Optional<User> findByEmail(String email);
-
-  List<User> findAllByEmailIn(Collection<String> emails);
+  Optional<User> findByLoginId(String loginId);
 
   Optional<User> findByFriendInvitationCode(String friendInvitationCode);
 
   List<User> findAllByIdIn(Collection<Long> ids);
 
-  boolean existsByEmail(String email);
+  boolean existsByLoginId(String loginId);
 
   List<User> findAllByCreatedAtAfter(LocalDateTime createdAtAfter);
 

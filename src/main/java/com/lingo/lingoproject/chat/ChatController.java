@@ -263,7 +263,7 @@ public class ChatController {
   @MessageMapping("/{roomId}")
   public void sendMessage(@DestinationVariable Long roomId, GetChatMessageResponseDto chatMessageDto) {
     List<User> roomMembers = chatService.findUserInChatroom(roomId);
-    List<String> roomMemberEmails = roomMembers.stream().map(User::getEmail).toList();
+    List<String> roomMemberLoginId = roomMembers.stream().map(User::getLoginId).toList();
     List<Long> existUserIdsInRoom = chatService.findExistUserIdsInRoom(roomId, roomMembers, chatMessageDto.getSenderId());
 
     // 메세지 저장
@@ -272,20 +272,20 @@ public class ChatController {
 
     if (savedMessage == null) return;
 
-    for (String userEmail : roomMemberEmails) {
+    for (String userLoginId : roomMemberLoginId) {
       try {
         // 해당 방에 메세지 전송
-        simpMessagingTemplate.convertAndSendToUser(userEmail, "/topic/" + roomId, chatMessageDto);
+        simpMessagingTemplate.convertAndSendToUser(userLoginId, "/topic/" + roomId, chatMessageDto);
       } catch (Exception e) {
-        chatService.savedSimpMessagingError(roomId, savedMessage, userEmail, e, "/topic/");
+        chatService.savedSimpMessagingError(roomId, savedMessage, userLoginId, e, "/topic/");
       }
       try {
         // 채팅 미리보기 기능
-        simpMessagingTemplate.convertAndSendToUser(userEmail, "/room-list", chatMessageDto);
+        simpMessagingTemplate.convertAndSendToUser(userLoginId, "/room-list", chatMessageDto);
       } catch (Exception e) {
-        log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail,
+        log.error("chatroomId={}, userLoginId={}, step=메세지_전송_실패, status=FAILED", roomId, userLoginId,
             e);
-        chatService.savedSimpMessagingError(roomId, savedMessage, userEmail, e, "/room-list/");
+        chatService.savedSimpMessagingError(roomId, savedMessage, userLoginId, e, "/room-list/");
       }
     }
 

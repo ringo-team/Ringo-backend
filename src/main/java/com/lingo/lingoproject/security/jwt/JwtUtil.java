@@ -50,7 +50,7 @@ public class JwtUtil {
     return Jwts.builder()
         .issuer(issuer)
         .issuedAt(new Date())
-        .subject(user.getEmail())
+        .subject(user.getLoginId())
         .expiration(new Date(System.currentTimeMillis() + expiration))
         .signWith(this.getSigningKey())
         .compact();

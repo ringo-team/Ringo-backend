@@ -1,7 +1,6 @@
 package com.lingo.lingoproject.user;
 
 import com.lingo.lingoproject.domain.User;
-import com.lingo.lingoproject.domain.UserAccessLog;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.user.dto.GetFriendInvitationCodeResponseDto;
@@ -117,13 +116,13 @@ public class UserController {
       }
   )
   @GetMapping("/find-id")
-  public ResponseEntity<GetUserLoginIdResponseDto> findUserEmail(@AuthenticationPrincipal User user){
+  public ResponseEntity<GetUserLoginIdResponseDto> findUserLoginId(@AuthenticationPrincipal User user){
     try {
       log.info("userId={}, step=유저_ID찾기_시작, status=SUCCESS", user.getId());
-      String username = userService.findUserEmail(user);
+      String loginId = userService.findUserLoginId(user);
       log.info("userId={}, step=유저_ID찾기_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.status(HttpStatus.OK).body(new GetUserLoginIdResponseDto(username));
+      return ResponseEntity.status(HttpStatus.OK).body(new GetUserLoginIdResponseDto(loginId));
     } catch (Exception e) {
       log.error("userId={}, step=유저_ID찾기_실패, status=FAILED", user.getId(), e);
       if (e instanceof RingoException re){

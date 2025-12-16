@@ -32,7 +32,7 @@ public class StompConnectionListener {
       StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
       if (accessor.getUser() == null) return;
       String loginId = accessor.getUser().getName();
-      User user = userRepository.findByEmail(loginId).orElseThrow(() -> new RingoException(
+      User user = userRepository.findByLoginId(loginId).orElseThrow(() -> new RingoException(
               "세션에 해당하는 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
       // 접속 중인 채팅방 조회
@@ -74,7 +74,7 @@ public class StompConnectionListener {
       StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
       if (accessor.getUser() == null) return;
       String username = accessor.getUser().getName();
-      User user = userRepository.findByEmail(username).orElseThrow(() ->
+      User user = userRepository.findByLoginId(username).orElseThrow(() ->
           new RingoException("세션에 해당하는 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
       // 유저 id 로 저장된 키 모두 삭제

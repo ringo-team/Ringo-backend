@@ -142,8 +142,8 @@ public class ChatService {
     }
   }
 
-  public void savedSimpMessagingError(Long roomId, Message savedMessage, String userEmail, Exception e, String destination) {
-    log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail,
+  public void savedSimpMessagingError(Long roomId, Message savedMessage, String userLoginId, Exception e, String destination) {
+    log.error("chatroomId={}, userLoginId={}, step=메세지_전송_실패, status=FAILED", roomId, userLoginId,
         e);
     FailedChatMessageLog failedFcmMessageLog = FailedChatMessageLog.builder()
         .roomId(roomId)
@@ -151,7 +151,7 @@ public class ChatService {
         .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
         .messageId(savedMessage.getId())
         .destination(destination + roomId)
-        .userEmail(userEmail)
+        .userLoginId(userLoginId)
         .build();
     failedChatMessageLogRepository.save(failedFcmMessageLog);
   }
@@ -360,22 +360,6 @@ public class ChatService {
         .toList();
 
     return userIds.contains(userId);
-  }
-
-
-  /**
-   * 채팅방에 존재하는 유저들의 이메일들을 조회하는 함수
-   */
-  public List<String> getUserEmailsInChatroom(Long roomId){
-    Chatroom chatroom = chatroomRepository.findById(roomId)
-        .orElseThrow(() -> new RingoException("채팅방에 초대된 유저를 찾는 중 채팅방가 존재하지 않습니다", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-
-    return chatroomParticipantRepository.findAllByChatroom(chatroom)
-        .stream()
-        .filter(participant -> !participant.getIsWithdrawn())
-        .map(ChatroomParticipant::getParticipant)
-        .map(User::getUsername)
-        .toList();
   }
 
   public List<User> findUserInChatroom(Long roomId){

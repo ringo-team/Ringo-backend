@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +65,7 @@ public class LoginService {
       throw new RingoException("유저가 인증되지 않았습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
-    User user = userRepository.findByEmail(dto.email())
+    User user = userRepository.findByLoginId(dto.email())
         .orElseThrow(() -> new RingoException(
             "해당 로그인 아이디를 가진 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
@@ -93,7 +92,7 @@ public class LoginService {
 
     Claims claims =  jwtUtil.getClaims(refreshToken);
 
-    User user = userRepository.findByEmail(claims.getSubject())
+    User user = userRepository.findByLoginId(claims.getSubject())
         .orElseThrow(() -> new RingoException("해당 이메일을 가진 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     JwtRefreshToken tokenInfo = jwtRefreshTokenRepository.findByUser(user)
@@ -122,11 +121,11 @@ public class LoginService {
     if(!dto.password().matches("^(?=.*[A-Za-z])(?=.*\\d).+$")){
       throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.NOT_ACCEPTABLE);
     }
-    if(userRepository.existsByEmail(dto.email())){
+    if(userRepository.existsByLoginId(dto.email())){
       throw new RingoException("중복된 로그인 아이디 입니다.", ErrorCode.DUPLICATED, HttpStatus.NOT_ACCEPTABLE);
     }
     User user = User.builder()
-        .email(dto.email())
+        .loginId(dto.email())
         .password(passwordEncoder.encode(dto.password()))
         .role(Role.USER)
         .status(SignupStatus.IN_PROGRESS)
@@ -134,8 +133,8 @@ public class LoginService {
     return  userRepository.save(user);
   }
 
-  public boolean verifyDuplicatedLoginId(String email){
-    return userRepository.existsByEmail(email);
+  public boolean verifyDuplicatedLoginId(String loginId){
+    return userRepository.existsByLoginId(loginId);
   }
 
   public boolean verifyDuplicatedNickname(String nickname){

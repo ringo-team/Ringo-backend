@@ -99,7 +99,7 @@ public class UserService {
     }
   }
 
-  public String findUserEmail(User user) {
+  public String findUserLoginId(User user) {
     Long userId = user.getId();
     boolean isAuthenticated = redisUtils.isCompleteSelfAuth(userId.toString());
     if (isAuthenticated) {

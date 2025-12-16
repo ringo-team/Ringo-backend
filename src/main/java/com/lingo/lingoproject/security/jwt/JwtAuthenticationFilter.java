@@ -20,7 +20,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -41,7 +40,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       accessToken = accessToken.substring(7);
 
       Claims claims = jwtUtil.getClaims(accessToken);
-      User user = userRepository.findByEmail(claims.getSubject())
+      User user = userRepository.findByLoginId(claims.getSubject())
           .orElseThrow(() -> new RingoException("유효하지 않은 토큰입니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN));
 
       // 로그아웃한 유저가 기존 토큰으로 접근하려고 할때 접근을 차단함

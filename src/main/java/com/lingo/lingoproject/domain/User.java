@@ -51,7 +51,7 @@ public class User extends Timestamp implements UserDetails {
 
   @Override
   public String getUsername() {
-    return this.email;
+    return this.loginId;
   }
 
   @Override
@@ -69,7 +69,7 @@ public class User extends Timestamp implements UserDetails {
   private String name;
 
   @Column(unique = true)
-  private String email;
+  private String loginId;
   private String password;
 
   @Column(unique = true)

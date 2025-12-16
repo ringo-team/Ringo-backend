@@ -25,5 +25,5 @@ public class FailedChatMessageLog {
   private String errorCause;
   private Long roomId;
   private String destination;
-  private String userEmail;
+  private String userLoginId;
 }

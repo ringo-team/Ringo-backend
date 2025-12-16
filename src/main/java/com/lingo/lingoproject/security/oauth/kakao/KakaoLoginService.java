@@ -77,7 +77,7 @@ public class KakaoLoginService {
     if(response == null){
       throw new RingoException("Kakao user info response is null", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    Optional<User> user = userRepository.findByEmail(response.id().toString());
+    Optional<User> user = userRepository.findByLoginId(response.id().toString());
     User loginUser = null;
     if(user.isEmpty()){
       loginUser = oAuthUtils.signup(response.id().toString());
