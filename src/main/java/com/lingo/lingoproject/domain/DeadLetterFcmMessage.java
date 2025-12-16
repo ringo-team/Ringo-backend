@@ -44,7 +44,6 @@ public class DeadLetterFcmMessage {
         .errorMessage(log.getErrorMessage())
         .errorCause(log.getErrorCause())
         .message(log.getMessage())
-        .userEmail(log.getUserEmail())
         .retryCount(log.getRetryCount())
         .title(log.getTitle())
         .build();

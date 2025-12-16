@@ -119,7 +119,7 @@ public class ChatService {
         .build();
   }
 
-  public List<Long> findExistUserIdsInRoom(Long roomId, GetChatMessageResponseDto message, List<User> roomMembers) {
+  public List<Long> findExistUserIdsInRoom(Long roomId, List<User> roomMembers, Long senderId) {
 
     List<Long> existMemberIdList = new ArrayList<>();
 
@@ -137,8 +137,8 @@ public class ChatService {
 
       return existMemberIdList;
     }catch (Exception e){
-      log.error("senderId={}, chatroomId={}, step=메세제_저장, status=FAILED",  message.getSenderId(), roomId, e);
-      return null;
+      log.error("senderId={}, chatroomId={}, step=메세제_저장, status=FAILED",  senderId, roomId, e);
+      throw new RingoException("채팅방에 접속해있는 멤버 확인 중 오류가 발생했습니다.", ErrorCode.INTERNAL_SERVER_ERROR,  HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -173,10 +173,10 @@ public class ChatService {
 
     List<String> fcmTokens = null;
     try{
-    List<User> notExistMember = roomMembers.stream()
-        .filter(u -> !existUserIdsInRoom.contains(u.getId()))
-        .toList();
-    fcmTokens = fcmTokenRepository.findByUserIn(notExistMember);
+      List<User> notExistMember = roomMembers.stream()
+          .filter(u -> !existUserIdsInRoom.contains(u.getId()))
+          .toList();
+      fcmTokens = fcmTokenRepository.findByUserIn(notExistMember);
     } catch (Exception e) {
       log.error("chatroomId={}, step=FCM_TOKEN_조회, status=FAILED", roomId, e);
       return;
@@ -200,14 +200,7 @@ public class ChatService {
         log.error("chatroomId={}, step=FCM_SEND_ERROR, status=FAILED", roomId, e);
         List<FailedFcmMessageLog> errorLogList = new ArrayList<>();
         for (String fcmToken : fcmTokens) {
-          FailedFcmMessageLog log = FailedFcmMessageLog.builder()
-              .title("메세지가 도착했습니다.")
-              .errorMessage(e.getMessage())
-              .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
-              .message(savedMessage.getContent())
-              .token(fcmToken)
-              .retryCount(0)
-              .build();
+          FailedFcmMessageLog log = FailedFcmMessageLog.of(e, fcmToken, "메세지가 도착했습니다.", savedMessage.getContent());
           errorLogList.add(log);
           fcmRetryQueueService.pushToQueue("FCM", log);
         }
@@ -231,14 +224,7 @@ public class ChatService {
         // 보내지지 않은 메세지의 세부 정보를 로깅하기
         FirebaseMessagingException exception = responses.get(i).getException();
         log.error("step=CHAT_FCM_MULTICAST, status=FAILED");
-        FailedFcmMessageLog log = FailedFcmMessageLog.builder()
-            .token(fcmTokens.get(i))
-            .errorMessage(exception.getMessage())
-            .errorCause(exception.getCause() != null ? exception.getCause().getMessage() : null)
-            .message(savedMessage.getContent())
-            .title("메세지가 도착했습니다.")
-            .retryCount(0)
-            .build();
+        FailedFcmMessageLog log = FailedFcmMessageLog.of(exception, fcmTokens.get(i), "메세지가 도착했습니다.", savedMessage.getContent());
         errorLogList.add(log);
         // 재전송 로직
         fcmRetryQueueService.pushToQueue("FCM", log);
@@ -389,6 +375,16 @@ public class ChatService {
         .filter(participant -> !participant.getIsWithdrawn())
         .map(ChatroomParticipant::getParticipant)
         .map(User::getUsername)
+        .toList();
+  }
+
+  public List<User> findUserInChatroom(Long roomId){
+    Chatroom chatroom = chatroomRepository.findById(roomId)
+        .orElseThrow(() -> new RingoException("채팅방에 초대된 유저를 찾는 중 채팅방가 존재하지 않습니다", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+    return chatroomParticipantRepository.findAllByChatroom(chatroom)
+        .stream()
+        .filter(participant -> !participant.getIsWithdrawn())
+        .map(ChatroomParticipant::getParticipant)
         .toList();
   }
 

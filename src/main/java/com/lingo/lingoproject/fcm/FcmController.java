@@ -60,7 +60,8 @@ public class FcmController {
       log.info("userId={}, step=리프레시_토큰_완료, status=SUCCESS", user.getId());
 
       return ResponseEntity.ok().body(
-          new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "토큰이 정상적으로 저장되었습니다."));
+          new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "토큰이 정상적으로 저장되었습니다.")
+      );
 
     }catch (Exception e){
       log.error("userId={}, step=리프레시_토큰_실패, status=FAILED", user.getId(), e);

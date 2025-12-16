@@ -23,8 +23,6 @@ import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -33,7 +31,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -264,27 +261,27 @@ public class ChatController {
    * prefix인 app이 빠져있음
    */
   @MessageMapping("/{roomId}")
-  public void sendMessage(@DestinationVariable Long roomId, GetChatMessageResponseDto message) {
-    List<String> roomMemberEmails = chatService.getUserEmailsInChatroom(roomId);
-    List<User> roomMembers = userService.findUserByEmailsIn(roomMemberEmails);
-    List<Long> existUserIdsInRoom = chatService.findExistUserIdsInRoom(roomId, message, roomMembers);
+  public void sendMessage(@DestinationVariable Long roomId, GetChatMessageResponseDto chatMessageDto) {
+    List<User> roomMembers = chatService.findUserInChatroom(roomId);
+    List<String> roomMemberEmails = roomMembers.stream().map(User::getEmail).toList();
+    List<Long> existUserIdsInRoom = chatService.findExistUserIdsInRoom(roomId, roomMembers, chatMessageDto.getSenderId());
 
     // 메세지 저장
-    message.getReaderIds().addAll(existUserIdsInRoom);
-    Message savedMessage = chatService.saveMessage(message, roomId);
+    chatMessageDto.getReaderIds().addAll(existUserIdsInRoom);
+    Message savedMessage = chatService.saveMessage(chatMessageDto, roomId);
 
     if (savedMessage == null) return;
 
     for (String userEmail : roomMemberEmails) {
       try {
         // 해당 방에 메세지 전송
-        simpMessagingTemplate.convertAndSendToUser(userEmail, "/topic/" + roomId, message);
+        simpMessagingTemplate.convertAndSendToUser(userEmail, "/topic/" + roomId, chatMessageDto);
       } catch (Exception e) {
         chatService.savedSimpMessagingError(roomId, savedMessage, userEmail, e, "/topic/");
       }
       try {
         // 채팅 미리보기 기능
-        simpMessagingTemplate.convertAndSendToUser(userEmail, "/room-list", message);
+        simpMessagingTemplate.convertAndSendToUser(userEmail, "/room-list", chatMessageDto);
       } catch (Exception e) {
         log.error("chatroomId={}, userEmail={}, step=메세지_전송_실패, status=FAILED", roomId, userEmail,
             e);

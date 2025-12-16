@@ -34,10 +34,21 @@ public class FailedFcmMessageLog extends RedisQueueMessagePayLoad {
   private String token;
   private String errorMessage;
   private String errorCause;
-  private String userEmail;
   private String title;
 
   @CreationTimestamp
   @Column(updatable = false)
   private LocalDateTime createAt;
+
+  public static FailedFcmMessageLog of(Exception exception, String token, String title, String message){
+    return FailedFcmMessageLog.builder()
+        .token(token)
+        .errorMessage(exception.getMessage())
+        .errorCause(exception.getCause() != null ? exception.getCause().getMessage() : null)
+        .title(title)
+        .message(message)
+        .retryCount(0)
+        .build();
+  }
+
 }

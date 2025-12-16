@@ -258,8 +258,4 @@ public class UserService {
         .build();
     dormantAccountRepository.save(dormantAccount);
   }
-
-  public List<User> findUserByEmailsIn(List<String> userEmails){
-    return userRepository.findAllByEmailIn(userEmails);
-  }
 }
