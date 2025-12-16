@@ -9,6 +9,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -28,7 +29,23 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @AllArgsConstructor
 @Setter
 @Getter
-@Table(name = "MATCHINGS")
+@Table(
+    name = "MATCHINGS",
+    indexes = {
+        @Index(
+            name = "idx_matchings_req_reqd_status",
+            columnList = "request_user, requested_user, matchingStatus"
+        ),
+        @Index(
+            name = "idx_matchings_request_user",
+            columnList = "request_user"
+        ),
+        @Index(
+            name = "idx_matchings_requested_user",
+            columnList = "requested_user"
+        )
+    }
+)
 public class Matching {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
