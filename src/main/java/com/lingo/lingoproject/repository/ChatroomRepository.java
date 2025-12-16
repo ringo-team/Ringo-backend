@@ -9,6 +9,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ChatroomRepository extends JpaRepository<Chatroom, Long> {
-  @Query("select c from Chatroom c join ChatroomParticipant cp on c = cp.chatroom where cp.participant = :user")
+  @Query("select cp.chatroom from ChatroomParticipant cp where cp.participant = :user")
   List<Chatroom> findAllByUser(@Param("user") User user);
 }

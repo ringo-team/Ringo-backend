@@ -7,6 +7,7 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -18,12 +19,20 @@ import lombok.Setter;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
-@Table(name = "ANSWERED_SURVEYS")
 @Builder
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(
+    name = "ANSWERED_SURVEYS",
+    indexes = {
+        @Index(
+            name = "idx_answered_surveys_user_id_survey_num",
+            columnList = "user_id, surveyNum"
+        )
+    }
+)
 public class AnsweredSurvey extends Timestamp {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

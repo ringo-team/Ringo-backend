@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -17,7 +18,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
-@Table(name = "BLOCKED_USERS")
+@Table(
+    name = "BLOCKED_USERS",
+    indexes = {
+        @Index(
+            name = "idx_blocked_users_blocked_user_id",
+            columnList = "blockedUserId"
+        )
+    }
+)
 public class BlockedUser {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

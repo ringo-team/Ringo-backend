@@ -54,11 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       }
 
       // 영구 정지된 사람인 경우 접근을 차단함
-      List<Long> blockUserIds = blockedUserRepository.findAll()
-          .stream()
-          .map(BlockedUser::getId)
-          .toList();
-      if (blockUserIds.contains(user.getId())) {
+      if (blockedUserRepository.existsByBlockedUserId(user.getId())) {
         throw new RingoException("영구정지된 유저입니다.", ErrorCode.BLOCKED, HttpStatus.FORBIDDEN);
       }
 

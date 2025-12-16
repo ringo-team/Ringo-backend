@@ -10,10 +10,12 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -28,7 +30,15 @@ import org.hibernate.annotations.DynamicInsert;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "PROFILES")
+@Table(
+    name = "PROFILES",
+    indexes = {
+        @Index(name = "idx_profiles_user_id", columnList = "user_id")
+    },
+    uniqueConstraints = {
+        @UniqueConstraint(name = "ux_profiles_user_id", columnNames = {"user_id"})
+    }
+)
 @DynamicInsert
 public class Profile extends Timestamp {
   @Id
@@ -44,7 +54,4 @@ public class Profile extends Timestamp {
 
   @ColumnDefault(value = "false")
   private Boolean isVerified;
-
-  @Enumerated(EnumType.STRING)
-  private InspectStatus status;
 }

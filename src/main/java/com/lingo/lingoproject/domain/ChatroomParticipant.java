@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -19,8 +20,20 @@ import org.hibernate.annotations.DynamicInsert;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-@Table(name = "CHATROOM_PARTICIPANTS")
 @DynamicInsert
+@Table(
+    name = "CHATROOM_PARTICIPANTS",
+    indexes = {
+        @Index(
+            name = "idx_chatroom_participants_chatroom",
+            columnList = "chatting_room_id"
+        ),
+        @Index(
+            name = "idx_chatroom_participants_participant",
+            columnList = "participant_user_id"
+        )
+    }
+)
 public class ChatroomParticipant {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

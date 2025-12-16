@@ -167,11 +167,7 @@ public class LoginService {
       throw new RingoException("본인인증 되지 않은 회원입니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
 
-    List<String> blockUserPhoneNumberList = blockedUserRepository.findAll()
-        .stream()
-        .map(BlockedUser::getPhoneNumber)
-        .toList();
-    if(blockUserPhoneNumberList.contains(user.getPhoneNumber().trim())){
+    if(blockedUserRepository.existsByPhoneNumber(user.getPhoneNumber().trim())){
       throw new RingoException("블락된 유저 입니다.", ErrorCode.BLOCKED, HttpStatus.FORBIDDEN);
     }
 
@@ -186,7 +182,7 @@ public class LoginService {
     }
 
     // 친구초대코드가 존재한다면 한번 더 api 호출
-    if (!user.getFriendInvitationCode().isBlank()){
+    if (user.getFriendInvitationCode() != null && !user.getFriendInvitationCode().isBlank()){
       try {
         userRepository.save(user);
         hashtagRepository.deleteAllByUser(user);
