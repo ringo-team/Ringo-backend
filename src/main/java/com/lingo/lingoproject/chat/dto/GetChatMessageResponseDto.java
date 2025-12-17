@@ -1,7 +1,9 @@
 package com.lingo.lingoproject.chat.dto;
 
 
+import com.lingo.lingoproject.domain.Message;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,4 +29,14 @@ public class GetChatMessageResponseDto {
   String createdAt;
   @Schema(description = "채팅 읽은 사람 리스트", example = "[\"12\", \"25\"]")
   List<Long> readerIds;
+
+  public static GetChatMessageResponseDto from(Long chatroomId, Message m){
+    return GetChatMessageResponseDto.builder()
+        .chatroomId(chatroomId)
+        .senderId(m.getSenderId())
+        .content(m.getContent())
+        .createdAt(m.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+        .readerIds(m.getReaderIds())
+        .build();
+  }
 }

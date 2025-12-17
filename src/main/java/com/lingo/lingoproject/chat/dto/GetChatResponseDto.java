@@ -10,6 +10,6 @@ import lombok.Data;
 public class GetChatResponseDto {
   @Schema(description = "응답 결과", example = "0000")
   String result;
-  List<GetChatroomMemberInfoResponseDto> memberInfos;
+  GetChatroomMemberInfoResponseDto memberInfo;
   List<GetChatMessageResponseDto> messages;
 }

@@ -1,11 +1,6 @@
 package com.lingo.lingoproject.chat;
 
-import com.google.firebase.messaging.BatchResponse;
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.FirebaseMessagingException;
-import com.google.firebase.messaging.MulticastMessage;
-import com.google.firebase.messaging.Notification;
-import com.google.firebase.messaging.SendResponse;
+
 import com.lingo.lingoproject.chat.dto.GetChatMessageResponseDto;
 import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
@@ -13,9 +8,7 @@ import com.lingo.lingoproject.chat.dto.GetChatroomMemberInfoResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.ChatroomParticipant;
-import com.lingo.lingoproject.domain.ExceptionMessage;
 import com.lingo.lingoproject.domain.FailedChatMessageLog;
-import com.lingo.lingoproject.domain.FailedFcmMessageLog;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Message;
 import com.lingo.lingoproject.domain.Profile;
@@ -27,15 +20,11 @@ import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.ChatroomRepository;
 import com.lingo.lingoproject.mongo_repository.MessageRepository;
-import com.lingo.lingoproject.repository.ExceptionMessageRepository;
 import com.lingo.lingoproject.repository.FailedChatMessageLogRepository;
-import com.lingo.lingoproject.repository.FailedFcmMessageLogRepository;
-import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
-import com.lingo.lingoproject.retry.FcmRetryQueueService;
 import com.lingo.lingoproject.utils.GenericUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
@@ -66,13 +55,10 @@ public class ChatService {
   private final GenericUtils genericUtils;
   private final MatchingRepository matchingRepository;
   private final RedisTemplate<String, Object> redisTemplate;
-  private final FailedFcmMessageLogRepository failedFcmMessageLogRepository;
-  private final FcmTokenRepository fcmTokenRepository;
-  private final ExceptionMessageRepository exceptionMessageRepository;
   private final ProfileRepository profileRepository;
   private final HashtagRepository hashtagRepository;
   private final FailedChatMessageLogRepository failedChatMessageLogRepository;
-  private final FcmRetryQueueService fcmRetryQueueService;
+
 
   public GetChatResponseDto getChatMessages(User user, Long chatroomId, int page, int size){
     // 페이지네이션
@@ -80,69 +66,68 @@ public class ChatService {
 
     // 메세지 조회
     Page<Message> messages = messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable);
+    List<GetChatMessageResponseDto> messagesDto = messages.stream()
+        .map(m -> GetChatMessageResponseDto.from(chatroomId, m))
+        .toList();
 
+    // 채팅방 및 채팅방 멤버 조회
     Chatroom chatroom = chatroomRepository.findById(chatroomId)
         .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-    List<User> participants = chatroomParticipantRepository.findAllByChatroom(chatroom)
-        .stream()
-        .map(ChatroomParticipant::getParticipant)
-        .filter(p -> !p.getId().equals(user.getId()))
-        .toList();
-    List<GetChatroomMemberInfoResponseDto> memberInfoDtos = new ArrayList<>();
-    participants.forEach(p -> {
-      Profile userProfile = profileRepository.findByUser(p).orElse(null);
-      List<String> hashtags = hashtagRepository.findAllByUser(p).stream().map(Hashtag::getHashtag).toList();
-      memberInfoDtos.add(GetChatroomMemberInfoResponseDto.builder()
-              .profileUrl(userProfile != null ? userProfile.getImageUrl() : null)
-              .userId(p.getId())
-              .nickname(p.getNickname())
-              .hashtag(hashtags)
-          .build());
-    });
+    List<ChatroomParticipant> participants = chatroomParticipantRepository.findAllByChatroom(chatroom);
+    if (participants.size() == 1){
+      return GetChatResponseDto.builder()
+          .result(ErrorCode.SUCCESS.getCode())
+          .memberInfo(null)
+          .messages(messagesDto)
+          .build();
+    }
 
-    List<GetChatMessageResponseDto> messagesDto = messages.stream()
-        .map(m ->
-          GetChatMessageResponseDto.builder()
-              .chatroomId(chatroomId)
-              .senderId(m.getSenderId())
-              .content(m.getContent())
-              .createdAt(m.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
-              .readerIds(m.getReaderIds())
-              .build()
-        )
-        .toList();
+    // 상대방 유저 확인
+    User firstParticipant = participants.getFirst().getParticipant();
+    User otherChatroomMember;
+    if (firstParticipant.getId().equals(user.getId())){
+      otherChatroomMember = participants.get(1).getParticipant();
+    }
+    else otherChatroomMember = participants.get(0).getParticipant();
+
+    // 상대방 유저 프로필 조회
+    Profile userProfile = profileRepository.findByUser(otherChatroomMember).orElse(null);
+    List<String> hashtags = hashtagRepository.findAllByUser(otherChatroomMember).stream()
+        .map(Hashtag::getHashtag).toList();
+    GetChatroomMemberInfoResponseDto memberInfo = GetChatroomMemberInfoResponseDto.builder()
+        .profileUrl(userProfile != null ? userProfile.getImageUrl() : null)
+        .userId(otherChatroomMember.getId())
+        .nickname(otherChatroomMember.getNickname())
+        .hashtag(hashtags)
+        .build();
 
     return GetChatResponseDto.builder()
         .result(ErrorCode.SUCCESS.getCode())
-        .memberInfos(memberInfoDtos)
+        .memberInfo(memberInfo)
         .messages(messagesDto)
         .build();
   }
 
-  public List<Long> findExistUserIdsInRoom(Long roomId, List<User> roomMembers, Long senderId) {
-
-    List<Long> existMemberIdList = new ArrayList<>();
+  public Boolean existReceiverInChatroom(Long senderId, Long receiverId, Long roomId) {
 
     try {
       ValueOperations<String, Object> ops = redisTemplate.opsForValue();
 
-      // 현재 접속해있는 채팅방 멤버의 유저 id를 구한다.
-      for (User user : roomMembers) {
+      return ops.getOperations().hasKey("connect::" + receiverId + "::" + roomId);
 
-        if (ops.get("connect::" + user.getId() + "::" + roomId) != null) {
-
-          existMemberIdList.add(user.getId());
-        }
-      }
-
-      return existMemberIdList;
     }catch (Exception e){
       log.error("senderId={}, chatroomId={}, step=메세제_저장, status=FAILED",  senderId, roomId, e);
       throw new RingoException("채팅방에 접속해있는 멤버 확인 중 오류가 발생했습니다.", ErrorCode.INTERNAL_SERVER_ERROR,  HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  public void savedSimpMessagingError(Long roomId, Message savedMessage, String userLoginId, Exception e, String destination) {
+  public void savedSimpMessagingError(
+      Exception e,
+      Message savedMessage,
+      Long roomId,
+      String userLoginId,
+      String destination
+  ) {
     log.error("chatroomId={}, userLoginId={}, step=메세지_전송_실패, status=FAILED", roomId, userLoginId,
         e);
     FailedChatMessageLog failedFcmMessageLog = FailedChatMessageLog.builder()
@@ -153,89 +138,9 @@ public class ChatService {
         .destination(destination + roomId)
         .userLoginId(userLoginId)
         .build();
+    messageRepository.delete(savedMessage);
     failedChatMessageLogRepository.save(failedFcmMessageLog);
   }
-
-  // 채팅방에 존재하지 않는 사람들은 fcm으로 알림을 보낸다.
-  /*
-   * {
-   *    "message":{
-   *      "notification":{
-   *        "title": "title",
-   *        "body": "message"
-   *        "image": "imageUrl"
-   *      }
-   *    }
-   * }
-   */
-  public void sendMessageNotification(List<User> roomMembers, List<Long> existUserIdsInRoom,
-      Long roomId, Message savedMessage) {
-
-    List<String> fcmTokens = null;
-    try{
-      List<User> notExistMember = roomMembers.stream()
-          .filter(u -> !existUserIdsInRoom.contains(u.getId()))
-          .toList();
-      fcmTokens = fcmTokenRepository.findByUserIn(notExistMember);
-    } catch (Exception e) {
-      log.error("chatroomId={}, step=FCM_TOKEN_조회, status=FAILED", roomId, e);
-      return;
-    }
-    if (!fcmTokens.isEmpty()) {
-      try{
-        MulticastMessage multicastMessage = MulticastMessage.builder()
-            .addAllTokens(fcmTokens)
-            .setNotification(Notification.builder()
-                .setTitle("메세지가 도착했습니다.")
-                .setBody(savedMessage.getContent())
-                .setImage("imageUrl")
-                .build())
-            .build();
-        BatchResponse response = FirebaseMessaging.getInstance()
-            .sendEachForMulticast(multicastMessage);
-        if (response.getFailureCount() > 0) {
-          saveNotificationSendingError(response, fcmTokens, savedMessage);
-        }
-      } catch (Exception e) {
-        log.error("chatroomId={}, step=FCM_SEND_ERROR, status=FAILED", roomId, e);
-        List<FailedFcmMessageLog> errorLogList = new ArrayList<>();
-        for (String fcmToken : fcmTokens) {
-          FailedFcmMessageLog log = FailedFcmMessageLog.of(e, fcmToken, "메세지가 도착했습니다.", savedMessage.getContent());
-          errorLogList.add(log);
-          fcmRetryQueueService.pushToQueue("FCM", log);
-        }
-        failedFcmMessageLogRepository.saveAll(errorLogList);
-        ExceptionMessage exceptionMessage = new ExceptionMessage(
-            errorLogList.size() + "개의 fcm 메세지가 보내지지 않았습니다.");
-        exceptionMessageRepository.save(exceptionMessage);
-      }
-    }
-  }
-
-  public void saveNotificationSendingError(
-      BatchResponse response,
-      List<String> fcmTokens,
-      Message savedMessage) {
-    // 이미지가 전송되지 않으면 몇개의 이미지가 전송되지 않았는지 데이터베이스에 저장
-    List<SendResponse> responses = response.getResponses();
-    List<FailedFcmMessageLog> errorLogList = new ArrayList<>();
-    for (int i = 0; i < responses.size(); i++) {
-      if (!responses.get(i).isSuccessful()) {
-        // 보내지지 않은 메세지의 세부 정보를 로깅하기
-        FirebaseMessagingException exception = responses.get(i).getException();
-        log.error("step=CHAT_FCM_MULTICAST, status=FAILED");
-        FailedFcmMessageLog log = FailedFcmMessageLog.of(exception, fcmTokens.get(i), "메세지가 도착했습니다.", savedMessage.getContent());
-        errorLogList.add(log);
-        // 재전송 로직
-        fcmRetryQueueService.pushToQueue("FCM", log);
-      }
-      failedFcmMessageLogRepository.saveAll(errorLogList);
-      ExceptionMessage exceptionMessage = new ExceptionMessage(
-           errorLogList.size() + "개의 fcm 메세지가 보내지지 않았습니다.");
-      exceptionMessageRepository.save(exceptionMessage);
-    }
-  }
-
 
   public Message saveMessage(GetChatMessageResponseDto message, Long chatroomId){
     Message messageEntity = Message.builder()

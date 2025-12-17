@@ -10,6 +10,7 @@ import com.lingo.lingoproject.domain.Message;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.fcm.FcmService;
 import com.lingo.lingoproject.user.UserService;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
@@ -44,7 +45,7 @@ public class ChatController {
 
   private final ChatService chatService;
   private final SimpMessagingTemplate simpMessagingTemplate;
-  private final UserService userService;
+  private final FcmService fcmService;
 
   /**
    * 메세지 내용 불러오는 api
@@ -263,11 +264,32 @@ public class ChatController {
   @MessageMapping("/{roomId}")
   public void sendMessage(@DestinationVariable Long roomId, GetChatMessageResponseDto chatMessageDto) {
     List<User> roomMembers = chatService.findUserInChatroom(roomId);
-    List<String> roomMemberLoginId = roomMembers.stream().map(User::getLoginId).toList();
-    List<Long> existUserIdsInRoom = chatService.findExistUserIdsInRoom(roomId, roomMembers, chatMessageDto.getSenderId());
+
+    if (roomMembers.size() == 1) return;
+
+    List<String> roomMemberLoginId = List.of(
+        roomMembers.get(0).getLoginId(),
+        roomMembers.get(1).getLoginId()
+    );
+
+    // 1 대 1 채팅이라고 가정
+    // 상대방 유저 확인
+    User receiver;
+    Long senderId = chatMessageDto.getSenderId();
+    if (roomMembers.getFirst().getId().equals(senderId)) {
+      receiver = roomMembers.get(1);
+    }
+    else receiver = roomMembers.get(0);
+
+    // 상대방 유저가 채팅방에 접속 중인지 확인
+    Boolean existReceiverInChatroom = chatService.existReceiverInChatroom(senderId, receiver.getId(), roomId);
+    if (existReceiverInChatroom){
+      chatMessageDto.setReaderIds(List.of(senderId, receiver.getId()));
+    }else{
+      chatMessageDto.setReaderIds(List.of(senderId));
+    }
 
     // 메세지 저장
-    chatMessageDto.getReaderIds().addAll(existUserIdsInRoom);
     Message savedMessage = chatService.saveMessage(chatMessageDto, roomId);
 
     if (savedMessage == null) return;
@@ -277,7 +299,8 @@ public class ChatController {
         // 해당 방에 메세지 전송
         simpMessagingTemplate.convertAndSendToUser(userLoginId, "/topic/" + roomId, chatMessageDto);
       } catch (Exception e) {
-        chatService.savedSimpMessagingError(roomId, savedMessage, userLoginId, e, "/topic/");
+        // 에러, 메세지, 방id, 전송자, 목적지
+        chatService.savedSimpMessagingError(e, savedMessage, roomId, userLoginId, "/topic/");
       }
       try {
         // 채팅 미리보기 기능
@@ -285,12 +308,13 @@ public class ChatController {
       } catch (Exception e) {
         log.error("chatroomId={}, userLoginId={}, step=메세지_전송_실패, status=FAILED", roomId, userLoginId,
             e);
-        chatService.savedSimpMessagingError(roomId, savedMessage, userLoginId, e, "/room-list/");
+        chatService.savedSimpMessagingError(e, savedMessage, roomId, userLoginId, "/room-list/");
       }
     }
 
     // 방에 없는 유저에게 fcm 메세지 전달
-    chatService.sendMessageNotification(roomMembers, existUserIdsInRoom, roomId, savedMessage);
+    if (existReceiverInChatroom) return;
+    fcmService.sendFcmNotification(receiver, "메세지가 도착했어요", savedMessage.getContent());
   }
 
 }

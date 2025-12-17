@@ -1,15 +1,10 @@
 package com.lingo.lingoproject.match;
 
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.Message;
-import com.google.firebase.messaging.Notification;
 import com.lingo.lingoproject.chat.ChatService;
 import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
-import com.lingo.lingoproject.domain.FailedFcmMessageLog;
-import com.lingo.lingoproject.domain.FcmToken;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
@@ -18,6 +13,7 @@ import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.fcm.FcmService;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
@@ -26,14 +22,12 @@ import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.BlockedFriendRepository;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.DormantAccountRepository;
-import com.lingo.lingoproject.repository.FailedFcmMessageLogRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.repository.impl.UserRepositoryImpl;
-import com.lingo.lingoproject.retry.FcmRetryQueueService;
 import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
@@ -64,15 +58,13 @@ public class MatchService {
   private final HashtagRepository hashtagRepository;
   private final BlockedUserRepository blockedUserRepository;
   private final RedisUtils redisUtils;
-  private final FcmTokenRepository fcmTokenRepository;
   private final UserRepositoryImpl userRepositoryImpl;
+  private final FcmService fcmService;
 
   private final int MAX_PROFILE_RECOMMENDATION_SIZE = 4;
   private final int MAX_NUMBER_OF_LOOP = 10;
   private final int MAX_DAILY_RECOMMENDATION_SIZE = 4;
   private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
-  private final FailedFcmMessageLogRepository failedFcmMessageLogRepository;
-  private final FcmRetryQueueService fcmRetryQueueService;
 
   @Value("${ringo.config.survey.space_weight}")
   private float SURVEY_SPACE_WEIGHT;
@@ -149,38 +141,9 @@ public class MatchService {
     );
 
     // fcm 요청 전송
-    sendFcmNotification(matching.getRequestUser(), "누군가 요청을 수락했어요");
+    fcmService.sendFcmNotification(matching.getRequestUser(), "누군가 요청을 수락했어요", null);
   }
 
-  private void sendFcmNotification(User requestUser, String title) {
-    FcmToken token = fcmTokenRepository.findByUser(requestUser)
-        .orElseThrow(() -> new RingoException("fcm 토큰을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-    Message message = Message.builder()
-        .setToken(token.getToken())
-        .setNotification(
-            Notification.builder()
-                .setTitle(title)
-                .setImage("ImageUrl")
-                .build()
-        )
-        .build();
-    try {
-      FirebaseMessaging.getInstance().send(message);
-    }catch (Exception e){
-      log.error("step=FCM_알림_전송_실패, requestUserId={}, title={}, status=FAILED", requestUser.getId(), title, e);
-      FailedFcmMessageLog log = FailedFcmMessageLog.builder()
-          .token(token.getToken())
-          .errorMessage(e.getMessage())
-          .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
-          .message(null)
-          .title(title)
-          .retryCount(0)
-          .build();
-      failedFcmMessageLogRepository.save(log);
-      fcmRetryQueueService.pushToQueue("FCM", log);
-      throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
 
   @Transactional
   public List<GetUserProfileResponseDto> recommend(User user){
@@ -435,7 +398,7 @@ public class MatchService {
     matchingRepository.save(match);
 
     // 유저 알림
-    sendFcmNotification(match.getRequestedUser(), "누군가 매칭을 요청했어요");
+    fcmService.sendFcmNotification(match.getRequestedUser(), "누군가 매칭을 요청했어요", null);
   }
 
   public String getMatchingRequestMessage(Long matchingId, User user){
