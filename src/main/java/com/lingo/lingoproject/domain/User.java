@@ -108,11 +108,14 @@ public class User extends Timestamp implements UserDetails {
   private String residenceFirstPlace;
   private String residenceSecondPlace;
 
-  private String activityLocFirstsPlace;
-  private String activityLocSecondsPlace;
+  private String activityLocFirstPlace;
+  private String activityLocSecondPlace;
 
 
+  @Enumerated(EnumType.STRING)
   private Smoking isSmoking;
+
+  @Enumerated(EnumType.STRING)
   private Drinking isDrinking;
 
 
@@ -133,6 +136,7 @@ public class User extends Timestamp implements UserDetails {
    *   진행중
    *   완료
    */
+  @Enumerated(EnumType.STRING)
   private SignupStatus status;
 
   private String friendInvitationCode;
@@ -145,8 +149,8 @@ public class User extends Timestamp implements UserDetails {
     this.nickname = dto.nickname();
     this.residenceFirstPlace = dto.address().city();
     this.residenceSecondPlace = dto.address().district();
-    this.activityLocFirstsPlace = dto.activeAddress().city();
-    this.activityLocSecondsPlace = dto.activeAddress().district();
+    this.activityLocFirstPlace = dto.activeAddress().city();
+    this.activityLocSecondPlace = dto.activeAddress().district();
     this.job = dto.job();
     this.height = dto.height();
     this.isSmoking = Smoking.valueOf(dto.isSmoking());
