@@ -274,12 +274,10 @@ public class ChatController {
 
     // 1 대 1 채팅이라고 가정
     // 상대방 유저 확인
-    User receiver;
+    User first = roomMembers.get(0);
+    User second = roomMembers.get(1);
     Long senderId = chatMessageDto.getSenderId();
-    if (roomMembers.getFirst().getId().equals(senderId)) {
-      receiver = roomMembers.get(1);
-    }
-    else receiver = roomMembers.get(0);
+    User receiver = first.getId().equals(senderId) ? second : first;
 
     // 상대방 유저가 채팅방에 접속 중인지 확인
     Boolean existReceiverInChatroom = chatService.existReceiverInChatroom(senderId, receiver.getId(), roomId);

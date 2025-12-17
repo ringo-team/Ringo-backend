@@ -70,9 +70,11 @@ public class ChatService {
         .map(m -> GetChatMessageResponseDto.from(chatroomId, m))
         .toList();
 
-    // 채팅방 및 채팅방 멤버 조회
+    // 채팅방 조회
     Chatroom chatroom = chatroomRepository.findById(chatroomId)
         .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+
+    // 채팅방 멤버 조회
     List<ChatroomParticipant> participants = chatroomParticipantRepository.findAllByChatroom(chatroom);
     if (participants.size() == 1){
       return GetChatResponseDto.builder()
@@ -83,12 +85,9 @@ public class ChatService {
     }
 
     // 상대방 유저 확인
-    User firstParticipant = participants.getFirst().getParticipant();
-    User otherChatroomMember;
-    if (firstParticipant.getId().equals(user.getId())){
-      otherChatroomMember = participants.get(1).getParticipant();
-    }
-    else otherChatroomMember = participants.get(0).getParticipant();
+    User first = participants.get(0).getParticipant();
+    User second = participants.get(1).getParticipant();
+    User otherChatroomMember = first.getId().equals(user.getId()) ? second : first;
 
     // 상대방 유저 프로필 조회
     Profile userProfile = profileRepository.findByUser(otherChatroomMember).orElse(null);
