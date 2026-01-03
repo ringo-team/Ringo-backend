@@ -29,7 +29,11 @@ import com.lingo.lingoproject.utils.GenericUtils;
 import com.lingo.lingoproject.utils.RedisUtils;
 import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Calendar;
@@ -158,18 +162,24 @@ public class LoginService {
         "해당 회원을 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     Calendar calendar = Calendar.getInstance();
-    calendar.setTime(user.getBirthday());
+    //calendar.setTime(user.getBirthday());
+    try {
+      SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+      calendar.setTime(formatter.parse(dto.birthday()));
+    } catch (ParseException e) {
+      throw new RingoException("파싱 입셉션", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
     if(calendar.get(Calendar.YEAR) + 19 > LocalDate.now().getYear()){
       throw new RingoException("미성년자는 회원가입이 불가합니다.", ErrorCode.NOT_ADULT, HttpStatus.FORBIDDEN);
     }
 
-    if(user.getPhoneNumber() == null || user.getPhoneNumber().isBlank()){
-      throw new RingoException("본인인증 되지 않은 회원입니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
-    }
-
-    if(blockedUserRepository.existsByPhoneNumber(user.getPhoneNumber().trim())){
-      throw new RingoException("블락된 유저 입니다.", ErrorCode.BLOCKED, HttpStatus.FORBIDDEN);
-    }
+//    if(user.getPhoneNumber() == null || user.getPhoneNumber().isBlank()){
+//      throw new RingoException("본인인증 되지 않은 회원입니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+//    }
+//
+//    if(blockedUserRepository.existsByPhoneNumber(user.getPhoneNumber().trim())){
+//      throw new RingoException("블락된 유저 입니다.", ErrorCode.BLOCKED, HttpStatus.FORBIDDEN);
+//    }
 
     // 유저 정보 및 해시태그 객체에 저장
     user.setUserInfo(dto);

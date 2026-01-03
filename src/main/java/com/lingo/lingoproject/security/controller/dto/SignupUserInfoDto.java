@@ -16,6 +16,10 @@ public record SignupUserInfoDto(
     @NotBlank
     String nickname,
 
+    @Schema(description = "생년월일", example = "2003-02-06")
+    @NotBlank
+    String birthday,
+
     @NotNull
     Address address,
 
