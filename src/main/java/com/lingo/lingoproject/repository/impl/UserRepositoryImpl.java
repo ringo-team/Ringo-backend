@@ -25,6 +25,7 @@ public class UserRepositoryImpl {
     return jpaQueryFactory.selectFrom(qUser)
         .where(builder)
         .orderBy(Expressions.numberTemplate(Double.class, "function('rand')").asc())
+        .limit(100)
         .fetch();
 
   }

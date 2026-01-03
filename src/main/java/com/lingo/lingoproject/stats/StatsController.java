@@ -48,7 +48,7 @@ public class StatsController {
   public ResponseEntity<JsonListWrapper<GetDailyNumberOfVisitorRequestDto>> getDailyNumberOfVisitor(){
     try {
       log.info("step=주간_방문자수_조회_시작, status=SUCCESS");
-      List<GetDailyNumberOfVisitorRequestDto> visitors = statService.getDailyNumberOfVisitor();
+      List<GetDailyNumberOfVisitorRequestDto> visitors = statService.getDailyNumberOfVisitorForWeek();
       log.info("count={}, step=주간_방문자수_조회_완료, status=SUCCESS", visitors.size());
       return ResponseEntity.status(HttpStatus.OK)
           .body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), visitors));

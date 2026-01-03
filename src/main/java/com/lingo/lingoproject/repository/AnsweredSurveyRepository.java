@@ -36,8 +36,6 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
         """, nativeQuery = true)
   List<MatchScoreResultInterface> calcMatchScore(@Param("user1") Long user1, @Param("user2") Long user2);
 
-  boolean existsByUserAndCreatedAtAfter(User user, LocalDateTime createdAtAfter);
-
   long countByUser(User user);
 
   List<AnsweredSurvey> findAllByUserNotInAndAnswerAndSurveyNum(Collection<User> users, Integer answer, Integer surveyNum);
@@ -52,5 +50,8 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
       """)
   List<GetUserSurveyResponseDto> getUserSurveyResponseDto(Long userId);
 
-  List<AnsweredSurvey> findAllByUserAndCreatedAtAfter(User user, LocalDateTime createdAtAfter);
+
+  boolean existsByUserAndUpdatedAtAfter(User user, LocalDateTime updatedAtAfter);
+
+  List<AnsweredSurvey> findAllByUserAndUpdatedAtAfter(User user, LocalDateTime updatedAtAfter);
 }

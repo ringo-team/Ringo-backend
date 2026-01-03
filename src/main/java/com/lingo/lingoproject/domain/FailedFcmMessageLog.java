@@ -23,7 +23,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Setter
 @SuperBuilder
 @NoArgsConstructor
-@Table(name = "FAILED_MESSAGE_LOG")
+@Table(name = "FAILED_FCM_MESSAGE_LOG")
 @EntityListeners(AuditingEntityListener.class)
 public class FailedFcmMessageLog extends RedisQueueMessagePayLoad {
 

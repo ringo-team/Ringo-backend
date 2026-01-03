@@ -60,6 +60,10 @@ public class RedisUtils {
     return redisTemplate.hasKey("logoutUser::" + key);
   }
 
+  public Set<String> getLogoutUsers(){
+    return redisTemplate.keys("logoutUser::*");
+  }
+
   public void saveRecommendUser(String key, List<GetUserProfileResponseDto> value){
     cacheUntilMidnight("recommend::" + key,
         new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), value));
@@ -128,7 +132,7 @@ public class RedisUtils {
     return redisTemplate.hasKey("suspension::" + userId);
   }
 
-  public Set<String> getSuspendedUser(){
+  public Set<String> getSuspendedUsers(){
     return redisTemplate.keys("suspension::*");
   }
 

@@ -48,12 +48,23 @@ public class GetUserProfileResponseDto {
   @Schema(description = "매칭 여부", example = "PENDING", allowableValues = {"PENDING", "ACCEPTED", "REJECTED"})
   private String matchingStatus;
 
+  @Schema(description = "매칭 메세지", example = "안녕하세요")
+  private String matchingMessage;
+
   @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
   private List<String> hashtags;
 
 
-  public GetUserProfileResponseDto(Long userId, Integer age, Gender gender, String nickname,
-      String profileUrl, Float matchingScore, Long matchingId, MatchingStatus matchingStatus) {
+  public GetUserProfileResponseDto(
+      Long userId,
+      Integer age,
+      Gender gender,
+      String nickname,
+      String profileUrl,
+      Float matchingScore,
+      Long matchingId,
+      MatchingStatus matchingStatus,
+      String matchingMessage) {
     this.userId = userId;
     this.age = age;
     this.gender = gender.toString();
@@ -62,5 +73,6 @@ public class GetUserProfileResponseDto {
     this.matchingScore = matchingScore;
     this.matchingId = matchingId;
     this.matchingStatus = matchingStatus.toString();
+    this.matchingMessage = matchingMessage;
   }
 }

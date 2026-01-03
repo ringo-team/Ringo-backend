@@ -87,10 +87,15 @@ public class SurveyService {
   public void updateSurvey(UpdateSurveyRequestDto dto, Long surveyId){
     Survey survey = surveyRepository.findById(surveyId)
         .orElseThrow(() -> new RingoException("해당 설문을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-    if(!dto.purpose().isBlank()) survey.setPurpose(dto.purpose());
-    if(!dto.content().isBlank()) survey.setContent(dto.content());
-    if(!dto.category().isBlank() && genericUtils.isContains(SurveyCategory.values(),dto.category()))
-      survey.setCategory(SurveyCategory.valueOf(dto.category()));
+
+    String purpose = dto.purpose();
+    String content = dto.content();
+    String category = dto.category();
+
+    genericUtils.validateAndSetStringValue(purpose, survey::setPurpose);
+    genericUtils.validateAndSetStringValue(content, survey::setContent);
+    genericUtils.validateAndSetEnum(category, SurveyCategory.values(), survey::setCategory, SurveyCategory.class);
+
     surveyRepository.save(survey);
   }
 
@@ -107,16 +112,23 @@ public class SurveyService {
         .stream()
         .collect(Collectors.toMap(AnsweredSurvey::getSurveyNum, Function.identity(), (a, b) -> b));
 
+    // 이미 응답한 설문이 존재하면 응답을 덮어씌운다.
     responses.getList().forEach(r -> {
+
+      // 응답 객체 생성
       AnsweredSurvey answeredSurvey = AnsweredSurvey.builder()
           .user(user)
           .surveyNum(r.surveyNum())
           .answer(r.answer())
           .build();
+
+      // 이미 응답한 설문이 존재하면 id를 설정한다.
       AnsweredSurvey alreadyAnsweredSurvey = alreadyAnsweredSurveys.get(r.surveyNum());
       if (alreadyAnsweredSurvey != null) {
         answeredSurvey.setId(alreadyAnsweredSurvey.getId());
       }
+
+      // 리스트에 저장
       list.add(answeredSurvey);
     });
 
@@ -127,24 +139,31 @@ public class SurveyService {
 
     Long userId = user.getId();
 
+    // 이미 설문을 진행했으면 null을 반환
     LocalDateTime now = LocalDate.now().atStartOfDay();
-    boolean isExists = answeredSurveyRepository.existsByUserAndCreatedAtAfter(user, now);
+    boolean isExists = answeredSurveyRepository.existsByUserAndUpdatedAtAfter(user, now);
     if (isExists) {
       return null;
     }
+
+    // 캐시 조회
     if (redisUtils.containsUserDailySurvey(userId.toString())){
       return redisUtils.getUserDailySurvey(userId.toString());
     }
+
+    // 일정기간까지는 정해진 설문을 제공한다.
     int numberOfAnswerSurveys = (int) answeredSurveyRepository.countByUser(user);
-    // 일정기간까지는 정해진 설문을 응답한다.
     if (numberOfAnswerSurveys < SIGNUP_NUMBER_OF_SURVEYS + NUMBER_OF_DAILY_SURVEYS * MAX_SURVEY_STARTER_DAYS){
-      List<Survey> surveys = surveyRepository.findAllBySurveyNumBetween(numberOfAnswerSurveys + 1, numberOfAnswerSurveys + NUMBER_OF_DAILY_SURVEYS);
+      List<Survey> surveys = surveyRepository.findAllBySurveyNumBetween
+          (numberOfAnswerSurveys + 1, numberOfAnswerSurveys + NUMBER_OF_DAILY_SURVEYS);
       List<GetSurveyResponseDto> results = surveys.stream()
           .map(GetSurveyResponseDto::from)
           .toList();
       redisUtils.saveUserDailySurvey(userId.toString(), results);
       return results;
     }
+
+    // 무작위로 설문을 제공한다.
     int numberOfSurveys = (int) surveyRepository.count();
     Random random = new Random(System.currentTimeMillis());
     List<Integer> randomSelectedSurveyNums = new ArrayList<>();
@@ -155,6 +174,8 @@ public class SurveyService {
     List<GetSurveyResponseDto> results = randomSurveys.stream()
         .map(GetSurveyResponseDto::from)
         .toList();
+
+    // 캐시 저장
     redisUtils.saveUserDailySurvey(userId.toString(), results);
     return results;
   }

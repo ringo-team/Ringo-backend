@@ -11,6 +11,7 @@ import com.lingo.lingoproject.match.dto.RequestMatchingResponseDto;
 import com.lingo.lingoproject.match.dto.SaveMatchingRequestMessageRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -431,6 +432,7 @@ public class MatchController {
           )
       }
   )
+  @Hidden
   @GetMapping("/matches/{matchingId}/message")
   public ResponseEntity<GetMatchingRequestMessageResponseDto> getMatchingRequestMessage(
       @PathVariable(value = "matchingId") Long matchingId,

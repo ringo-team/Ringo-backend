@@ -30,10 +30,12 @@ public class StatService {
     return Math.round(((float) todayNumberOfMaleVisitor /todayNumberOfVisitor) * 100 * 10) / 10.0f;
   }
 
-  public List<GetDailyNumberOfVisitorRequestDto> getDailyNumberOfVisitor(){
+  public List<GetDailyNumberOfVisitorRequestDto> getDailyNumberOfVisitorForWeek(){
+    // 시작 날짜 - 6일전
     LocalDate startDate = LocalDate.now().minusDays(6);
     LocalDateTime startDateTime = startDate.atStartOfDay();
 
+    // 날짜 - 접속자 수
     Map<String, Long> userAccessMap = userAccessLogRepository.findAllByCreateAtAfter(startDateTime)
         .stream()
         .collect(Collectors.groupingBy(
@@ -41,6 +43,7 @@ public class StatService {
             Collectors.counting()
         ));
 
+    // 날짜 - 회원가입 수
     Map<String, Long> userSignupMap = userRepository.findAllByCreatedAtAfter(startDateTime)
         .stream()
         .collect(Collectors.groupingBy(

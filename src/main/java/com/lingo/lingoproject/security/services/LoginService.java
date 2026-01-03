@@ -163,7 +163,7 @@ public class LoginService {
       throw new RingoException("미성년자는 회원가입이 불가합니다.", ErrorCode.NOT_ADULT, HttpStatus.FORBIDDEN);
     }
 
-    if(user.getPhoneNumber().isBlank()){
+    if(user.getPhoneNumber() == null || user.getPhoneNumber().isBlank()){
       throw new RingoException("본인인증 되지 않은 회원입니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
 
@@ -181,7 +181,7 @@ public class LoginService {
           .build());
     }
 
-    // 친구초대코드가 존재한다면 한번 더 api 호출
+    // 친구초대코드가 존재한다면 한번 더 api 호출로 판단
     if (user.getFriendInvitationCode() != null && !user.getFriendInvitationCode().isBlank()){
       try {
         userRepository.save(user);

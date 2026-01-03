@@ -36,12 +36,13 @@ public class ReportRepositoryImpl{
 
     BooleanBuilder builder = new BooleanBuilder();
 
-    if(dto.userId() != null){
-      builder.and(report.id.eq(dto.userId()));
+    if(dto.userId() == null){
+      return null;
     }
+    builder.and(report.id.eq(dto.userId()));
 
-    if(dto.startedAt() != null && !dto.startedAt().isBlank()
-        && dto.finishedAt() != null && !dto.finishedAt().isBlank() ){
+    // where 문 기간 옵션
+    if(validate(dto.startedAt()) && validate(dto.finishedAt())){
       try {
         LocalDateTime startedAt = LocalDate.parse(dto.startedAt().trim()).atStartOfDay();
         LocalDateTime finishedAt = LocalDate.parse(dto.finishedAt().trim()).atTime(23, 59, 59);
@@ -54,40 +55,30 @@ public class ReportRepositoryImpl{
       }
     }
 
-    if(dto.reportedUserStatus() != null &&
-        !dto.reportedUserStatus().isEmpty() &&
-        genericUtils.isContains(ReportStatus.values(), dto.reportedUserStatus())
+    // where 문 신고 상태 옵션
+    if(validate(dto.reportedUserStatus(), ReportStatus.values())
     ){
       builder.and(report.reportedUserStatus.eq(ReportStatus.valueOf(dto.reportedUserStatus())));
     }
 
-    if (dto.reportIntensity() != null &&
-        !dto.reportIntensity().isEmpty() &&
-        genericUtils.isContains(ReportIntensity.values(), dto.reportIntensity())
+    // where 문 신고 강도 옵션
+    if (validate(dto.reportIntensity(), ReportIntensity.values())
     ){
       builder.and(report.reportIntensity.eq(ReportIntensity.valueOf(dto.reportIntensity())));
     }
 
-    OrderSpecifier<?> ordering = report.createdAt.asc();
-    if (dto.ordering() != null &&
-        !dto.ordering().isEmpty() &&
-        genericUtils.isContains(ReportOrdering.values(), dto.ordering())
+    // where 문 신고 정렬 옵션
+    OrderSpecifier<?> ordering = null;
+    if (validate(dto.ordering(), ReportOrdering.values())
     ){
-      if(ReportOrdering.CREATED_AT_DESC.equals(ReportOrdering.valueOf(dto.ordering()))){
-        ordering = report.createdAt.desc();
-      }
-      else if(ReportOrdering.INTENSITY_ASC.equals(ReportOrdering.valueOf(dto.ordering()))){
-        ordering = report.reportIntensity.asc();
-      }
-      else if(ReportOrdering.CREATED_AT_DESC.equals(ReportOrdering.valueOf(dto.ordering()))){
-        ordering = report.createdAt.desc();
-      }
-      else if (ReportOrdering.STATUS_ASC.equals(ReportOrdering.valueOf(dto.ordering()))){
-        ordering = report.reportedUserStatus.asc();
-      }
-      else{
-        ordering = report.reportedUserStatus.desc();
-      }
+      ordering = switch (ReportOrdering.valueOf(dto.ordering())) {
+        case ReportOrdering.CREATED_AT_ASC -> report.createdAt.asc();
+        case ReportOrdering.CREATED_AT_DESC -> report.createdAt.desc();
+        case ReportOrdering.INTENSITY_ASC -> report.reportIntensity.asc();
+        case ReportOrdering.INTENSITY_DESC -> report.reportIntensity.desc();
+        case ReportOrdering.STATUS_ASC -> report.reportedUserStatus.asc();
+        default -> report.reportedUserStatus.desc();
+      };
     }
 
     return jpaQueryFactory
@@ -103,5 +94,15 @@ public class ReportRepositoryImpl{
         .orderBy(ordering)
         .fetch();
 
+  }
+
+  public boolean validate(String property){
+    if (property == null || property.isBlank()) return false;
+    return true;
+  }
+  public <E extends Enum<E>> boolean validate(String property, E[] values){
+    if (property == null || property.isBlank()) return false;
+    if (!genericUtils.isContains(values, property)) return false;
+    return true;
   }
 }

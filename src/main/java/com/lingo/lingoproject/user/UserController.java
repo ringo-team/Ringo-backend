@@ -71,12 +71,17 @@ public class UserController {
       @NotBlank
       @RequestParam(value = "reason") String reason,
 
-      @AuthenticationPrincipal User user){
+      @AuthenticationPrincipal User user
+  ){
     Long userId = user.getId();
-    if(!userId.equals(id)){
-      throw new RingoException("유저를 탈퇴할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
+
     try {
+      // 유저 권한 체크
+      if(!userId.equals(id)){
+        throw new RingoException("유저를 탈퇴할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      }
+
+      // 유저 삭제
       log.info("userId={}, step=회원탈퇴_시작, status=SUCCESS", userId);
       userService.deleteUser(user, reason);
       log.info("userId={}, step=회원탈퇴_완료, status=SUCCESS", userId);

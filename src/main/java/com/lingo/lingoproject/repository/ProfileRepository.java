@@ -15,8 +15,17 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
 
   @Query("""
       select
-        new com.lingo.lingoproject.match.dto.GetUserProfileResponseDto
-        (u.id, u.age, u.gender, u.nickname, p.imageUrl, m.matchingScore, m.id, m.matchingStatus)
+        new com.lingo.lingoproject.match.dto.GetUserProfileResponseDto(
+          u.id,
+          u.age,
+          u.gender,
+          u.nickname,
+          p.imageUrl,
+          m.matchingScore,
+          m.id,
+          m.matchingStatus,
+          m.matchingRequestMessage
+      )
       from Matching m
         join User u on m.requestedUser = u
         join Profile p on m.requestedUser = p.user
@@ -26,8 +35,17 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
 
   @Query("""
       select
-        new com.lingo.lingoproject.match.dto.GetUserProfileResponseDto
-        (u.id, u.age, u.gender, u.nickname, p.imageUrl, m.matchingScore, m.id, m.matchingStatus)
+        new com.lingo.lingoproject.match.dto.GetUserProfileResponseDto(
+          u.id,
+          u.age,
+          u.gender,
+          u.nickname,
+          p.imageUrl,
+          m.matchingScore,
+          m.id,
+          m.matchingStatus,
+          m.matchingRequestMessage
+      )
       from Matching m
         join User u on m.requestUser = u
         join Profile p on m.requestUser = p.user

@@ -9,6 +9,7 @@ import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.UserMatchingLog;
 import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.exception.ErrorCode;
@@ -22,10 +23,10 @@ import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.BlockedFriendRepository;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.DormantAccountRepository;
-import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
+import com.lingo.lingoproject.repository.UserMatchingLogRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.repository.impl.UserRepositoryImpl;
 import com.lingo.lingoproject.utils.RedisUtils;
@@ -33,9 +34,9 @@ import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +61,7 @@ public class MatchService {
   private final RedisUtils redisUtils;
   private final UserRepositoryImpl userRepositoryImpl;
   private final FcmService fcmService;
+  private final UserMatchingLogRepository userMatchingLogRepository;
 
   private final int MAX_PROFILE_RECOMMENDATION_SIZE = 4;
   private final int MAX_NUMBER_OF_LOOP = 10;
@@ -99,6 +101,7 @@ public class MatchService {
         .matchingStatus(MatchingStatus.PRE_REQUESTED)
         .matchingScore(calcMatchScore(requestedUser.getId(), requestUser.getId()))
         .build();
+
     return matchingRepository.save(matching);
   }
 
@@ -123,6 +126,14 @@ public class MatchService {
       default -> throw new RingoException("decision 값이 적절하지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
 
+    UserMatchingLog log = UserMatchingLog.builder()
+        .userId(user.getId())
+        .matchingId(matchingId)
+        .status(matching.getMatchingStatus())
+        .gender(user.getGender())
+        .build();
+
+    userMatchingLogRepository.save(log);
     matchingRepository.save(matching);
   }
 
@@ -134,8 +145,8 @@ public class MatchService {
     // 채팅방 생성
     chatService.createChatroom(
         new CreateChatroomRequestDto(
-            matching.getRequestedUser().getId(),
             matching.getRequestUser().getId(),
+            matching.getRequestedUser().getId(),
             ChatType.USER.toString()
         )
     );
@@ -195,7 +206,7 @@ public class MatchService {
     }
 
     // 오늘 응답한 설문 조회
-    List<AnsweredSurvey> todayAnsweredSurveys = answeredSurveyRepository.findAllByUserAndCreatedAtAfter(
+    List<AnsweredSurvey> todayAnsweredSurveys = answeredSurveyRepository.findAllByUserAndUpdatedAtAfter(
         user,
         LocalDate.now().atStartOfDay()
     );
@@ -206,15 +217,12 @@ public class MatchService {
     }
 
     // 4개의 설문에 대해서만 추천해줌
-    Random randomGenerator = new Random(System.currentTimeMillis());
-    while(todayAnsweredSurveys.size() > MAX_DAILY_RECOMMENDATION_SIZE){
-      int index = randomGenerator.nextInt(todayAnsweredSurveys.size());
-      todayAnsweredSurveys.remove(index);
-    }
+    Collections.shuffle(todayAnsweredSurveys);
 
     // 유저와 같은 응답을 한 이성을 추천해줌
     List<GetUserProfileResponseDto> recommendUserProfileList = new ArrayList<>();
     for (AnsweredSurvey todayAnsweredSurvey : todayAnsweredSurveys) {
+      if (recommendUserProfileList.size() == 4) break;
       List<User> excludedUsers = convertIdListToUserList(getExcludedUserIdsForRecommendation(user.getId()));
       List<AnsweredSurvey> matchingAnsweredSurveyList = answeredSurveyRepository.findAllByUserNotInAndAnswerAndSurveyNum(
           excludedUsers,
@@ -222,8 +230,17 @@ public class MatchService {
           todayAnsweredSurvey.getSurveyNum()
       );
       if (matchingAnsweredSurveyList.isEmpty()){ continue; }
-      int randomIndex = randomGenerator.nextInt(matchingAnsweredSurveyList.size());
-      AnsweredSurvey matchingAnsweredSurvey = matchingAnsweredSurveyList.get(randomIndex);
+
+      Collections.shuffle(matchingAnsweredSurveyList);
+      AnsweredSurvey matchingAnsweredSurvey = null;
+      for (AnsweredSurvey as : matchingAnsweredSurveyList){
+        float score = calcMatchScore(user.getId(), as.getUser().getId());
+        if (isMatch(score)){
+          matchingAnsweredSurvey = as;
+          break;
+        }
+      }
+      if (matchingAnsweredSurvey == null){ continue; }
       User recommendedUser = matchingAnsweredSurvey.getUser();
       addUserProfileToCollection(recommendUserProfileList, recommendedUser);
     }
@@ -269,19 +286,26 @@ public class MatchService {
         .map(BlockedUser::getBlockedUserId)
         .toList();
     // 계정 중지된 유저
-    List<Long> suspendedUserIds = redisUtils.getSuspendedUser()
+    List<Long> suspendedUserIds = redisUtils.getSuspendedUsers()
         .stream()
         .map(s -> s.replace("suspension::", ""))
         .map(Long::parseLong)
         .toList();
+    // 로그아웃한 유저
+    List<Long> logoutUserIds = redisUtils.getLogoutUsers()
+        .stream()
+        .map(s -> s.replace("logoutUser::", ""))
+        .map(Long::parseLong)
+        .toList();
 
-    List<Long> excludedUserId = new ArrayList<>();
+    Set<Long> excludedUserId = new HashSet<>();
     excludedUserId.addAll(blockedFriendUserIds);
     excludedUserId.addAll(dormantUserIds);
     excludedUserId.addAll(blockedUserIds);
     excludedUserId.addAll(suspendedUserIds);
+    excludedUserId.addAll(logoutUserIds);
     
-    return excludedUserId;
+    return new ArrayList<>(excludedUserId);
   }
   
   public List<User> convertIdListToUserList(List<Long> idList){
@@ -323,12 +347,12 @@ public class MatchService {
 
     // 매칭 id 조회
     List<Long> matchingIds = matchings.stream()
-        .filter(m -> m.getMatchingStatus() != MatchingStatus.PRE_REQUESTED)
         .map(Matching::getId)
         .toList();
 
     // 매칭 요청 받은 유저들의 정보 조회
-    List<GetUserProfileResponseDto> requestedUserProfileDtoList = profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
+    List<GetUserProfileResponseDto> requestedUserProfileDtoList =
+        profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
 
     setHashtagInProfileDtoList(requestedUserProfileDtoList);
 
@@ -339,14 +363,12 @@ public class MatchService {
     List<Matching> matchings = matchingRepository.findAllByRequestedUser(requestedUser);
 
     List<Long> matchingIds = matchings.stream()
-        .filter(m ->
-              (m.getMatchingStatus() == MatchingStatus.PENDING) ||
-              (m.getMatchingStatus() == MatchingStatus.ACCEPTED)
-        )
+        .filter(m -> m.getMatchingStatus() != MatchingStatus.PRE_REQUESTED)
         .map(Matching::getId)
         .toList();
 
-    List<GetUserProfileResponseDto> requestUserProfileDtoList = profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
+    List<GetUserProfileResponseDto> requestUserProfileDtoList =
+        profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
 
     setHashtagInProfileDtoList(requestUserProfileDtoList);
 
@@ -384,21 +406,30 @@ public class MatchService {
   @Transactional
   public void saveMatchingRequestMessage(SaveMatchingRequestMessageRequestDto dto, Long matchingId, User user){
 
-    Matching match = matchingRepository.findById(matchingId)
+    Matching matching = matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
-    Long requestUserId = match.getRequestUser().getId();
-    if (!requestUserId.equals(user.getId())){
-      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestUserId);
+    User requestUser = matching.getRequestUser();
+    if (!requestUser.getId().equals(user.getId())){
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestUser.getId());
       throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
-    match.setMatchingStatus(MatchingStatus.PENDING);
-    match.setMatchingRequestMessage(dto.message());
+    matching.setMatchingStatus(MatchingStatus.PENDING);
+    matching.setMatchingRequestMessage(dto.message());
 
-    matchingRepository.save(match);
+    // 로그에 저장
+    UserMatchingLog log = UserMatchingLog.builder()
+        .userId(requestUser.getId())
+        .matchingId(matching.getId())
+        .status(MatchingStatus.PENDING)
+        .gender(requestUser.getGender())
+        .build();
+
+    matchingRepository.save(matching);
+    userMatchingLogRepository.save(log);
 
     // 유저 알림
-    fcmService.sendFcmNotification(match.getRequestedUser(), "누군가 매칭을 요청했어요", null);
+    fcmService.sendFcmNotification(matching.getRequestedUser(), "누군가 매칭을 요청했어요", null);
   }
 
   public String getMatchingRequestMessage(Long matchingId, User user){

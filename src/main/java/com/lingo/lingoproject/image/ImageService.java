@@ -414,7 +414,7 @@ public class ImageService {
 
   public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto, Long snapImageId, Long userId){
 
-    if (dto == null || dto.description().isBlank()){
+    if (dto == null || dto.description() == null || dto.description().isBlank()){
       return;
     }
 

@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
@@ -20,7 +21,15 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "JWT_REFRESH_TOKENS")
+@Table(
+    name = "JWT_REFRESH_TOKENS",
+    indexes = {
+        @Index(
+            name = "idx_jwt_fresh_token_user_id",
+            columnList = "user_id"
+        )
+    }
+)
 public class JwtRefreshToken {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

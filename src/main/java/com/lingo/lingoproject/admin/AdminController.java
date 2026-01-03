@@ -59,34 +59,6 @@ public class AdminController {
     }
   }
 
-//  @Operation(
-//      summary = "유저 블락 기능"
-//  )
-//  @PostMapping("users/{id}/blocks")
-//  public ResponseEntity<?> blockUser(
-//      @Parameter(description = "블락시키고자 하는 유저 id", example = "5")
-//      @PathVariable Long id,
-//
-//      @AuthenticationPrincipal User admin){
-//    userService.blockUser(id, admin.getId());
-//    return ResponseEntity.ok().build();
-//  }
-
-  /* 관리자더라도 유저삭제를 불가능하게 함
-
-  @Operation(
-      summary = "유저 영구 삭제",
-      description = "유저와 관련된 모든 정보를 없애거나 관계를 끊어버린다."
-  )
-  @DeleteMapping("/{id}")
-  public ResponseEntity<?> deleteUser(
-      @Parameter(description = "삭제하고자 하는 유저id")
-      @PathVariable Long id){
-    userService.deleteUser(id, "관리자 삭제");
-    return ResponseEntity.ok().build();
-  }
-*/
-
   @Operation(summary = "신고조회", description = "조건에 따라 필터링된 신고된 유저 조회")
   @GetMapping("/reports")
   public ResponseEntity<JsonListWrapper<GetReportInfoResponseDto>> getReportInfos(

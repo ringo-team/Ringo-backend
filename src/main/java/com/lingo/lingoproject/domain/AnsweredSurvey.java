@@ -30,6 +30,10 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
         @Index(
             name = "idx_answered_surveys_user_id_survey_num",
             columnList = "user_id, surveyNum"
+        ),
+        @Index(
+            name = "idx_answered_surveys_user_id_updated_at",
+            columnList = "user_id, updatedAt"
         )
     }
 )

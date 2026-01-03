@@ -74,6 +74,7 @@ public class UserService {
   public void deleteUser(User user, String reason) {
 
     try {
+
       withdrawerRepository.save(Withdrawer
           .builder()
           .joinPeriod(ChronoUnit.DAYS.between(user.getCreatedAt(), LocalDate.now()))
@@ -142,18 +143,20 @@ public class UserService {
 
   public void updateUserInfo(User user, UpdateUserInfoRequestDto dto) {
 
-    if (dto.isDrinking() != null && genericUtils.isContains(Drinking.values(), dto.isDrinking()))
-      user.setIsDrinking(Drinking.valueOf(dto.isDrinking()));
-    if (dto.isSmoking() != null && genericUtils.isContains(Smoking.values(), dto.isSmoking()))
-      user.setIsSmoking(Smoking.valueOf(dto.isSmoking()));
-    if (dto.religion() != null && genericUtils.isContains(Religion.values(), dto.religion()))
-      user.setReligion(Religion.valueOf(dto.religion()));
-    if (!dto.height().isBlank())
-      user.setHeight(dto.height());
-    if (!dto.job().isBlank())
-      user.setJob(dto.job());
-    if (!dto.biography().isBlank())
-      user.setBiography(dto.biography());
+    String drinking = dto.isDrinking();
+    String smoking  = dto.isSmoking();
+    String religion = dto.religion();
+    String height   = dto.height();
+    String job      = dto.job();
+    String biography = dto.biography();
+
+    genericUtils.validateAndSetEnum(drinking, Drinking.values(), user::setIsDrinking, Drinking.class);
+    genericUtils.validateAndSetEnum(smoking, Smoking.values(), user::setIsSmoking, Smoking.class);
+    genericUtils.validateAndSetEnum(religion, Religion.values(), user::setReligion, Religion.class);
+
+    genericUtils.validateAndSetStringValue(height, user::setHeight);
+    genericUtils.validateAndSetStringValue(job, user::setJob);
+    genericUtils.validateAndSetStringValue(biography, user::setBiography);
 
     userRepository.save(user);
   }

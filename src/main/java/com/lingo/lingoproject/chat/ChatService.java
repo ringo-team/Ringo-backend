@@ -175,7 +175,7 @@ public class ChatService {
 
     // 채팅방 생성 및 저장
     Chatroom chatroom = Chatroom.builder()
-        .chatroomName(dto.user1Id().toString() + "_" +dto.user2Id().toString())
+        .chatroomName(dto.user1Id() + "_" +dto.user2Id())
         .type(ChatType.valueOf(dto.chatType()))
         .build();
     Chatroom savedChatroom = chatroomRepository.save(chatroom);

@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
@@ -18,7 +19,15 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter@Setter
-@Table(name = "FCM_TOKENS")
+@Table(
+    name = "FCM_TOKENS",
+    indexes = {
+        @Index(
+            name = "fcm_tokens_user_id",
+            columnList = "user_id"
+        )
+    }
+)
 public class FcmToken {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
