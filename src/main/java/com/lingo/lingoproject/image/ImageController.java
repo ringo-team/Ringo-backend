@@ -3,6 +3,7 @@ package com.lingo.lingoproject.image;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.image.dto.FeedImageDataListDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
 import com.lingo.lingoproject.user.UserService;
@@ -24,6 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -278,10 +280,10 @@ public class ImageController {
           )
       }
   )
-  @PostMapping(value = "/users/snaps", consumes =  MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PostMapping(value = "/feeds", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadSnapImages(
       @Parameter(description = "이미지 파일들 업로드")
-      @RequestParam(value = "images") List<MultipartFile> images,
+      @ModelAttribute FeedImageDataListDto images,
 
       @Parameter(description = "유저 id", example = "5")
       @RequestParam("userId") Long userId
@@ -295,7 +297,7 @@ public class ImageController {
     try {
 
       log.info("userId={}, step=스냅_업로드_시작, status=SUCCESS", userId);
-      List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images, userId);
+      List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images.getList(), userId);
       log.info("userId={}, step=스냅_업로드_완료, status=SUCCESS", userId);
 
       return ResponseEntity.status(HttpStatus.CREATED)

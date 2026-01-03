@@ -9,6 +9,7 @@ import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.image.dto.FeedImageDataRequestDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
 import com.lingo.lingoproject.repository.PhotographerImageRepository;
@@ -172,27 +173,28 @@ public class ImageService {
   }
 
   @Transactional
-  public List<GetImageUrlResponseDto> uploadSnapImages(List<MultipartFile> images, Long userId) {
+  public List<GetImageUrlResponseDto> uploadSnapImages(List<FeedImageDataRequestDto> list, Long userId) {
 
     User user = userRepository.findById(userId).orElseThrow(() ->
         new RingoException("유저를 찾을 수 없습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST));
 
     List<SnapImage> existedSnapImages = snapImageRepository.findAllByUser(user);
-    if (existedSnapImages.size() + images.size() > MAX_NUMBER_OF_SNAP_IMAGES){
+    if (existedSnapImages.size() + list.size() > MAX_NUMBER_OF_SNAP_IMAGES){
       throw new RingoException("최대 업로드 개수를 초과하였습니다.", ErrorCode.OVERFLOW, HttpStatus.BAD_REQUEST);
     }
 
     List<SnapImage> snapImages = new ArrayList<>();
 
-    for(MultipartFile file : images){
+    for(FeedImageDataRequestDto file : list){
 
-      if (isUnmoderateImage(file)){
+      if (isUnmoderateImage(file.getImage())){
         continue;
       }
 
-      String imageUrl = uploadImageToS3(file, "snaps");
+      String imageUrl = uploadImageToS3(file.getImage(), "snaps");
       SnapImage snapImage = SnapImage.builder()
           .imageUrl(imageUrl)
+          .description(file.getContent())
           .user(user)
           .build();
       snapImages.add(snapImage);
