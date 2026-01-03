@@ -172,7 +172,10 @@ public class ImageService {
   }
 
   @Transactional
-  public List<GetImageUrlResponseDto> uploadSnapImages(List<MultipartFile> images, User user) {
+  public List<GetImageUrlResponseDto> uploadSnapImages(List<MultipartFile> images, Long userId) {
+
+    User user = userRepository.findById(userId).orElseThrow(() ->
+        new RingoException("유저를 찾을 수 없습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST));
 
     List<SnapImage> existedSnapImages = snapImageRepository.findAllByUser(user);
     if (existedSnapImages.size() + images.size() > MAX_NUMBER_OF_SNAP_IMAGES){

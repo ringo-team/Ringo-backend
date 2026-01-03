@@ -262,6 +262,11 @@ public class ImageController {
               content = @Content(schema = @Schema(implementation = JsonListWrapper.class))
           ),
           @ApiResponse(
+              responseCode = "E0007",
+              description = "잘못된 유저 id 파라미터",
+              content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
+          ),
+          @ApiResponse(
               responseCode = "E0012",
               description = "업로드 사진 개수 초과",
               content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
@@ -273,24 +278,24 @@ public class ImageController {
           )
       }
   )
-  @PostMapping(value = "/users/{userId}/snaps", consumes =  MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PostMapping(value = "/users/snaps", consumes =  MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadSnapImages(
       @Parameter(description = "이미지 파일들 업로드")
       @RequestParam(value = "images") List<MultipartFile> images,
 
       @Parameter(description = "유저 id", example = "5")
-      @PathVariable("userId") Long userId,
+      @RequestParam("userId") Long userId
 
-      @AuthenticationPrincipal User user
+      //@AuthenticationPrincipal User user
   ){
-    if (!userId.equals(user.getId())){
-      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
-      throw new RingoException("스냅사진을 업로드할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
+//    if (!userId.equals(user.getId())){
+//      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
+//      throw new RingoException("스냅사진을 업로드할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+//    }
     try {
 
       log.info("userId={}, step=스냅_업로드_시작, status=SUCCESS", userId);
-      List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images, user);
+      List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images, userId);
       log.info("userId={}, step=스냅_업로드_완료, status=SUCCESS", userId);
 
       return ResponseEntity.status(HttpStatus.CREATED)

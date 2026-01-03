@@ -46,6 +46,7 @@ public class SecurityConfig {
       "/swagger-ui/**", "v3/api-docs/**",
       "/ws", "/stomp/**", "/stomp-test.html",
       "/actuator/**",
+      "/profiles", "users/snaps"
   };
 
   @Bean
