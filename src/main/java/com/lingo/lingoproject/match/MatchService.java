@@ -157,7 +157,7 @@ public class MatchService {
 
 
   @Transactional
-  public List<GetUserProfileResponseDto> recommend(User user){
+  public List<GetUserProfileResponseDto> recommendByCumulativeSurvey(User user){
 
     Long userId = user.getId();
 
@@ -232,16 +232,9 @@ public class MatchService {
       if (matchingAnsweredSurveyList.isEmpty()){ continue; }
 
       Collections.shuffle(matchingAnsweredSurveyList);
-      AnsweredSurvey matchingAnsweredSurvey = null;
-      for (AnsweredSurvey as : matchingAnsweredSurveyList){
-        float score = calcMatchScore(user.getId(), as.getUser().getId());
-        if (isMatch(score)){
-          matchingAnsweredSurvey = as;
-          break;
-        }
-      }
-      if (matchingAnsweredSurvey == null){ continue; }
-      User recommendedUser = matchingAnsweredSurvey.getUser();
+      User recommendedUser = matchingAnsweredSurveyList.isEmpty() ?
+          null : matchingAnsweredSurveyList.getFirst().getUser();
+      if (recommendedUser == null) continue;
       addUserProfileToCollection(recommendUserProfileList, recommendedUser);
     }
 

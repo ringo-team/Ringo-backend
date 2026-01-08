@@ -263,7 +263,7 @@ public class MatchController {
     }
     try {
       log.info("userId={}, step=이성_추천_시작, status=SUCCESS", userId);
-      List<GetUserProfileResponseDto> rtnList = matchService.recommend(user);
+      List<GetUserProfileResponseDto> rtnList = matchService.recommendByCumulativeSurvey(user);
       log.info("userId={}, step=이성_추천_시작, status=SUCCESS", userId);
 
       return ResponseEntity.status(HttpStatus.OK)
