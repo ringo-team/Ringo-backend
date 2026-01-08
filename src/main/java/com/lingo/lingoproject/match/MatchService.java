@@ -9,6 +9,7 @@ import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.UserAccessLog;
 import com.lingo.lingoproject.domain.UserMatchingLog;
 import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
@@ -26,21 +27,25 @@ import com.lingo.lingoproject.repository.DormantAccountRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
+import com.lingo.lingoproject.repository.UserAccessLogRepository;
 import com.lingo.lingoproject.repository.UserMatchingLogRepository;
 import com.lingo.lingoproject.repository.UserRepository;
-import com.lingo.lingoproject.repository.impl.UserRepositoryImpl;
 import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -59,14 +64,16 @@ public class MatchService {
   private final HashtagRepository hashtagRepository;
   private final BlockedUserRepository blockedUserRepository;
   private final RedisUtils redisUtils;
-  private final UserRepositoryImpl userRepositoryImpl;
   private final FcmService fcmService;
   private final UserMatchingLogRepository userMatchingLogRepository;
+  private final UserAccessLogRepository userAccessLogRepository;
+  private final RedisTemplate<String, Object> redisTemplate;
 
   private final int MAX_PROFILE_RECOMMENDATION_SIZE = 4;
-  private final int MAX_NUMBER_OF_LOOP = 10;
   private final int MAX_DAILY_RECOMMENDATION_SIZE = 4;
   private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
+  private final int ACTIVE_DAY_DURATION = 10;
+  private final String REDIS_ACTIVE_USER_IDS = "redis:active:ids";
 
   @Value("${ringo.config.survey.space_weight}")
   private float SURVEY_SPACE_WEIGHT;
@@ -155,6 +162,20 @@ public class MatchService {
     fcmService.sendFcmNotification(matching.getRequestUser(), "누군가 요청을 수락했어요", null);
   }
 
+  @Transactional
+  public void syncRedisAllActiveUsers(){
+    LocalDateTime startDay = LocalDate.now().minusDays(ACTIVE_DAY_DURATION).atStartOfDay();
+    List<Long> activeUserIds = userAccessLogRepository.findAllByCreateAtAfter(startDay)
+        .stream().map(UserAccessLog::getUserId).toList();
+    redisTemplate.delete(REDIS_ACTIVE_USER_IDS);
+    redisTemplate.opsForSet().add(
+        REDIS_ACTIVE_USER_IDS,
+        activeUserIds,
+        1,
+        TimeUnit.HOURS
+    );
+  }
+
 
   @Transactional
   public List<GetUserProfileResponseDto> recommendByCumulativeSurvey(User user){
@@ -167,25 +188,35 @@ public class MatchService {
       if (responses.size() == MAX_PROFILE_RECOMMENDATION_SIZE) return responses;
     }
 
-    Set<GetUserProfileResponseDto> recommendUserProfileSet = new HashSet<>();
+    Set<Object> redisActiveUserIds = redisTemplate.opsForSet().members(REDIS_ACTIVE_USER_IDS);
+    List<Long> activeUserIds;
 
-    List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(user.getId());
-
-    int whileLoopCount =  0;
-    int recommendationSize = 0;
-
-    while(recommendationSize < MAX_PROFILE_RECOMMENDATION_SIZE && whileLoopCount < MAX_NUMBER_OF_LOOP){
-      List<User> randomCandidates = userRepositoryImpl.findRandomRecommendationCandidates(user.getGender(), excludedUserIds);
-      for(User candidateUser : randomCandidates){
-        if(recommendationSize >= MAX_PROFILE_RECOMMENDATION_SIZE) break;
-        Float matchingScore = calcMatchScore(userId, candidateUser.getId());
-        if(isMatch(matchingScore)){
-          addUserProfileToCollection(recommendUserProfileSet, candidateUser);
-          recommendationSize++;
-        }
-      }
-      whileLoopCount++;
+    if (redisActiveUserIds == null || redisActiveUserIds.isEmpty()){
+      syncRedisAllActiveUsers();
+      activeUserIds = redisTemplate.opsForSet().members(REDIS_ACTIVE_USER_IDS)
+          .stream().map(v -> (long) v).collect(Collectors.toList());;
+    }else{
+      activeUserIds = redisTemplate.opsForSet().members(REDIS_ACTIVE_USER_IDS)
+          .stream().map(v -> (long) v).collect(Collectors.toList());
     }
+
+    List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(userId);
+    activeUserIds.removeAll(excludedUserIds);
+
+    List<Long> closeRelationUserIds = activeUserIds
+        .stream()
+        .map(id -> {
+          float matchingScore = calcMatchScore(userId, id);
+          return new UserMatchingScoreMapping(id, matchingScore);
+        })
+        .sorted((m1, m2) -> (int) (m2.matchingScore - m1.matchingScore))
+        .map(UserMatchingScoreMapping::getId)
+        .limit(MAX_PROFILE_RECOMMENDATION_SIZE)
+        .toList();
+
+    Set<GetUserProfileResponseDto> recommendUserProfileSet = new HashSet<>();
+    userRepository.findAllById(closeRelationUserIds)
+        .forEach(u -> addUserProfileToCollection(recommendUserProfileSet, u));
 
     List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>(recommendUserProfileSet);
 
@@ -193,6 +224,20 @@ public class MatchService {
     redisUtils.saveRecommendUser(userId.toString(), recommendUserList);
 
     return recommendUserList;
+  }
+
+  static class UserMatchingScoreMapping {
+    Long userId;
+    Float matchingScore;
+
+    UserMatchingScoreMapping(Long userId, float matchingScore){
+      this.userId = userId;
+      this.matchingScore = matchingScore;
+    }
+
+    public Long getId(){
+      return userId;
+    }
   }
 
   public List<GetUserProfileResponseDto> recommendUserByDailySurvey(User user){
@@ -292,6 +337,7 @@ public class MatchService {
         .toList();
 
     Set<Long> excludedUserId = new HashSet<>();
+    excludedUserId.add(userId);
     excludedUserId.addAll(blockedFriendUserIds);
     excludedUserId.addAll(dormantUserIds);
     excludedUserId.addAll(blockedUserIds);
