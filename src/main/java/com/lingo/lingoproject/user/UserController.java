@@ -62,10 +62,10 @@ public class UserController {
           )
       }
   )
-  @DeleteMapping("/{id}")
+  @DeleteMapping("/{userId}")
   public ResponseEntity<ResultMessageResponseDto> deleteUser(
       @Parameter(description = "유저id", example = "4")
-      @PathVariable Long id,
+      @PathVariable Long userId,
 
       @Parameter(description = "유저 탈퇴 사유", example = "좋은 인연을 만날 수 없어서")
       @NotBlank
@@ -73,11 +73,11 @@ public class UserController {
 
       @AuthenticationPrincipal User user
   ){
-    Long userId = user.getId();
+    Long id = user.getId();
 
     try {
       // 유저 권한 체크
-      if(!userId.equals(id)){
+      if(!id.equals(userId)){
         throw new RingoException("유저를 탈퇴할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
       }
 
