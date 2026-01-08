@@ -3,6 +3,7 @@ package com.lingo.lingoproject.user;
 import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.FriendInvitationLog;
+import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.UserAccessLog;
@@ -20,6 +21,7 @@ import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.DormantAccountRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.FriendInvitationLogRepository;
+import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
@@ -69,6 +71,7 @@ public class UserService {
   private final UserPointRepository userPointRepository;
   private final FcmTokenRepository fcmTokenRepository;
   private final ProfileRepository profileRepository;
+  private final HashtagRepository hashtagRepository;
 
   @Transactional
   public void deleteUser(User user, String reason) {
@@ -127,9 +130,13 @@ public class UserService {
     Profile profile = profileRepository.findByUser(user)
         .orElseThrow(() -> new RingoException("유저 정보 조회 중 프로필을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
 
+    List<String> hashtags = hashtagRepository.findAllByUser(user)
+        .stream().map(Hashtag::getHashtag).toList();
+
     return GetUserInfoResponseDto.builder()
         .userId(user.getId())
         .profile(profile.getImageUrl())
+        .birthday(user.getBirthday().toString())
         .gender(user.getGender().toString())
         .height(user.getHeight())
         .isDrinking(user.getIsDrinking().toString())
@@ -138,6 +145,7 @@ public class UserService {
         .job(user.getJob())
         .nickname(user.getNickname())
         .biography(user.getBiography())
+        .hashtags(hashtags)
         .build();
   }
 

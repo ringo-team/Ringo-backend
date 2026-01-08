@@ -2,6 +2,7 @@ package com.lingo.lingoproject.user.dto;
 
 import com.lingo.lingoproject.domain.enums.Drinking;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 import lombok.Builder;
 
 @Builder
@@ -12,6 +13,9 @@ public record GetUserInfoResponseDto(
 
     @Schema(description = "프로필 url", example = "url")
     String profile,
+
+    @Schema(description = "생년월일", example = "2003-02-06")
+    String birthday,
 
     @Schema(description = "성별", example = "MALE", allowableValues = {"MALE", "FEMALE"})
     String gender,
@@ -36,7 +40,10 @@ public record GetUserInfoResponseDto(
     String religion,
 
     @Schema(description = "소개문구", example = "안녕하세요")
-    String biography
+    String biography,
+
+    @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
+    List<String> hashtags
 ) {
 
 }
