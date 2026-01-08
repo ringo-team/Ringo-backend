@@ -146,6 +146,7 @@ public class UserService {
         .nickname(user.getNickname())
         .biography(user.getBiography())
         .hashtags(hashtags)
+        .result(ErrorCode.SUCCESS.getCode())
         .build();
   }
 

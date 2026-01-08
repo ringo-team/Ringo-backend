@@ -43,7 +43,10 @@ public record GetUserInfoResponseDto(
     String biography,
 
     @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
-    List<String> hashtags
+    List<String> hashtags,
+
+    @Schema(description = "결과코드", example = "0000")
+    String result
 ) {
 
 }
