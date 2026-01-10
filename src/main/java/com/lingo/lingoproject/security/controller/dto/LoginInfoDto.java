@@ -10,7 +10,7 @@ public record LoginInfoDto(
     @Schema(description = "사용자 이메일", example = "ringo1234")
     @NotBlank
     @Length(min = 6, max = 12)
-    String email,
+    String loginId,
 
     @Schema(description = "사용자 비밀번호", example = "password1234!")
     @NotBlank

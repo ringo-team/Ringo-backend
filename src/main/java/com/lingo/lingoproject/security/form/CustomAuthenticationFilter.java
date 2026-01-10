@@ -61,7 +61,7 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
 
       // 아이디&비밀번호 인증
       Authentication authentication = customAuthenticationManager.authenticate(
-          new UsernamePasswordAuthenticationToken(info.email(), info.password(), new ArrayList<>())
+          new UsernamePasswordAuthenticationToken(info.loginId(), info.password(), new ArrayList<>())
       );
       SecurityContextHolder.getContext().setAuthentication(authentication);
 

@@ -69,7 +69,7 @@ public class LoginService {
       throw new RingoException("유저가 인증되지 않았습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
-    User user = userRepository.findByLoginId(dto.email())
+    User user = userRepository.findByLoginId(dto.loginId())
         .orElseThrow(() -> new RingoException(
             "해당 로그인 아이디를 가진 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
@@ -119,17 +119,17 @@ public class LoginService {
 
   public User signup(LoginInfoDto dto){
 
-    if(!dto.email().matches("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]+$")){
+    if(!dto.loginId().matches("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]+$")){
       throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.NOT_ACCEPTABLE);
     }
     if(!dto.password().matches("^(?=.*[A-Za-z])(?=.*\\d).+$")){
       throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.NOT_ACCEPTABLE);
     }
-    if(userRepository.existsByLoginId(dto.email())){
+    if(userRepository.existsByLoginId(dto.loginId())){
       throw new RingoException("중복된 로그인 아이디 입니다.", ErrorCode.DUPLICATED, HttpStatus.NOT_ACCEPTABLE);
     }
     User user = User.builder()
-        .loginId(dto.email())
+        .loginId(dto.loginId())
         .password(passwordEncoder.encode(dto.password()))
         .isMarketingReceptionConsent(dto.isMarketingReceptionConsent())
         .role(Role.USER)

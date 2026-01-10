@@ -265,11 +265,11 @@ public class LoginController {
       }
   )
   @GetMapping("/signup/check-loginId")
-  public ResponseEntity<ResultMessageResponseDto> verifyDuplicatedLoginId(@RequestParam(value = "email") String email)
+  public ResponseEntity<ResultMessageResponseDto> verifyDuplicatedLoginId(@RequestParam(value = "loginId") String loginId)
   {
     try {
       log.info("step=회원_아이디_중복확인_시작, status=SUCCESS");
-      boolean isDuplicated = loginService.verifyDuplicatedLoginId(email);
+      boolean isDuplicated = loginService.verifyDuplicatedLoginId(loginId);
       log.info("step=회원_아이디_중복확인_완료, status=SUCCESS");
       if (isDuplicated) {
         return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
