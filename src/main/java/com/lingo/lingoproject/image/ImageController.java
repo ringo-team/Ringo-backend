@@ -5,7 +5,7 @@ import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.dto.FeedImageDataListDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
-import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
+import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
 import com.lingo.lingoproject.user.UserService;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
@@ -255,7 +255,7 @@ public class ImageController {
     }
   }
 
-  @Operation(summary = "스냅 사진 일괄 업로드")
+  @Operation(summary = "피드 사진 일괄 업로드")
   @ApiResponses(
       value = {
           @ApiResponse(
@@ -281,7 +281,7 @@ public class ImageController {
       }
   )
   @PostMapping(value = "/feeds", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadSnapImages(
+  public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadFeedImages(
       @Parameter(description = "이미지 파일들 업로드")
       @ModelAttribute FeedImageDataListDto images,
 
@@ -292,29 +292,29 @@ public class ImageController {
   ){
 //    if (!userId.equals(user.getId())){
 //      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
-//      throw new RingoException("스냅사진을 업로드할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+//      throw new RingoException("피드사진을 업로드할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
 //    }
     try {
 
-      log.info("userId={}, step=스냅_업로드_시작, status=SUCCESS", userId);
-      List<GetImageUrlResponseDto> dtos = imageService.uploadSnapImages(images.getList(), userId);
-      log.info("userId={}, step=스냅_업로드_완료, status=SUCCESS", userId);
+      log.info("userId={}, step=피드_업로드_시작, status=SUCCESS", userId);
+      List<GetImageUrlResponseDto> dtos = imageService.uploadFeedImages(images.getList(), userId);
+      log.info("userId={}, step=피드_업로드_완료, status=SUCCESS", userId);
 
       return ResponseEntity.status(HttpStatus.CREATED)
           .body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), dtos));
 
     } catch (Exception e) {
-      log.error("userId={}, step=스냅_업로드_실패, status=FAILED", userId, e);
+      log.error("userId={}, step=피드_업로드_실패, status=FAILED", userId, e);
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("스냅 이미지를 업로드하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("피드 이미지를 업로드하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Operation(
-      summary = "스냅 이미지 조회.",
-      description = "유저가 올린 모든 스냅 사진을 조회"
+      summary = "피드 이미지 조회.",
+      description = "유저가 올린 모든 피드 사진을 조회"
   )
   @ApiResponses(
       value = {
@@ -335,29 +335,29 @@ public class ImageController {
           )
       }
   )
-  @GetMapping("users/{userId}/snaps")
-  public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> getAllSnapImageUrls(
+  @GetMapping("users/{userId}/feeds")
+  public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> getAllFeedImageUrls(
       @Parameter(description = "유저 Id", example = "5")
       @PathVariable(value = "userId") Long userId
   ){
     try {
-      log.info("userId={}, step=스냅_조회_시작, status=SUCCESS", userId);
-      List<GetImageUrlResponseDto> responses = imageService.getAllSnapImageUrls(userId);
-      log.info("userId={}, step=스냅_조회_완료, status=SUCCESS", userId);
+      log.info("userId={}, step=피드_조회_시작, status=SUCCESS", userId);
+      List<GetImageUrlResponseDto> responses = imageService.getAllFeedImageUrls(userId);
+      log.info("userId={}, step=피드_조회_완료, status=SUCCESS", userId);
 
       return ResponseEntity.status(HttpStatus.OK)
           .body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), responses));
 
     } catch (Exception e) {
-      log.error("userId={}, step=스냅_조회_실패, status=FAILED", userId, e);
+      log.error("userId={}, step=피드_조회_실패, status=FAILED", userId, e);
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("스냅 이미지를 조회하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("피드 이미지를 조회하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  @Operation(summary = "스냅 사진 업데이트")
+  @Operation(summary = "피드 사진 업데이트")
   @ApiResponses(
       value = {
           @ApiResponse(
@@ -372,12 +372,12 @@ public class ImageController {
           ),
           @ApiResponse(
               responseCode = "E0004",
-              description = "해당 id로 스냅사진을 찾을 수 없습니다.",
+              description = "해당 id로 피드사진을 찾을 수 없습니다.",
               content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
           ),
           @ApiResponse(
               responseCode = "E0003",
-              description = "스냅사진을 업데이트할 권한이 없습니다.",
+              description = "피드사진을 업데이트할 권한이 없습니다.",
               content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
           ),
           @ApiResponse(
@@ -387,24 +387,24 @@ public class ImageController {
           )
       }
   )
-  @PatchMapping("/snaps/{snapImageId}")
-  public ResponseEntity<?> updateSnapImage(
+  @PatchMapping("/feeds/{feedImageId}")
+  public ResponseEntity<?> updateFeedImage(
       @Parameter(description = "업데이트할 사진")
       @RequestParam(value = "image") MultipartFile image,
 
-      @Parameter(description = "업데이트할 스냅 사진의 id")
-      @PathVariable(value = "snapImageId") Long snapImageId,
+      @Parameter(description = "업데이트할 피드 사진의 id")
+      @PathVariable(value = "feedImageId") Long feedImageId,
 
-      @Parameter(description = "업데이트한 스냅 사진의 설명")
+      @Parameter(description = "업데이트한 피드 사진의 설명")
       @RequestParam(value = "description") String description,
 
       @AuthenticationPrincipal User user
   ){
     try {
 
-      log.info("userId={}, snapImageId={}, step=스냅_업데이트_시작, status=SUCCESS", user.getId(), snapImageId);
-      GetImageUrlResponseDto dto = imageService.updateSnapImage(image, snapImageId, description, user.getId());
-      log.info("userId={}, snapImageId={}, step=스냅_업데이트_완료, status=SUCCESS", user.getId(), snapImageId);
+      log.info("userId={}, snapImageId={}, step=피드_업데이트_시작, status=SUCCESS", user.getId(), feedImageId);
+      GetImageUrlResponseDto dto = imageService.updateFeedImage(image, feedImageId, description, user.getId());
+      log.info("userId={}, snapImageId={}, step=피드_업데이트_완료, status=SUCCESS", user.getId(), feedImageId);
 
       if (dto == null){
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto(
@@ -414,17 +414,17 @@ public class ImageController {
       return ResponseEntity.status(HttpStatus.OK).body(dto);
 
     } catch (Exception e) {
-      log.error("userId={}, snapImageId={}, step=스냅_업데이트_실패, status=FAILED", user.getId(), snapImageId, e);
+      log.error("userId={}, snapImageId={}, step=피드_업데이트_실패, status=FAILED", user.getId(), feedImageId, e);
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("스냅 이미지를 수정하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("피드 이미지를 수정하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Operation(
-      summary = "스냅 사진 삭제",
-      description = "스냅 사진 id에 해당하는 이미지를 삭제합니다."
+      summary = "피드 사진 삭제",
+      description = "피드 사진 id에 해당하는 이미지를 삭제합니다."
   )
   @ApiResponses(
       value = {
@@ -435,7 +435,7 @@ public class ImageController {
           ),
           @ApiResponse(
               responseCode = "E0004",
-              description = "id에 해당하는 스냅사진을 찾을 수 없습니다.",
+              description = "id에 해당하는 피드사진을 찾을 수 없습니다.",
               content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
           ),
           @ApiResponse(
@@ -450,32 +450,32 @@ public class ImageController {
           )
       }
   )
-  @DeleteMapping("/snaps/{snapImageId}")
-  public ResponseEntity<ResultMessageResponseDto> deleteSnapImage(
-      @Parameter(description = "스냅 사진 id", example = "11")
-      @PathVariable(value = "snapImageId") Long snapImageId,
+  @DeleteMapping("/feeds/{feedImageId}")
+  public ResponseEntity<ResultMessageResponseDto> deleteFeedImage(
+      @Parameter(description = "피드 사진 id", example = "11")
+      @PathVariable(value = "feedImageId") Long feedImageId,
 
       @AuthenticationPrincipal User user
   ){
     try {
 
-      log.info("userId={}, snapImageId={}, step=스냅_삭제_시작, status=SUCCESS", user.getId(), snapImageId);
-      imageService.deleteSnapImage(snapImageId, user.getId());
-      log.info("userId={}, snapImageId={}, step=스냅_삭제_완료, status=SUCCESS", user.getId(), snapImageId);
+      log.info("userId={}, snapImageId={}, step=피드_삭제_시작, status=SUCCESS", user.getId(), feedImageId);
+      imageService.deleteFeedImage(feedImageId, user.getId());
+      log.info("userId={}, snapImageId={}, step=피드_삭제_완료, status=SUCCESS", user.getId(), feedImageId);
 
       return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
-          ErrorCode.SUCCESS.getCode(), "성공적으로 스냅 사진을 삭제하였습니다."));
+          ErrorCode.SUCCESS.getCode(), "성공적으로 피드 사진을 삭제하였습니다."));
 
     } catch (Exception e) {
-      log.error("userId={}, snapImageId={}, step=스냅_삭제_실패, status=FAILED", user.getId(), snapImageId, e);
+      log.error("userId={}, snapImageId={}, step=피드_삭제_실패, status=FAILED", user.getId(), feedImageId, e);
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("스냅 이미지를 삭제하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("피드 이미지를 삭제하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  @Operation(summary = "스냅 사진 설명 저장")
+  @Operation(summary = "피드 사진 설명 저장")
   @ApiResponses(
       value = {
           @ApiResponse(
@@ -485,12 +485,12 @@ public class ImageController {
           ),
           @ApiResponse(
               responseCode = "E0004",
-              description = "해당 id로 스냅사진을 찾을 수 없습니다.",
+              description = "해당 id로 피드사진을 찾을 수 없습니다.",
               content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
           ),
           @ApiResponse(
               responseCode = "E0003",
-              description = "스냅사진을 저장할 권한이 없습니다.",
+              description = "피드사진을 저장할 권한이 없습니다.",
               content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
           ),
           @ApiResponse(
@@ -500,30 +500,30 @@ public class ImageController {
           )
       }
   )
-  @PatchMapping("/snaps/{snapImageId}/description")
-  public ResponseEntity<ResultMessageResponseDto> updateSnapImageDescription(
-      @Parameter(description = "스냅 사진 id", example = "11")
-      @PathVariable(value = "snapImageId") Long snapImageId,
+  @PatchMapping("/feeds/{feedImageId}/description")
+  public ResponseEntity<ResultMessageResponseDto> updateFeedImageDescription(
+      @Parameter(description = "피드 사진 id", example = "11")
+      @PathVariable(value = "feedImageId") Long feedImageId,
 
-      @RequestBody UpdateSnapImageDescriptionRequestDto dto,
+      @RequestBody UpdateFeedImageDescriptionRequestDto dto,
 
       @AuthenticationPrincipal User user
   ){
     try {
 
-      log.info("userId={}, snapImageId={}, step=스냅_설명_저장_시작, status=SUCCESS", user.getId(), snapImageId);
-      imageService.updateSnapImageDescription(dto, snapImageId, user.getId());
-      log.info("userId={}, snapImageId={}, step=스냅_설명_저장_완료, status=SUCCESS", user.getId(), snapImageId);
+      log.info("userId={}, snapImageId={}, step=피드_설명_저장_시작, status=SUCCESS", user.getId(), feedImageId);
+      imageService.updateFeedImageDescription(dto, feedImageId, user.getId());
+      log.info("userId={}, snapImageId={}, step=피드_설명_저장_완료, status=SUCCESS", user.getId(), feedImageId);
 
       return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
-          ErrorCode.SUCCESS.getCode(), "성공적으로 스냅 사진 설명을 성공적으로 저장하였습니다."));
+          ErrorCode.SUCCESS.getCode(), "성공적으로 피드 사진 설명을 성공적으로 저장하였습니다."));
 
     } catch (Exception e) {
-      log.error("userId={}, snapImageId={}, step=스냅_설명_저장_실패, status=FAILED", user.getId(), snapImageId, e);
+      log.error("userId={}, snapImageId={}, step=피드_설명_저장_실패, status=FAILED", user.getId(), feedImageId, e);
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("스냅 사진 설명을 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("피드 사진 설명을 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

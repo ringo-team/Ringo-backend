@@ -1,9 +1,9 @@
 package com.lingo.lingoproject.image;
 
 
+import com.lingo.lingoproject.domain.FeedImage;
 import com.lingo.lingoproject.domain.PhotographerImage;
 import com.lingo.lingoproject.domain.Profile;
-import com.lingo.lingoproject.domain.SnapImage;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.Role;
 import com.lingo.lingoproject.domain.enums.SignupStatus;
@@ -11,10 +11,10 @@ import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.dto.FeedImageDataRequestDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
-import com.lingo.lingoproject.image.dto.UpdateSnapImageDescriptionRequestDto;
+import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
 import com.lingo.lingoproject.repository.PhotographerImageRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
-import com.lingo.lingoproject.repository.SnapImageRepository;
+import com.lingo.lingoproject.repository.FeedImageRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
@@ -54,7 +54,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 public class ImageService {
 
   private final UserRepository userRepository;
-  private final SnapImageRepository snapImageRepository;
+  private final FeedImageRepository feedImageRepository;
   private final PhotographerImageRepository photographerImageRepository;
   private final S3Client amazonS3Client;
   private final ProfileRepository profileRepository;
@@ -173,17 +173,17 @@ public class ImageService {
   }
 
   @Transactional
-  public List<GetImageUrlResponseDto> uploadSnapImages(List<FeedImageDataRequestDto> list, Long userId) {
+  public List<GetImageUrlResponseDto> uploadFeedImages(List<FeedImageDataRequestDto> list, Long userId) {
 
     User user = userRepository.findById(userId).orElseThrow(() ->
         new RingoException("유저를 찾을 수 없습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST));
 
-    List<SnapImage> existedSnapImages = snapImageRepository.findAllByUser(user);
-    if (existedSnapImages.size() + list.size() > MAX_NUMBER_OF_SNAP_IMAGES){
+    List<FeedImage> existedFeedImages = feedImageRepository.findAllByUser(user);
+    if (existedFeedImages.size() + list.size() > MAX_NUMBER_OF_SNAP_IMAGES){
       throw new RingoException("최대 업로드 개수를 초과하였습니다.", ErrorCode.OVERFLOW, HttpStatus.BAD_REQUEST);
     }
 
-    List<SnapImage> snapImages = new ArrayList<>();
+    List<FeedImage> feedImages = new ArrayList<>();
 
     for(FeedImageDataRequestDto file : list){
 
@@ -192,16 +192,16 @@ public class ImageService {
       }
 
       String imageUrl = uploadImageToS3(file.getImage(), "snaps");
-      SnapImage snapImage = SnapImage.builder()
+      FeedImage feedImage = FeedImage.builder()
           .imageUrl(imageUrl)
           .description(file.getContent())
           .user(user)
           .build();
-      snapImages.add(snapImage);
+      feedImages.add(feedImage);
     }
-    List<SnapImage> savedSnapImages = snapImageRepository.saveAll(snapImages);
+    List<FeedImage> savedFeedImages = feedImageRepository.saveAll(feedImages);
 
-    return savedSnapImages.stream()
+    return savedFeedImages.stream()
         .map(image ->
             new GetImageUrlResponseDto(
                 ErrorCode.SUCCESS.getCode(),
@@ -243,10 +243,10 @@ public class ImageService {
   /**
    * snap 이미지 crud
    */
-  public List<GetImageUrlResponseDto> getAllSnapImageUrls(Long userId){
+  public List<GetImageUrlResponseDto> getAllFeedImageUrls(Long userId){
     User user = userRepository.findById(userId).orElseThrow(() -> new RingoException(
         "유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
-    List<SnapImage> images = snapImageRepository.findAllByUser(user);
+    List<FeedImage> images = feedImageRepository.findAllByUser(user);
     return images.stream()
         .map(image ->
             new GetImageUrlResponseDto(
@@ -259,19 +259,19 @@ public class ImageService {
   }
 
   @Transactional
-  public GetImageUrlResponseDto updateSnapImage(MultipartFile file, Long snapImageId, String description, Long userId){
+  public GetImageUrlResponseDto updateFeedImage(MultipartFile file, Long snapImageId, String description, Long userId){
 
     if (isUnmoderateImage(file)){
       return null;
     }
 
-    SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException(
-        "스냅 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-    if(!hasPermissionOnImage(snapImage.getUser(), userId)){
-      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, snapImage.getUser().getId());
+    FeedImage feedImage = feedImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException(
+        "피드 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+    if(!hasPermissionOnImage(feedImage.getUser(), userId)){
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, feedImage.getUser().getId());
       throw new RingoException("업데이트 할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
-    String imageUrl = getOriginalFilename(snapImage.getImageUrl());
+    String imageUrl = getOriginalFilename(feedImage.getImageUrl());
 
     //s3에 이미지 삭제
     deleteImageInS3(imageUrl);
@@ -280,43 +280,43 @@ public class ImageService {
     imageUrl = uploadImageToS3(file, "snaps");
 
     // snap_images 테이블에 변경된 사진 url 저장
-    snapImage.setImageUrl(imageUrl);
-    snapImage.setDescription(description);
-    snapImageRepository.save(snapImage);
+    feedImage.setImageUrl(imageUrl);
+    feedImage.setDescription(description);
+    feedImageRepository.save(feedImage);
 
     return new GetImageUrlResponseDto(
         ErrorCode.SUCCESS.getCode(),
         imageUrl,
-        snapImage.getId()
+        feedImage.getId()
     );
   }
 
   @Transactional
-  public void deleteSnapImage(Long snapImageId, Long userId){
-    // 스냅 사진 조회
-    SnapImage snapImage = snapImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException(
-        "스냅사진을 조회할 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+  public void deleteFeedImage(Long snapImageId, Long userId){
+    // 피드 사진 조회
+    FeedImage feedImage = feedImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException(
+        "피드사진을 조회할 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     // 삭제 권한 확인
-    if (!hasPermissionOnImage(snapImage.getUser(), userId)){
+    if (!hasPermissionOnImage(feedImage.getUser(), userId)){
       return;
     }
 
     // db 값 삭제
-    snapImageRepository.delete(snapImage);
+    feedImageRepository.delete(feedImage);
 
     // 키 조회 및 s3 값 삭제
-    String imageUrl = getOriginalFilename(snapImage.getImageUrl());
+    String imageUrl = getOriginalFilename(feedImage.getImageUrl());
     deleteImageInS3(imageUrl);
   }
 
   @Transactional
   public void deleteAllSnapImagesByUser(User user){
-    List<SnapImage> images = snapImageRepository.findAllByUser(user);
-    snapImageRepository.deleteAllByUser(user);
+    List<FeedImage> images = feedImageRepository.findAllByUser(user);
+    feedImageRepository.deleteAllByUser(user);
 
-    for(SnapImage snapImage : images){
-      deleteImageInS3(snapImage.getImageUrl());
+    for(FeedImage feedImage : images){
+      deleteImageInS3(feedImage.getImageUrl());
     }
   }
 
@@ -417,22 +417,22 @@ public class ImageService {
     return  ImageUrl.substring(ImageUrl.lastIndexOf("amazonaws.com/") + 14);
   }
 
-  public void updateSnapImageDescription(UpdateSnapImageDescriptionRequestDto dto, Long snapImageId, Long userId){
+  public void updateFeedImageDescription(UpdateFeedImageDescriptionRequestDto dto, Long snapImageId, Long userId){
 
     if (dto == null || dto.description() == null || dto.description().isBlank()){
       return;
     }
 
-    SnapImage image = snapImageRepository.findById(snapImageId)
-        .orElseThrow(() -> new RingoException("스냅 이미지를 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+    FeedImage image = feedImageRepository.findById(snapImageId)
+        .orElseThrow(() -> new RingoException("피드 이미지를 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     if (!hasPermissionOnImage(image.getUser(), userId)){
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, image.getUser().getId());
-      throw new RingoException("스냅 이미지에 글을 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("피드 이미지에 글을 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
     image.setDescription(dto.description());
-    snapImageRepository.save(image);
+    feedImageRepository.save(image);
   }
 
   public boolean isUnmoderateImage(MultipartFile file) {

@@ -20,7 +20,7 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SnapImage {
+public class FeedImage {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   public Long id;
