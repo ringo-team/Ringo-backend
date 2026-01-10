@@ -3,6 +3,7 @@ package com.lingo.lingoproject.auth;
 
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
+@Tag(name = "self-auth-controller", description = "유저 핸드폰 본인인증 관련 api")
 public class SelfAuthController {
 
   private final SelfAuthService selfAuthService;

@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@Tag(name = "인증", description = "로그인/로그아웃 및 토큰 관련 API")
+@Tag(name="login-signup-controller", description = "로그인/로그아웃/회원가입 및 토큰 관련 API")
 public class LoginController {
 
   private final LoginService loginService;

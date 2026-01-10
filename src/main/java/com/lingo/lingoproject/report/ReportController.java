@@ -5,6 +5,7 @@ import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.report.dto.SaveReportRequestDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Slf4j
 @RequiredArgsConstructor
+@Tag(name = "report-controller", description = "유저 신고 관련 api")
 public class ReportController {
 
   private final ReportService reportService;

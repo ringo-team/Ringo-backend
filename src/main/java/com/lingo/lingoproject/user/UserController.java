@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/users")
 @Slf4j
 @RequiredArgsConstructor
+@Tag(name = "user-controller", description = "유저 휴면/탈퇴/조회/친구초대 관련 api")
 public class UserController {
 
   private final UserService userService;

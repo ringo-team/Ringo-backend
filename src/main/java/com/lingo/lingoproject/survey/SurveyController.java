@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @Slf4j
 @RequiredArgsConstructor
+@Tag(name = "survey-controller", description = "설문지/설문결과 저장/조회/업데이트 관련 api")
 public class SurveyController {
 
   private final SurveyService surveyService;

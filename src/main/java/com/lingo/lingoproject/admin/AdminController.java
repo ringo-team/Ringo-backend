@@ -12,6 +12,7 @@ import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ import com.lingo.lingoproject.exception.RingoException;
 @RequestMapping("/admin")
 @Slf4j
 @RequiredArgsConstructor
+@Tag(name = "admin-controller", description = "유저조회/신고조회 등 관리자 페이지 관련 api")
 public class AdminController {
 
   private final UserService userService;

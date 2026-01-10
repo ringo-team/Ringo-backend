@@ -5,6 +5,7 @@ import com.lingo.lingoproject.stats.dto.GetDailyNumberOfVisitorRequestDto;
 import com.lingo.lingoproject.stats.dto.GetTodayVisitorStatsRequestDto;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import com.lingo.lingoproject.exception.RingoException;
 @Slf4j
 @RequiredArgsConstructor
 @RequestMapping("/admin/stats")
+@Tag(name = "stats-controller", description = "유저 통계 관련 api")
 public class StatsController {
 
   private final StatService statService;

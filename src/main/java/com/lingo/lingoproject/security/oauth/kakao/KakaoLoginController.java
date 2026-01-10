@@ -6,6 +6,7 @@ import com.lingo.lingoproject.security.TokenType;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.exception.RingoException;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Slf4j
 @RequiredArgsConstructor
+@Hidden
 public class KakaoLoginController {
 
   private final KakaoLoginService kakaoLoginService;

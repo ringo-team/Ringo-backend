@@ -11,6 +11,7 @@ import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import com.lingo.lingoproject.exception.RingoException;
 @RestController
 @Slf4j
 @RequiredArgsConstructor
+@Tag(name = "snap-controller", description = "스냅 신청, 작가 정보 조회 관련 api")
 public class SnapController {
 
   private final SnapService snapService;

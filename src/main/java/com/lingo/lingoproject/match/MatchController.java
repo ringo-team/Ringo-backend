@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
+@Tag(name = "match-controller", description = "매칭 관련 api")
 public class MatchController {
 
   private final MatchService matchService;
@@ -432,7 +434,6 @@ public class MatchController {
           )
       }
   )
-  @Hidden
   @GetMapping("/matches/{matchingId}/message")
   public ResponseEntity<GetMatchingRequestMessageResponseDto> getMatchingRequestMessage(
       @PathVariable(value = "matchingId") Long matchingId,

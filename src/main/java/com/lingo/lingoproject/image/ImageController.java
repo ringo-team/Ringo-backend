@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping()
 @Slf4j
 @RequiredArgsConstructor
+@Tag(name = "image-controller", description = "프로필, 피드 사진 관련 api")
 public class ImageController {
 
   private final ImageService imageService;
