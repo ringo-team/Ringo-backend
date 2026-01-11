@@ -29,6 +29,7 @@ import com.lingo.lingoproject.utils.GenericUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -202,19 +203,25 @@ public class ChatService {
 
     for(Chatroom chatroom : chatrooms){
 
-      // 채팅방 참여자 닉네임 조회
-      List<String> roomMemberNicknames = chatroomParticipantRepository
+      // 채팅 상대방 유저 닉네임 조회
+      User chatOpponent = chatroomParticipantRepository
           .findAllByChatroom(chatroom)
           .stream()
           .map(chatroomParticipant -> {
 
             // 참여자가 앱을 탈퇴했으면 "알 수 없음" 으로 변경
-            if(chatroomParticipant.getIsWithdrawn()) return "알 수 없음";
+            if(chatroomParticipant.getIsWithdrawn()) {
+              User participant = chatroomParticipant.getParticipant();
+              participant.setNickname("알 수 없음");
+              return participant;
+            }
 
             // 그 외의 경우 닉네임 조회
-            else return chatroomParticipant.getParticipant().getNickname();
+            else return chatroomParticipant.getParticipant();
           })
-          .toList();
+          .filter(opponent -> !user.getId().equals(opponent.getId()))
+          .toList()
+          .getFirst();
 
       // 유저가 읽지 않은 메세지의 개수를 조회한다.
       int numberOfNotReadMessages = messageRepository.findNumberOfNotReadMessages(chatroom.getId(),
@@ -224,12 +231,25 @@ public class ChatService {
       Optional<Message> lastMessage = messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(
           chatroom.getId());
 
+      // 채팅 상대방 유저의 프로필 사진을 조회
+      Profile chatOpponentProfile = profileRepository.findByUser(chatOpponent)
+          .orElseThrow(() -> new RingoException("프로필을 찾는 도중 유저를 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+
+      // 마지막 메세지 전송 시기
+      String lastSendDateTime = null;
+      if (lastMessage.isPresent()){
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        lastSendDateTime = formatter.format(lastMessage.get().getCreatedAt());
+      }
+
       responseDtoList.add(GetChatroomResponseDto.builder()
           .chatroomId(chatroom.getId())
-          .participants(roomMemberNicknames)
+          .chatOpponent(chatOpponent.getNickname())
+          .chatOpponentProfileUrl(chatOpponentProfile.getImageUrl())
           .lastChatMessage(lastMessage.map(Message::getContent).orElse(null))
           .NumberOfNotReadMessages(numberOfNotReadMessages)
-          .chatroomSize(roomMemberNicknames.size())
+          .lastSendDateTime(lastSendDateTime)
+          .chatroomSize(2)
           .build());
     }
     return responseDtoList;
