@@ -157,8 +157,7 @@ public class ChatController {
       value = {
           @ApiResponse(
               responseCode = "0000",
-              description = "조회 성공",
-              content = @Content(schema = @Schema(implementation = JsonListWrapper.class))
+              description = "조회 성공"
           ),
           @ApiResponse(
               responseCode = "E0003",
