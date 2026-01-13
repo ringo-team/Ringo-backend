@@ -20,6 +20,9 @@ public record GetUserInfoResponseDto(
     @Schema(description = "성별", example = "MALE", allowableValues = {"MALE", "FEMALE"})
     String gender,
 
+    @Schema(description = "mbti", example = "ENFP")
+    String mbti,
+
     @Schema(description = "닉네임", example = "불타는 망고")
     String nickname,
 

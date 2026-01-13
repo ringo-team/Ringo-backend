@@ -145,8 +145,11 @@ public class User extends Timestamp implements UserDetails {
   @ColumnDefault(value = "false")
   private Boolean isMarketingReceptionConsent;
 
+  private String mbti;
+
   public void setUserInfo(SignupUserInfoDto dto){
     this.nickname = dto.nickname();
+    this.gender = Gender.valueOf(dto.gender().toUpperCase());
     this.residenceFirstPlace = dto.address().city();
     this.residenceSecondPlace = dto.address().district();
     this.activityLocFirstPlace = dto.activeAddress().city();
@@ -158,6 +161,7 @@ public class User extends Timestamp implements UserDetails {
     this.religion = Religion.valueOf(dto.religion());
     this.biography = dto.biography();
     this.status = SignupStatus.IN_PROGRESS;
+    this.mbti = dto.mbti();
   }
 
   public void setUserSelfAuthInfo(UserSelfAuthInfo dto){

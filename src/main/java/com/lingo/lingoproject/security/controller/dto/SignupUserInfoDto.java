@@ -20,6 +20,9 @@ public record SignupUserInfoDto(
     @NotBlank
     String birthday,
 
+    @Schema(description = "성별", example = "MALE", allowableValues = {"MALE", "FEMALE"})
+    String gender,
+
     @NotNull
     Address address,
 
@@ -52,7 +55,10 @@ public record SignupUserInfoDto(
 
     @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
     @Size(max = 5)
-    List<String> hashtags
+    List<String> hashtags,
+
+    @Schema(description = "mbti", example = "ENFP")
+    String mbti
 ) {
 
 }

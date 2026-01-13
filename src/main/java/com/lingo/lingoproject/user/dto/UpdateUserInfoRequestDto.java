@@ -22,5 +22,8 @@ public record UpdateUserInfoRequestDto(
     String religion,
 
     @Schema(description = "자기 소개", example = "안녕하세요")
-    String biography
+    String biography,
+
+    @Schema(description = "mbti", example = "ENFP")
+    String mbti
 ){}

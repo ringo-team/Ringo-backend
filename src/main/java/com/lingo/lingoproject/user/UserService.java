@@ -53,6 +53,12 @@ public class UserService {
 
   private final int FRIEND_INVITATION_REWARD = 10;
   private final int MAX_NUMBER_OF_INPUT = 5;
+  private final List<String> MBTI = List.of(
+      "ESTJ", "ESTP", "ESFJ", "ESFP",
+      "ENTJ", "ENTP", "ENFJ", "ENFP",
+      "ISTJ", "ISTP", "ISFJ", "ISFP",
+      "INTJ", "INTP", "INFJ", "INFP"
+  );
 
   private final UserRepository userRepository;
   private final RedisUtils redisUtils;
@@ -138,6 +144,7 @@ public class UserService {
         .profile(profile.getImageUrl())
         .birthday(user.getBirthday().toString())
         .gender(user.getGender().toString())
+        .mbti(user.getMbti())
         .height(user.getHeight())
         .isDrinking(user.getIsDrinking().toString())
         .isSmoking(user.getIsSmoking().toString())
@@ -158,6 +165,7 @@ public class UserService {
     String height   = dto.height();
     String job      = dto.job();
     String biography = dto.biography();
+    String mbti     = dto.mbti();
 
     genericUtils.validateAndSetEnum(drinking, Drinking.values(), user::setIsDrinking, Drinking.class);
     genericUtils.validateAndSetEnum(smoking, Smoking.values(), user::setIsSmoking, Smoking.class);
@@ -166,6 +174,13 @@ public class UserService {
     genericUtils.validateAndSetStringValue(height, user::setHeight);
     genericUtils.validateAndSetStringValue(job, user::setJob);
     genericUtils.validateAndSetStringValue(biography, user::setBiography);
+
+    if (!MBTI.contains(mbti.toUpperCase())){
+      throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+    }
+    else{
+      user.setMbti(mbti.toUpperCase());
+    }
 
     userRepository.save(user);
   }

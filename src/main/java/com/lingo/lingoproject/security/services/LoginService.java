@@ -37,6 +37,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +63,13 @@ public class LoginService {
   private final BlockedUserRepository blockedUserRepository;
   private final UserPointRepository userPointRepository;
   private final FcmTokenRepository fcmTokenRepository;
+
+  private final List<String> MBTI = List.of(
+      "ESTJ", "ESTP", "ESFJ", "ESFP",
+      "ENTJ", "ENTP", "ENFJ", "ENFP",
+      "ISTJ", "ISTP", "ISFJ", "ISFP",
+      "INTJ", "INTP", "INFJ", "INFP"
+  );
 
   public LoginResponseDto login(LoginInfoDto dto){
 
@@ -158,6 +166,12 @@ public class LoginService {
     if (!genericUtils.isContains(Religion.values(), dto.religion())){
       throw new RingoException("종교 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
+    if (!MBTI.contains(dto.mbti().toUpperCase())){
+      throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+    }
+    if (!(dto.gender().equalsIgnoreCase("MALE") || dto.gender().equalsIgnoreCase("FEMALE"))){
+      throw new RingoException("성별 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+    }
     User user = userRepository.findById(dto.id()).orElseThrow(() -> new RingoException(
         "해당 회원을 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
@@ -165,7 +179,9 @@ public class LoginService {
     //calendar.setTime(user.getBirthday());
     try {
       SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-      calendar.setTime(formatter.parse(dto.birthday()));
+      Date birthday = formatter.parse(dto.birthday());
+      calendar.setTime(birthday);
+      user.setBirthday(birthday);
     } catch (ParseException e) {
       throw new RingoException("파싱 입셉션", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
