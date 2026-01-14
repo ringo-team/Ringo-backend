@@ -255,9 +255,10 @@ public class MatchController {
       }
   )
   @GetMapping("/users/{userId}/recommendations")
-  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>>  recommend(
+  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>>  recommendByCumulatedSurveys(
       @Parameter(description = "유저id", example = "5")
       @PathVariable(value = "userId") Long userId,
+
       @AuthenticationPrincipal User user) {
     if (!userId.equals(user.getId())) {
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);

@@ -198,11 +198,13 @@ public class UserController {
           )
       }
   )
-  @GetMapping()
-  public ResponseEntity<GetUserInfoResponseDto> getUserInfo(@AuthenticationPrincipal User user){
+  @GetMapping("/{userId}")
+  public ResponseEntity<GetUserInfoResponseDto> getUserInfo(
+      @PathVariable(value = "userId") Long userId,
+      @AuthenticationPrincipal User user){
     try {
       log.info("userId={}, step=유저정보_조회_시작, status=SUCCESS", user.getId());
-      GetUserInfoResponseDto dto = userService.getUserInfo(user);
+      GetUserInfoResponseDto dto = userService.getUserInfo(userId, user);
       log.info("userId={}, step=유저정보_조회_완료, status=SUCCESS", user.getId());
 
       return ResponseEntity.status(HttpStatus.OK).body(dto);
@@ -211,6 +213,7 @@ public class UserController {
       if (e instanceof RingoException re){
         throw re;
       }
+      log.error(e.getMessage());
       throw new RingoException("유저 정보를 조회하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

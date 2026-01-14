@@ -22,13 +22,13 @@ public interface BlockedFriendRepository extends JpaRepository<BlockedFriend, Lo
   @Query("""
     select
         case
-           when u.id = :userId then b.user
-           else u
+           when u.id = :userId then b.user.id
+           else u.id
         end
     from BlockedFriend b join User u on b.phoneNumber = u.phoneNumber
     where b.user.id = :userId or u.id = :userId
     """)
-  List<User> findUsersMutuallyBlockedWith(Long userId);
+  List<Long> findUsersMutuallyBlockedWith(Long userId);
 
   void deleteByUser(User user);
 }

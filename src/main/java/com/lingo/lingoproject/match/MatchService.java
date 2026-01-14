@@ -30,6 +30,7 @@ import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserAccessLogRepository;
 import com.lingo.lingoproject.repository.UserMatchingLogRepository;
 import com.lingo.lingoproject.repository.UserRepository;
+import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
@@ -72,7 +73,7 @@ public class MatchService {
   private final int MAX_PROFILE_RECOMMENDATION_SIZE = 4;
   private final int MAX_DAILY_RECOMMENDATION_SIZE = 4;
   private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
-  private final int ACTIVE_DAY_DURATION = 10;
+  private final int ACTIVE_DAY_DURATION = 10000;
   private final String REDIS_ACTIVE_USER_IDS = "redis:active:ids";
 
   @Value("${ringo.config.survey.space_weight}")
@@ -168,9 +169,9 @@ public class MatchService {
     List<Long> activeUserIds = userAccessLogRepository.findAllByCreateAtAfter(startDay)
         .stream().map(UserAccessLog::getUserId).toList();
     redisTemplate.delete(REDIS_ACTIVE_USER_IDS);
-    redisTemplate.opsForSet().add(
+    redisTemplate.opsForValue().set(
         REDIS_ACTIVE_USER_IDS,
-        activeUserIds,
+        new JsonListWrapper<>(ErrorCode.SUCCESS.toString(), activeUserIds),
         1,
         TimeUnit.HOURS
     );
@@ -188,16 +189,16 @@ public class MatchService {
       if (responses.size() == MAX_PROFILE_RECOMMENDATION_SIZE) return responses;
     }
 
-    Set<Object> redisActiveUserIds = redisTemplate.opsForSet().members(REDIS_ACTIVE_USER_IDS);
-    List<Long> activeUserIds;
+    JsonListWrapper<Long> redisListWrapper = (JsonListWrapper<Long>) redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS);
+    List<Long> activeUserIds = redisListWrapper != null ? redisListWrapper.getList() : null;
 
-    if (redisActiveUserIds == null || redisActiveUserIds.isEmpty()){
+    if (activeUserIds == null || activeUserIds.isEmpty()){
       syncRedisAllActiveUsers();
-      activeUserIds = redisTemplate.opsForSet().members(REDIS_ACTIVE_USER_IDS)
-          .stream().map(v -> (long) v).collect(Collectors.toList());;
+      activeUserIds = ((JsonListWrapper<Long>) redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS))
+          .getList().stream().map(v -> (long) v).collect(Collectors.toList());
     }else{
-      activeUserIds = redisTemplate.opsForSet().members(REDIS_ACTIVE_USER_IDS)
-          .stream().map(v -> (long) v).collect(Collectors.toList());
+      activeUserIds = ((JsonListWrapper<Long>) redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS))
+          .getList().stream().map(v -> (long) v).collect(Collectors.toList());;
     }
 
     List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(userId);
@@ -215,7 +216,7 @@ public class MatchService {
         .toList();
 
     Set<GetUserProfileResponseDto> recommendUserProfileSet = new HashSet<>();
-    userRepository.findAllById(closeRelationUserIds)
+    userRepository.findAllByIdIn(closeRelationUserIds)
         .forEach(u -> addUserProfileToCollection(recommendUserProfileSet, u));
 
     List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>(recommendUserProfileSet);
@@ -308,10 +309,8 @@ public class MatchService {
   
   public List<Long> getExcludedUserIdsForRecommendation(Long userId){
     // 연락처에 존재하는 유저
-    List<Long> blockedFriendUserIds = blockedFriendRepository.findUsersMutuallyBlockedWith(userId)
-        .stream()
-        .map(User::getId)
-        .toList();
+    List<Long> blockedFriendUserIds = blockedFriendRepository.findUsersMutuallyBlockedWith(userId);
+
     // 휴면 계정인 유저
     List<Long> dormantUserIds = dormantAccountRepository.findAll()
         .stream()

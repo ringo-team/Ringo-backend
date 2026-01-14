@@ -14,6 +14,7 @@ import com.lingo.lingoproject.domain.enums.Smoking;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.ImageService;
+import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.BlockedFriendRepository;
 import com.lingo.lingoproject.repository.BlockedUserRepository;
@@ -36,6 +37,7 @@ import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -131,27 +133,44 @@ public class UserService {
     }
   }
 
-  public GetUserInfoResponseDto getUserInfo(User user) {
+  public GetUserInfoResponseDto getUserInfo(Long userId, User user) {
 
-    Profile profile = profileRepository.findByUser(user)
+    List<GetUserProfileResponseDto> recommendedUsers = redisUtils.getRecommendUser(user.getId().toString());
+    List<GetUserProfileResponseDto> recommendedUsersForDaily = redisUtils.getRecommendUserForDailySurvey(user.getId().toString());
+    List<GetUserProfileResponseDto> userList = new ArrayList<>();
+
+    if (recommendedUsers != null) userList.addAll(recommendedUsers);
+    if (recommendedUsersForDaily != null) userList.addAll(recommendedUsersForDaily);
+
+    List<Long> userIdList = userList.stream().map(GetUserProfileResponseDto::getUserId).toList();
+
+    if (!(userIdList.contains(userId) || userId.equals(user.getId()))){
+      throw new RingoException("유저를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    }
+
+    User findedUser = userRepository.findById(userId).orElseThrow(
+        () -> new RingoException("해당하는 유저가 존재하지 않습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)
+    );
+
+    Profile profile = profileRepository.findByUser(findedUser)
         .orElseThrow(() -> new RingoException("유저 정보 조회 중 프로필을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
 
-    List<String> hashtags = hashtagRepository.findAllByUser(user)
+    List<String> hashtags = hashtagRepository.findAllByUser(findedUser)
         .stream().map(Hashtag::getHashtag).toList();
 
     return GetUserInfoResponseDto.builder()
-        .userId(user.getId())
+        .userId(findedUser.getId())
         .profile(profile.getImageUrl())
-        .birthday(user.getBirthday().toString())
-        .gender(user.getGender().toString())
-        .mbti(user.getMbti())
-        .height(user.getHeight())
-        .isDrinking(user.getIsDrinking().toString())
-        .isSmoking(user.getIsSmoking().toString())
-        .religion(user.getReligion().toString())
-        .job(user.getJob())
-        .nickname(user.getNickname())
-        .biography(user.getBiography())
+        .birthday(findedUser.getBirthday().toString())
+        .gender(findedUser.getGender().toString())
+        .mbti(findedUser.getMbti())
+        .height(findedUser.getHeight())
+        .isDrinking(findedUser.getIsDrinking().toString())
+        .isSmoking(findedUser.getIsSmoking().toString())
+        .religion(findedUser.getReligion().toString())
+        .job(findedUser.getJob())
+        .nickname(findedUser.getNickname())
+        .biography(findedUser.getBiography())
         .hashtags(hashtags)
         .result(ErrorCode.SUCCESS.getCode())
         .build();

@@ -81,7 +81,7 @@ public class RedisUtils {
       log.error("추천 유저 캐시 역직렬화 실패. key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedRecommendUserList.getList();
+    return savedRecommendUserList != null ? savedRecommendUserList.getList() : null;
   }
 
   public void saveRecommendUserForDailySurvey(String key, List<GetUserProfileResponseDto> value){
@@ -101,7 +101,7 @@ public class RedisUtils {
       log.error("일일 설문 추천 캐시 역직렬화 실패. key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedRecommendUserList.getList();
+    return savedRecommendUserList != null ? savedRecommendUserList.getList() : null;
   }
 
   public void saveUserDailySurvey(String key, List<GetSurveyResponseDto> value){
@@ -120,7 +120,7 @@ public class RedisUtils {
       log.error("일일 설문 캐시 역직렬화 실패. key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedUserDailySurveyList.getList();
+    return savedUserDailySurveyList != null ? savedUserDailySurveyList.getList() : null;
   }
 
   public void suspendUser(Long userId, int day){
