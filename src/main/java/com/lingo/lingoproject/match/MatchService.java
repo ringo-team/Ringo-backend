@@ -96,9 +96,16 @@ public class MatchService {
             "매칭을 요청 받은 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     // 매칭 점수 계산
-    Float matchingScore = calcMatchScore(requestedUser.getId(), requestUser.getId());
+    float matchingScore = calcMatchScore(requestedUser.getId(), requestUser.getId());
     log.info("requestUserId={}, requestedUserId={}, matchingScore={}, step=매칭요청, status=SUCCESS", requestUser.getId(), requestedUser.getId(), matchingScore);
     if(!isMatch(matchingScore)){
+      Matching matching = Matching.builder()
+          .requestedUser(requestedUser)
+          .requestUser(requestUser)
+          .matchingStatus(MatchingStatus.UNSATISFIED)
+          .matchingScore(matchingScore)
+          .build();
+      matchingRepository.save(matching);
       return null;
     }
 
@@ -107,7 +114,7 @@ public class MatchService {
         .requestedUser(requestedUser)
         .requestUser(requestUser)
         .matchingStatus(MatchingStatus.PRE_REQUESTED)
-        .matchingScore(calcMatchScore(requestedUser.getId(), requestUser.getId()))
+        .matchingScore(matchingScore)
         .build();
 
     return matchingRepository.save(matching);
