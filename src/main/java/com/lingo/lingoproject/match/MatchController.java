@@ -40,7 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@Tag(name = "match-controller", description = "매칭 관련 api")
+@Tag(name = "matching-recommendation-controller", description = "매칭 관련 api")
 public class MatchController {
 
   private final MatchService matchService;
@@ -454,6 +454,44 @@ public class MatchController {
         throw re;
       }
       throw new RingoException("매칭 요청 메세지 조회에 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Operation(summary = "추천이성 가리기")
+  @ApiResponses(
+      value = {
+          @ApiResponse(
+              responseCode = "0000",
+              description = "성공",
+              content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
+          ),
+          @ApiResponse(
+              responseCode = "E1000",
+              description = "내부 오류, 기타 문의",
+              content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
+          )
+      }
+  )
+  @PatchMapping("users/{recommendedUserId}/recommendations/hide")
+  public ResponseEntity<?> hideRecommendationUser(
+      @Parameter(description = "가리고 싶은 유저의 아이디", example = "5")
+      @PathVariable(value = "recommendedUserId") Long recommendedUserId,
+
+      @AuthenticationPrincipal User user
+  ){
+    try{
+
+      log.info("userId={}, recommendedUserId={}, step=추천이성_가리기_시작, status=SUCCESS", user.getId(), recommendedUserId);
+      matchService.hideRecommendedUser(user, recommendedUserId);
+      log.info("userId={}, recommendedUserId={}, step=추천이성_가리기_완료, status=SUCCESS", user.getId(), recommendedUserId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "추천이성 가리기 성공"));
+    } catch (Exception e) {
+      log.error("userId={}, recommendedUserId={}, step=추천이성_가리기_실패, status=FAILED", user.getId(), recommendedUserId, e);
+      if (e instanceof RingoException re){
+        throw re;
+      }
+      throw new RingoException("추천 이성을 가리는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

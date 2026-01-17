@@ -54,6 +54,9 @@ public class GetUserProfileResponseDto {
   @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
   private List<String> hashtags;
 
+  @Schema(description = "숨김 여부, 1 -> 숨김, 0 -> 노출", example = "1")
+  private Integer hide;
+
 
   public GetUserProfileResponseDto(
       Long userId,

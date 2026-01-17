@@ -135,7 +135,7 @@ public class UserService {
 
   public GetUserInfoResponseDto getUserInfo(Long userId, User user) {
 
-    List<GetUserProfileResponseDto> recommendedUsers = redisUtils.getRecommendUser(user.getId().toString());
+    List<GetUserProfileResponseDto> recommendedUsers = redisUtils.getRecommendedUserForCumulativeSurvey(user.getId().toString());
     List<GetUserProfileResponseDto> recommendedUsersForDaily = redisUtils.getRecommendUserForDailySurvey(user.getId().toString());
     List<GetUserProfileResponseDto> userList = new ArrayList<>();
 

@@ -64,16 +64,16 @@ public class RedisUtils {
     return redisTemplate.keys("logoutUser::*");
   }
 
-  public void saveRecommendUser(String key, List<GetUserProfileResponseDto> value){
+  public void saveRecommendedUserForCumulativeSurvey(String key, List<GetUserProfileResponseDto> value){
     cacheUntilMidnight("recommend::" + key,
         new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), value));
   }
 
-  public boolean containsRecommendUser(String key){
+  public boolean containsRecommendedUser(String key){
     return redisTemplate.hasKey("recommend::" + key);
   }
 
-  public List<GetUserProfileResponseDto> getRecommendUser(String key){
+  public List<GetUserProfileResponseDto> getRecommendedUserForCumulativeSurvey(String key){
     JsonListWrapper<GetUserProfileResponseDto> savedRecommendUserList = null;
     try {
       savedRecommendUserList = (JsonListWrapper<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);

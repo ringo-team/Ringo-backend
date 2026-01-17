@@ -70,10 +70,12 @@ public class MatchService {
   private final UserAccessLogRepository userAccessLogRepository;
   private final RedisTemplate<String, Object> redisTemplate;
 
-  private final int MAX_PROFILE_RECOMMENDATION_SIZE = 4;
-  private final int MAX_DAILY_RECOMMENDATION_SIZE = 4;
+  private final int MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY = 4;
+  private final int MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY = 4;
   private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
-  private final int ACTIVE_DAY_DURATION = 10000;
+  private final int ACTIVE_DAY_DURATION = 14;
+  private final int HIDE_PROFILE_FLAG = 1;
+  private final int EXPOSE_PROFILE_FLAG = 0;
   private final String REDIS_ACTIVE_USER_IDS = "redis:active:ids";
 
   @Value("${ringo.config.survey.space_weight}")
@@ -191,14 +193,15 @@ public class MatchService {
     Long userId = user.getId();
 
     // 캐시 조회
-    if(redisUtils.containsRecommendUser(userId.toString())){
-      List<GetUserProfileResponseDto> responses = redisUtils.getRecommendUser(userId.toString());
-      if (responses.size() == MAX_PROFILE_RECOMMENDATION_SIZE) return responses;
+    if(redisUtils.containsRecommendedUser(userId.toString())){
+      List<GetUserProfileResponseDto> responses = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
+      if (responses.size() == MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY) return responses;
     }
 
     JsonListWrapper<Long> redisListWrapper = (JsonListWrapper<Long>) redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS);
     List<Long> activeUserIds = redisListWrapper != null ? redisListWrapper.getList() : null;
 
+    // 레디스에 존재하는 active 유저(14일 안에 접속한 유저)를 가져온다.
     if (activeUserIds == null || activeUserIds.isEmpty()){
       syncRedisAllActiveUsers();
       activeUserIds = ((JsonListWrapper<Long>) redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS))
@@ -208,28 +211,34 @@ public class MatchService {
           .getList().stream().map(v -> (long) v).collect(Collectors.toList());;
     }
 
+    // 이성추천에서 배제해야할 유저를 가져온다.
     List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(userId);
     activeUserIds.removeAll(excludedUserIds);
 
+
+    // 임계치 이상의 매칭도를 가진 유저를 랜덤으로 4명 추천해준다.
     List<Long> closeRelationUserIds = activeUserIds
         .stream()
         .map(id -> {
           float matchingScore = calcMatchScore(userId, id);
           return new UserMatchingScoreMapping(id, matchingScore);
         })
-        .sorted((m1, m2) -> (int) (m2.matchingScore - m1.matchingScore))
+        .filter(m -> m.matchingScore >= LIMIT_OF_MATCHING_SCORE)
         .map(UserMatchingScoreMapping::getId)
-        .limit(MAX_PROFILE_RECOMMENDATION_SIZE)
-        .toList();
+        .collect(Collectors.toList());
 
-    Set<GetUserProfileResponseDto> recommendUserProfileSet = new HashSet<>();
+    Collections.shuffle(closeRelationUserIds);
+    closeRelationUserIds = closeRelationUserIds.subList(0, MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY);
+
+    // 추천된 이성의 프로필을 set에 저장한다.
+    Set<GetUserProfileResponseDto> recommendedUserProfileSet = new HashSet<>();
     userRepository.findAllByIdIn(closeRelationUserIds)
-        .forEach(u -> addUserProfileToCollection(recommendUserProfileSet, u));
+        .forEach(recommendedUser -> addUserProfileToCollection(recommendedUserProfileSet, user, recommendedUser));
 
-    List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>(recommendUserProfileSet);
+    List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>(recommendedUserProfileSet);
 
     // 캐시 저장
-    redisUtils.saveRecommendUser(userId.toString(), recommendUserList);
+    redisUtils.saveRecommendedUserForCumulativeSurvey(userId.toString(), recommendUserList);
 
     return recommendUserList;
   }
@@ -255,7 +264,7 @@ public class MatchService {
     //캐시 조회
     if (redisUtils.containsRecommendUserForDailySurvey(userId.toString())){
       List<GetUserProfileResponseDto> responses = redisUtils.getRecommendUserForDailySurvey(userId.toString());
-      if (responses.size() == MAX_DAILY_RECOMMENDATION_SIZE) return responses;
+      if (responses.size() == MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY) return responses;
     }
 
     // 오늘 응답한 설문의 응답값을 조회
@@ -276,7 +285,7 @@ public class MatchService {
     for (AnsweredSurvey todayAnsweredSurvey : todayAnsweredSurveys) {
 
       // 4명만 추천해줌
-      if (recommendUserProfileList.size() == 4) break;
+      if (recommendUserProfileList.size() == MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY) break;
 
       // 추천되지 않아야할 유저를 조회
       List<User> excludedUsers = convertIdListToUserList(getExcludedUserIdsForRecommendation(user.getId()));
@@ -299,7 +308,7 @@ public class MatchService {
       if (recommendedUser == null) continue;
 
       // recommendUserProfileList에 유저 프로필 정보를 저장함
-      addUserProfileToCollection(recommendUserProfileList, recommendedUser);
+      addUserProfileToCollection(recommendUserProfileList, user, recommendedUser);
     }
 
     // 캐시 저장
@@ -307,20 +316,50 @@ public class MatchService {
     return recommendUserProfileList;
   }
 
-  public void addUserProfileToCollection(Collection<GetUserProfileResponseDto> collection, User user){
-    Profile profile = profileRepository.findByUser(user)
+  public void hideRecommendedUser(User user, Long recommendedUserId){
+
+    Long userId = user.getId();
+
+    if(redisUtils.containsRecommendedUser(userId.toString())){
+      List<GetUserProfileResponseDto> responses = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
+      removeRecommendedUserFromList(responses, recommendedUserId);
+      redisUtils.saveRecommendedUserForCumulativeSurvey(userId.toString(), responses);
+    }
+
+    if (redisUtils.containsRecommendUserForDailySurvey(userId.toString())){
+      List<GetUserProfileResponseDto> responses = redisUtils.getRecommendUserForDailySurvey(userId.toString());
+      removeRecommendedUserFromList(responses, recommendedUserId);
+      redisUtils.saveRecommendUserForDailySurvey(userId.toString(), responses);
+    }
+
+  }
+
+  public void removeRecommendedUserFromList(List<GetUserProfileResponseDto> responses, Long recommendedUserId){
+    for (GetUserProfileResponseDto response : responses){
+      if (response.getUserId().equals(recommendedUserId)){
+        response.setHide(HIDE_PROFILE_FLAG);
+        return;
+      }
+    }
+  }
+
+  public void addUserProfileToCollection(Collection<GetUserProfileResponseDto> collection, User user, User recommendedUser){
+    Profile profile = profileRepository.findByUser(recommendedUser)
         .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-    List<String> hashtags = hashtagRepository.findAllByUser(user)
+    List<String> hashtags = hashtagRepository.findAllByUser(recommendedUser)
         .stream()
         .map(Hashtag::getHashtag)
         .toList();
+    float matchingScore = calcMatchScore(user.getId(), recommendedUser.getId());
     collection.add(
         GetUserProfileResponseDto.builder()
-            .userId(user.getId())
-            .age(user.getAge())
-            .nickname(user.getNickname())
+            .userId(recommendedUser.getId())
+            .matchingScore(matchingScore)
+            .age(recommendedUser.getAge())
+            .nickname(recommendedUser.getNickname())
             .profileUrl(profile.getImageUrl())
             .hashtags(hashtags)
+            .hide(EXPOSE_PROFILE_FLAG)
             .build()
     );
   }
