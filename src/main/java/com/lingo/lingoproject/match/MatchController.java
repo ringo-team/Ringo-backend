@@ -255,7 +255,7 @@ public class MatchController {
       }
   )
   @GetMapping("/users/{userId}/recommendations")
-  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>>  recommendByCumulatedSurveys(
+  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>>  recommendByCumulativeSurveys(
       @Parameter(description = "유저id", example = "5")
       @PathVariable(value = "userId") Long userId,
 

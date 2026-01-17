@@ -258,7 +258,7 @@ public class MatchService {
       if (responses.size() == MAX_DAILY_RECOMMENDATION_SIZE) return responses;
     }
 
-    // 오늘 응답한 설문 조회
+    // 오늘 응답한 설문의 응답값을 조회
     List<AnsweredSurvey> todayAnsweredSurveys = answeredSurveyRepository.findAllByUserAndUpdatedAtAfter(
         user,
         LocalDate.now().atStartOfDay()
@@ -269,25 +269,36 @@ public class MatchService {
       return null;
     }
 
-    // 4개의 설문에 대해서만 추천해줌
     Collections.shuffle(todayAnsweredSurveys);
 
-    // 유저와 같은 응답을 한 이성을 추천해줌
+    // 유저와 유사한 응답을 한 이성을 추천해줌
     List<GetUserProfileResponseDto> recommendUserProfileList = new ArrayList<>();
     for (AnsweredSurvey todayAnsweredSurvey : todayAnsweredSurveys) {
+
+      // 4명만 추천해줌
       if (recommendUserProfileList.size() == 4) break;
+
+      // 추천되지 않아야할 유저를 조회
       List<User> excludedUsers = convertIdListToUserList(getExcludedUserIdsForRecommendation(user.getId()));
-      List<AnsweredSurvey> matchingAnsweredSurveyList = answeredSurveyRepository.findAllByUserNotInAndAnswerAndSurveyNum(
+
+      int answer = todayAnsweredSurvey.getSurveyNum();
+      // 유사한 (+/- 1) 응답을 한 유저들을 조회
+      List<AnsweredSurvey> matchingAnsweredSurveyList = answeredSurveyRepository.findAllByUserNotInAndAnswerAndSurveyNumIn(
           excludedUsers,
           todayAnsweredSurvey.getAnswer(),
-          todayAnsweredSurvey.getSurveyNum()
+          List.of(answer, answer + 1, answer - 1)
       );
+
+      // 유사한 응답을 한 유저가 없으면 continue
       if (matchingAnsweredSurveyList.isEmpty()){ continue; }
 
+      // 유사한 응답을 한 유저들 중 한 사람을 뽑음
       Collections.shuffle(matchingAnsweredSurveyList);
       User recommendedUser = matchingAnsweredSurveyList.isEmpty() ?
           null : matchingAnsweredSurveyList.getFirst().getUser();
       if (recommendedUser == null) continue;
+
+      // recommendUserProfileList에 유저 프로필 정보를 저장함
       addUserProfileToCollection(recommendUserProfileList, recommendedUser);
     }
 

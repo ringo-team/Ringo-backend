@@ -192,6 +192,16 @@ public class UserController {
               content = @Content(schema = @Schema(implementation = GetUserInfoResponseDto.class))
           ),
           @ApiResponse(
+              responseCode = "E0003",
+              description = "유저 정보를 조회할 권한이 없습니다.",
+              content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
+          ),
+          @ApiResponse(
+              responseCode = "E0005",
+              description = "해당 userId는 가입된 유저의 아이디가 아닙니다.",
+              content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
+          ),
+          @ApiResponse(
               responseCode = "E1000",
               description = "내부 오류, 기타 문의",
               content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
