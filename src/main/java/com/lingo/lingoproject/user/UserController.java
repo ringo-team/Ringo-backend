@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.validator.constraints.Length;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -71,7 +72,12 @@ public class UserController {
 
       @Parameter(description = "유저 탈퇴 사유", example = "좋은 인연을 만날 수 없어서")
       @NotBlank
+      @Length(max = 100)
       @RequestParam(value = "reason") String reason,
+
+      @Parameter(description = "피드백", example = "앱 피드백")
+      @Length(max = 1000)
+      @RequestParam(value = "feedback") String feedback,
 
       @AuthenticationPrincipal User user
   ){
@@ -85,7 +91,7 @@ public class UserController {
 
       // 유저 삭제
       log.info("userId={}, step=회원탈퇴_시작, status=SUCCESS", userId);
-      userService.deleteUser(user, reason);
+      userService.deleteUser(user, reason, feedback);
       log.info("userId={}, step=회원탈퇴_완료, status=SUCCESS", userId);
 
       return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(

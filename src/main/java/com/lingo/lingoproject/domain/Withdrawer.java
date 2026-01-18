@@ -27,6 +27,7 @@ public class Withdrawer{
 
   private Long joinPeriod;
   private String reason;
+  private String feedback;
 
   @CreationTimestamp
   @Column(updatable = false, nullable = false)

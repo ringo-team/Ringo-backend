@@ -82,7 +82,7 @@ public class UserService {
   private final HashtagRepository hashtagRepository;
 
   @Transactional
-  public void deleteUser(User user, String reason) {
+  public void deleteUser(User user, String reason, String feedback) {
 
     try {
 
@@ -90,6 +90,7 @@ public class UserService {
           .builder()
           .joinPeriod(ChronoUnit.DAYS.between(user.getCreatedAt(), LocalDate.now()))
           .reason(reason)
+          .feedback(feedback)
           .build());
 
       answeredSurveyRepository.deleteAllByUser(user);
@@ -104,6 +105,7 @@ public class UserService {
       userPointRepository.deleteAllByUser(user);
       jwtRefreshTokenRepository.deleteByUser(user);
       userRepository.delete(user);
+
     } catch (Exception e) {
       log.error("유저 데이터 삭제 실패. userId: {}, reason: {}", user.getId(), reason, e);
       throw new RingoException("유저 정보를 삭제하는데 실패하였습니다." + e.getMessage(),
