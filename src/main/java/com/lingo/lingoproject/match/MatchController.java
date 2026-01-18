@@ -63,10 +63,6 @@ public class MatchController {
           description = "해당 id로 유저를 찾을 수 없습니다.",
           content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(
-          responseCode = "E0013",
-          description = "매칭 점수가 기준 이하로 매칭되지 않았습니다.",
-          content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
-      @ApiResponse(
           responseCode = "E1000",
           description = "내부 오류, 기타 문의",
           content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))
@@ -92,14 +88,6 @@ public class MatchController {
       log.info("requestId={}, requestedId={}, step=매칭_요청_완료, status=SUCCESS",
           matchingRequestDto.requestId(),
           matchingRequestDto.requestedId());
-
-      if (matching == null){
-        log.info("requestId={}, requestedId={}, step=매칭_점수_미충족, status=SUCCESS",
-            matchingRequestDto.requestId(),
-            matchingRequestDto.requestedId());
-        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(
-            new ResultMessageResponseDto(ErrorCode.INADEQUATE.getCode(), "매칭 점수가 기준 이하로 매칭되지 않았습니다."));
-      }
 
       return ResponseEntity.status(HttpStatus.OK).body(new RequestMatchingResponseDto(ErrorCode.SUCCESS.getCode(), matching.getId()));
     }

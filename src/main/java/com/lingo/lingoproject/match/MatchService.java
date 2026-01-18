@@ -100,16 +100,6 @@ public class MatchService {
     // 매칭 점수 계산
     float matchingScore = calcMatchScore(requestedUser.getId(), requestUser.getId());
     log.info("requestUserId={}, requestedUserId={}, matchingScore={}, step=매칭요청, status=SUCCESS", requestUser.getId(), requestedUser.getId(), matchingScore);
-    if(!isMatch(matchingScore)){
-      Matching matching = Matching.builder()
-          .requestedUser(requestedUser)
-          .requestUser(requestUser)
-          .matchingStatus(MatchingStatus.UNSATISFIED)
-          .matchingScore(matchingScore)
-          .build();
-      matchingRepository.save(matching);
-      return null;
-    }
 
     // 매칭 내용 저장
     Matching matching = Matching.builder()
