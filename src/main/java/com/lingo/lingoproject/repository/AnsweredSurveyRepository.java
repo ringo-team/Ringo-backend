@@ -3,10 +3,12 @@ package com.lingo.lingoproject.repository;
 import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
+import com.lingo.lingoproject.match.dto.MatchedSurveyAnswerInterface;
 import com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -36,9 +38,18 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
         """, nativeQuery = true)
   List<MatchScoreResultInterface> calcMatchScore(@Param("user1") Long user1, @Param("user2") Long user2);
 
-  long countByUser(User user);
+  @Query(value = """
+        select S.id as surveyId, A.answer
+        from Survey S
+        join (select s from AnsweredSurvey s where s.user.id = :user1) A
+           on S.surveyNum = A.surveyNum
+        join (select s from AnsweredSurvey s where s.user.id = :user2) B
+           on S.confrontSurveyNum = B.surveyNum
+        where A.answer = B.answer
+   """)
+  List<MatchedSurveyAnswerInterface> getMatchedSurveyNum(Long user1, Long user2);
 
-  List<AnsweredSurvey> findAllByUserNotInAndAnswerAndSurveyNum(Collection<User> users, Integer answer, Integer surveyNum);
+  long countByUser(User user);
 
   @Query(value = """
       select
