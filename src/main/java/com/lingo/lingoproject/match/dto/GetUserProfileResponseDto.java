@@ -57,6 +57,9 @@ public class GetUserProfileResponseDto {
   @Schema(description = "숨김 여부, 1 -> 숨김, 0 -> 노출", example = "1")
   private Integer hide;
 
+  @Schema(description = "얼굴 인증 여부, 1 -> 인증됨, 0 -> 인증 안됨", example = "1")
+  private Integer verify;
+
 
   public GetUserProfileResponseDto(
       Long userId,
@@ -67,7 +70,9 @@ public class GetUserProfileResponseDto {
       Float matchingScore,
       Long matchingId,
       MatchingStatus matchingStatus,
-      String matchingMessage) {
+      String matchingMessage,
+      Boolean verify
+  ) {
     this.userId = userId;
     this.age = age;
     this.gender = gender.toString();
@@ -77,5 +82,6 @@ public class GetUserProfileResponseDto {
     this.matchingId = matchingId;
     this.matchingStatus = matchingStatus.toString();
     this.matchingMessage = matchingMessage;
+    this.verify = verify ? 1 : 0;
   }
 }

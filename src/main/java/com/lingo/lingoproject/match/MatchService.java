@@ -77,6 +77,8 @@ public class MatchService {
   private final int ACTIVE_DAY_DURATION = 14;
   private final int HIDE_PROFILE_FLAG = 1;
   private final int EXPOSE_PROFILE_FLAG = 0;
+  private final int PROFILE_VERIFICATION_FLAG = 1;
+  private final int PROFILE_NON_VERIFICATION_FLAG = 0;
   private final String REDIS_ACTIVE_USER_IDS = "redis:active:ids";
 
   @Value("${ringo.config.survey.space_weight}")
@@ -347,12 +349,14 @@ public class MatchService {
     collection.add(
         GetUserProfileResponseDto.builder()
             .userId(recommendedUser.getId())
-            .matchingScore(matchingScore)
             .age(recommendedUser.getAge())
+            .gender(recommendedUser.getGender().toString())
             .nickname(recommendedUser.getNickname())
             .profileUrl(profile.getImageUrl())
+            .matchingScore(matchingScore)
             .hashtags(hashtags)
             .hide(EXPOSE_PROFILE_FLAG)
+            .verify(profile.getIsVerified() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG)
             .build()
     );
   }
@@ -398,10 +402,6 @@ public class MatchService {
   
   public List<User> convertIdListToUserList(List<Long> idList){
     return userRepository.findAllByIdIn(idList);
-  }
-
-  public boolean isMatch(Float matchingScore){
-    return matchingScore > LIMIT_OF_MATCHING_SCORE;
   }
 
   public float calcMatchScore(Long user1Id, Long user2Id){

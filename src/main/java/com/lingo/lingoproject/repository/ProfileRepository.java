@@ -24,7 +24,8 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
           m.matchingScore,
           m.id,
           m.matchingStatus,
-          m.matchingRequestMessage
+          m.matchingRequestMessage,
+          p.isVerified
       )
       from Matching m
         join User u on m.requestedUser = u
@@ -44,7 +45,8 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
           m.matchingScore,
           m.id,
           m.matchingStatus,
-          m.matchingRequestMessage
+          m.matchingRequestMessage,
+          p.isVerified
       )
       from Matching m
         join User u on m.requestUser = u
