@@ -36,9 +36,13 @@ import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -341,11 +345,17 @@ public class MatchService {
   public void addUserProfileToCollection(Collection<GetUserProfileResponseDto> collection, User user, User recommendedUser){
     Profile profile = profileRepository.findByUser(recommendedUser)
         .orElseThrow(() -> new RingoException("유저가 프로필을 가지지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+
     List<String> hashtags = hashtagRepository.findAllByUser(recommendedUser)
         .stream()
         .map(Hashtag::getHashtag)
         .toList();
+
+    UserAccessLog access = userAccessLogRepository.findFirstByUserIdOrderByCreateAtDesc(recommendedUser.getId());
+    long daysFromLastAccess = ChronoUnit.DAYS.between(access.getCreateAt(), LocalDate.now());
+
     float matchingScore = calcMatchScore(user.getId(), recommendedUser.getId());
+
     collection.add(
         GetUserProfileResponseDto.builder()
             .userId(recommendedUser.getId())
@@ -357,6 +367,8 @@ public class MatchService {
             .hashtags(hashtags)
             .hide(EXPOSE_PROFILE_FLAG)
             .verify(profile.getIsVerified() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG)
+            .daysFromLastAccess((int) daysFromLastAccess)
+            .mbti(user.getMbti())
             .build()
     );
   }

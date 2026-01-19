@@ -60,6 +60,12 @@ public class GetUserProfileResponseDto {
   @Schema(description = "얼굴 인증 여부, 1 -> 인증됨, 0 -> 인증 안됨", example = "1")
   private Integer verify;
 
+  @Schema(description = "오늘로부터 마지막으로 접속한 시간 사이의 기간", example = "5")
+  private Integer daysFromLastAccess;
+
+  @Schema(description = "mbti", example = "ESFP")
+  private String mbti;
+
 
   public GetUserProfileResponseDto(
       Long userId,

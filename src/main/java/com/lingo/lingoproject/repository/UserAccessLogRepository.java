@@ -16,4 +16,6 @@ public interface UserAccessLogRepository extends JpaRepository<UserAccessLog, Lo
   long countByCreateAtAfter(LocalDateTime createAtAfter);
 
   List<UserAccessLog> findAllByCreateAtAfter(LocalDateTime createAtAfter);
+
+  UserAccessLog findFirstByUserIdOrderByCreateAtDesc(Long userId);
 }

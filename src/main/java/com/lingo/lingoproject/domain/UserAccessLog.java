@@ -48,4 +48,5 @@ public class UserAccessLog{
   @CreationTimestamp
   @Column(updatable = false)
   private LocalDateTime createAt;
+
 }
