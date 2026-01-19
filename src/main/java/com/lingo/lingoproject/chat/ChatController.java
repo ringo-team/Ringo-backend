@@ -8,10 +8,10 @@ import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
 import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.Message;
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.domain.enums.NotificationType;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.fcm.FcmService;
-import com.lingo.lingoproject.user.UserService;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -313,7 +313,7 @@ public class ChatController {
 
     // 방에 없는 유저에게 fcm 메세지 전달
     if (existReceiverInChatroom) return;
-    fcmService.sendFcmNotification(receiver, "메세지가 도착했어요", savedMessage.getContent());
+    fcmService.sendFcmNotification(receiver, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
   }
 
 }

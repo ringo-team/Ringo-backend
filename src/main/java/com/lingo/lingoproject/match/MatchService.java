@@ -13,6 +13,7 @@ import com.lingo.lingoproject.domain.UserAccessLog;
 import com.lingo.lingoproject.domain.UserMatchingLog;
 import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
+import com.lingo.lingoproject.domain.enums.NotificationType;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.fcm.FcmService;
@@ -109,6 +110,8 @@ public class MatchService {
         .matchingScore(matchingScore)
         .build();
 
+    fcmService.sendFcmNotification(requestedUser, "누군가 매칭 요청을 했어요!", null, NotificationType.MATCHING_REQUEST);
+
     return matchingRepository.save(matching);
   }
 
@@ -159,7 +162,7 @@ public class MatchService {
     );
 
     // fcm 요청 전송
-    fcmService.sendFcmNotification(matching.getRequestUser(), "누군가 요청을 수락했어요", null);
+    fcmService.sendFcmNotification(matching.getRequestUser(), "누군가 요청을 수락했어요", null, NotificationType.MATCHING_ACCEPTED);
   }
 
   @Transactional
@@ -514,7 +517,7 @@ public class MatchService {
     userMatchingLogRepository.save(log);
 
     // 유저 알림
-    fcmService.sendFcmNotification(matching.getRequestedUser(), "누군가 매칭을 요청했어요", null);
+    fcmService.sendFcmNotification(matching.getRequestedUser(), "누군가 매칭을 요청했어요", null, NotificationType.MATCHING_REQUEST);
   }
 
   public String getMatchingRequestMessage(Long matchingId, User user){

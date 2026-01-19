@@ -45,10 +45,7 @@ public class MatchController {
 
   private final MatchService matchService;
 
-  @Operation(
-      summary = "매칭요청",
-      description = "유저가 매칭 요청을 할 때 사용하는 api"
-  )
+  @Operation(summary = "매칭요청", description = "유저가 매칭 요청을 할 때 사용하는 api")
   @ApiResponses(value = {
       @ApiResponse(
           responseCode = "0000",
@@ -102,10 +99,7 @@ public class MatchController {
     }
   }
 
-  @Operation(
-      summary = "매칭 응답",
-      description = "매칭 요청에 대한 응답(승낙, 거부)을 하는 api"
-  )
+  @Operation(summary = "매칭 응답", description = "매칭 요청에 대한 응답(승낙, 거부)을 하는 api")
   @ApiResponses(
       value = {
           @ApiResponse(

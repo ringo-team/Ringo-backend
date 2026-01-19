@@ -1,7 +1,10 @@
 package com.lingo.lingoproject.domain.enums;
 
 public enum NotificationType {
-  MATCHING,
+  MARKETING,
+  MATCHING_REQUEST,
+  MATCHING_ACCEPTED,
   MESSAGE,
+  SNAP,
   SYSTEM
 }
