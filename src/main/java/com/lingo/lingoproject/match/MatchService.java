@@ -77,6 +77,8 @@ public class MatchService {
   private final UserMatchingLogRepository userMatchingLogRepository;
   private final UserAccessLogRepository userAccessLogRepository;
   private final RedisTemplate<String, Object> redisTemplate;
+  private final SurveyRepository surveyRepository;
+  private final RecommendationRepository recommendationRepository;
 
   private final int MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY = 4;
   private final int MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY = 4;
@@ -87,8 +89,6 @@ public class MatchService {
   private final int PROFILE_VERIFICATION_FLAG = 1;
   private final int PROFILE_NON_VERIFICATION_FLAG = 0;
   private final String REDIS_ACTIVE_USER_IDS = "redis:active:ids";
-  private final SurveyRepository surveyRepository;
-  private final RecommendationRepository recommendationRepository;
 
   @Value("${ringo.config.survey.space_weight}")
   private float SURVEY_SPACE_WEIGHT;
