@@ -8,6 +8,8 @@ import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
+import com.lingo.lingoproject.domain.Recommendation;
+import com.lingo.lingoproject.domain.Survey;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.UserAccessLog;
 import com.lingo.lingoproject.domain.UserMatchingLog;
@@ -19,6 +21,7 @@ import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.fcm.FcmService;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
+import com.lingo.lingoproject.match.dto.MatchedSurveyAnswerInterface;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.match.dto.SaveMatchingRequestMessageRequestDto;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
@@ -28,6 +31,8 @@ import com.lingo.lingoproject.repository.DormantAccountRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
+import com.lingo.lingoproject.repository.RecommendationRepository;
+import com.lingo.lingoproject.repository.SurveyRepository;
 import com.lingo.lingoproject.repository.UserAccessLogRepository;
 import com.lingo.lingoproject.repository.UserMatchingLogRepository;
 import com.lingo.lingoproject.repository.UserRepository;
@@ -36,13 +41,11 @@ import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Calendar;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -84,6 +87,8 @@ public class MatchService {
   private final int PROFILE_VERIFICATION_FLAG = 1;
   private final int PROFILE_NON_VERIFICATION_FLAG = 0;
   private final String REDIS_ACTIVE_USER_IDS = "redis:active:ids";
+  private final SurveyRepository surveyRepository;
+  private final RecommendationRepository recommendationRepository;
 
   @Value("${ringo.config.survey.space_weight}")
   private float SURVEY_SPACE_WEIGHT;
@@ -454,7 +459,7 @@ public class MatchService {
     List<GetUserProfileResponseDto> requestedUserProfileDtoList =
         profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
 
-    setHashtagInProfileDtoList(requestedUserProfileDtoList);
+    setHashtagToProfileDtoList(requestedUserProfileDtoList);
 
     return requestedUserProfileDtoList;
   }
@@ -470,12 +475,12 @@ public class MatchService {
     List<GetUserProfileResponseDto> requestUserProfileDtoList =
         profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
 
-    setHashtagInProfileDtoList(requestUserProfileDtoList);
+    setHashtagToProfileDtoList(requestUserProfileDtoList);
 
     return requestUserProfileDtoList;
   }
 
-  private void setHashtagInProfileDtoList(List<GetUserProfileResponseDto> profiles){
+  private void setHashtagToProfileDtoList(List<GetUserProfileResponseDto> profiles){
     profiles.forEach(profile -> {
       User user = userRepository.findById(profile.getUserId()).orElse(null);
       if (user == null) return;
@@ -546,4 +551,72 @@ public class MatchService {
 
     return match.getMatchingRequestMessage();
   }
+
+  public List<String> getMatchedReason(Long user1, Long user2){
+    List<MatchedSurveyAnswerInterface> matchedSurveys = answeredSurveyRepository.getMatchedSurveyNum(user1, user2);
+    List<Integer> higherAnswer = List.of(3, 4, 5);
+    return matchedSurveys.stream()
+        .sorted((s1, s2) -> {
+          int score1 = answerToScore(s1.getAnswer());
+          int score2 = answerToScore(s2.getAnswer());
+          return score2 - score1;
+        })
+        .map( as -> {
+          Survey survey = surveyRepository.findById(as.getSurveyId())
+              .orElseThrow(() -> new RingoException("적절하지 않은 설문아이디입니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+          Integer answer = as.getAnswer();
+          if (higherAnswer.contains(answer)){
+            return survey.getMatchedReasonForHigherAnswer();
+          }
+          else{
+            return survey.getMatchedReasonForLowerAnswer();
+          }
+        })
+        .limit(5)
+        .toList();
+  }
+
+  public List<Recommendation> getRecommendations(User user){
+    List<AnsweredSurvey> answeredSurveyList = answeredSurveyRepository.findAllByUser(user);
+    List<Integer> higherAnswer = List.of(3, 4, 5);
+    return answeredSurveyList.stream()
+        .sorted((s1, s2) -> {
+          int score1 = answerToScore(s1.getAnswer());
+          int score2 = answerToScore(s2.getAnswer());
+          return score2 - score1;
+        })
+        .map(s ->{
+      Survey survey = surveyRepository.findBySurveyNum(s.getSurveyNum());
+      if (higherAnswer.contains(s.getAnswer())){
+        String category = survey.getCategoryForHigherAnswer();
+        return getRecommendationListByCategory(category);
+      }
+      else{
+        String category = survey.getCategoryForLowerAnswer();
+        return getRecommendationListByCategory(category);
+      }
+    })
+        .flatMap(Collection::stream)
+        .limit(5)
+        .toList();
+  }
+
+  public int answerToScore(int answer){
+    if (answer == 1 || answer == 5) return 1;
+    else if (answer == 2 || answer == 4) return 0;
+    else return -1;
+  }
+
+  public List<Recommendation> getRecommendationListByCategory(String category){
+    List<Recommendation> list = new ArrayList<>();
+    List<String> categoryList = Arrays.stream(category.split(",")).toList();
+    categoryList.forEach(c -> {
+      List<Recommendation> recommendations = recommendationRepository.findAllByCategoryContainingIgnoreCase(
+          c);
+      list.addAll(recommendations);
+    });
+    return list;
+  }
+
+
 }

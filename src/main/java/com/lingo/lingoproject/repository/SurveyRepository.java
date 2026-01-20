@@ -10,4 +10,6 @@ public interface SurveyRepository extends JpaRepository<Survey, Long> {
   List<Survey> findAllBySurveyNumBetween(Integer surveyNumAfter, Integer surveyNumBefore);
 
   List<Survey> findAllBySurveyNumIn(Collection<Integer> surveyNums);
+
+  Survey findBySurveyNum(Integer surveyNum);
 }

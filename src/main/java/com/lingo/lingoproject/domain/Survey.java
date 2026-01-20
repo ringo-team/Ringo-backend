@@ -34,4 +34,10 @@ public class Survey {
   private SurveyCategory category;
   private String purpose;
   private String content;
+
+  private String matchedReasonForHigherAnswer;
+  private String matchedReasonForLowerAnswer;
+
+  private String categoryForHigherAnswer;
+  private String categoryForLowerAnswer;
 }
