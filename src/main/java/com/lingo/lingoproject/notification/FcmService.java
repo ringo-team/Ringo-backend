@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.fcm;
+package com.lingo.lingoproject.notification;
 
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
@@ -10,13 +10,15 @@ import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.NotificationType;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.fcm.dto.SaveFcmTokenRequestDto;
+import com.lingo.lingoproject.notification.dto.GetNotificationResponseDto;
+import com.lingo.lingoproject.notification.dto.SaveFcmTokenRequestDto;
 import com.lingo.lingoproject.repository.FailedFcmMessageLogRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.NotificationOptionOutUserRepository;
 import com.lingo.lingoproject.repository.NotificationRepository;
 import com.lingo.lingoproject.retry.FcmRetryQueueService;
 import com.lingo.lingoproject.utils.GenericUtils;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -49,6 +51,8 @@ public class FcmService {
         .builder()
             .user(receiver)
             .type(type)
+            .title(title)
+            .message(body)
         .build());
 
     if(notificationOptionOutUserRepository.existsByUserAndType(receiver, type)) return;
@@ -107,5 +111,11 @@ public class FcmService {
     );
   }
 
+  public List<GetNotificationResponseDto> getNotificationMessage(User user){
+    List<com.lingo.lingoproject.domain.Notification> notifications = notificationRepository.findAllByUser(user);
+    return notifications.stream()
+        .map(n -> new GetNotificationResponseDto(n.getTitle(), n.getMessage()))
+        .toList();
+  }
 }
 

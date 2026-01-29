@@ -18,7 +18,7 @@ import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.domain.enums.NotificationType;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.fcm.FcmService;
+import com.lingo.lingoproject.notification.FcmService;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
 import com.lingo.lingoproject.match.dto.MatchedSurveyAnswerInterface;
@@ -552,6 +552,7 @@ public class MatchService {
     return match.getMatchingRequestMessage();
   }
 
+  @Transactional
   public List<String> getMatchedReason(Long user1, Long user2){
     List<MatchedSurveyAnswerInterface> matchedSurveys = answeredSurveyRepository.getMatchedSurveyNum(user1, user2);
     List<Integer> higherAnswer = List.of(3, 4, 5);
@@ -576,7 +577,12 @@ public class MatchService {
         .toList();
   }
 
-  public List<Recommendation> getRecommendations(User user){
+  public void getRecommendationForMatchedPreference()
+  {
+
+  }
+
+  public List<Recommendation> getRecommendationsForIndividualSurvey(User user){
     List<AnsweredSurvey> answeredSurveyList = answeredSurveyRepository.findAllByUser(user);
     List<Integer> higherAnswer = List.of(3, 4, 5);
     return answeredSurveyList.stream()
@@ -586,16 +592,16 @@ public class MatchService {
           return score2 - score1;
         })
         .map(s ->{
-      Survey survey = surveyRepository.findBySurveyNum(s.getSurveyNum());
-      if (higherAnswer.contains(s.getAnswer())){
-        String category = survey.getCategoryForHigherAnswer();
-        return getRecommendationListByCategory(category);
-      }
-      else{
-        String category = survey.getCategoryForLowerAnswer();
-        return getRecommendationListByCategory(category);
-      }
-    })
+          Survey survey = surveyRepository.findBySurveyNum(s.getSurveyNum());
+          if (higherAnswer.contains(s.getAnswer())){
+            String category = survey.getCategoryForHigherAnswer();
+            return getRecommendationListByCategory(category);
+          }
+          else{
+            String category = survey.getCategoryForLowerAnswer();
+            return getRecommendationListByCategory(category);
+          }
+        })
         .flatMap(Collection::stream)
         .limit(5)
         .toList();

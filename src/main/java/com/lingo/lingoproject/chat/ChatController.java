@@ -11,7 +11,7 @@ import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.NotificationType;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.fcm.FcmService;
+import com.lingo.lingoproject.notification.FcmService;
 import com.lingo.lingoproject.utils.JsonListWrapper;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;

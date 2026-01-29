@@ -29,6 +29,6 @@ public class RingoRepositoryTest {
   @Test
   public void getSubstringS3ImageUrl(){
     String url = "http://localhost:8080/amazonaws.com/2025/2025-12/2025-12-25/profile";
-    Assertions.assertEquals("2025/2025-12/2025-12-25/profile", imageService.getOriginalFilename(url));
+    Assertions.assertEquals("2025/2025-12/2025-12-25/profile", imageService.getFilenameFromS3ImageUrl(url));
   }
 }

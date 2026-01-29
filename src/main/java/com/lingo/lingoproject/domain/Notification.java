@@ -11,12 +11,14 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.DynamicInsert;
 
 @Entity
 @Table(name = "NOTIFICATIONS")
+@Getter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -31,6 +33,8 @@ public class Notification {
   private User user;
 
   private NotificationType type;
+  private String title;
+  private String message;
 
   @ColumnDefault(value = "false")
   private Boolean isRead;
