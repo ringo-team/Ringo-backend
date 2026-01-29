@@ -404,6 +404,7 @@ public class ImageService {
     String imageFormat = file.getOriginalFilename();
     if(imageFormat != null && imageFormat.contains(".")){
       imageFormat = imageFormat.substring(imageFormat.lastIndexOf("."));
+      if (imageFormat.equalsIgnoreCase(".HEIC")) return ".jpg";
       return imageFormat;
     }
     throw new RingoException("파일의 확장자가 없습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
