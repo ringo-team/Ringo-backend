@@ -61,6 +61,8 @@ dependencies {
     // aop 추가
     implementation("org.springframework.boot:spring-boot-starter-aop")
 
+
+    //excel
     implementation("org.apache.poi:poi:5.4.0")
     implementation("org.apache.poi:poi-ooxml:5.4.0")
 
@@ -86,7 +88,10 @@ dependencies {
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
     // webclient, webflux
-    implementation("org.springframework.boot:spring-boot-starter-webflux:4.0.0")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
+
+    implementation "org.bytedeco:ffmpeg-platform:7.1.1-1.5.12"
+    implementation "org.bytedeco:javacv-platform:1.5.12"
 
 
 }
