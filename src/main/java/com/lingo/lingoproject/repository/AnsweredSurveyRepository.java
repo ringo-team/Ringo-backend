@@ -39,15 +39,15 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
   List<MatchScoreResultInterface> calcMatchScore(@Param("user1") Long user1, @Param("user2") Long user2);
 
   @Query(value = """
-        select S.id as surveyId, A.answer
-        from Survey S
-        join (select s from AnsweredSurvey s where s.user.id = :user1) A
-           on S.surveyNum = A.surveyNum
-        join (select s from AnsweredSurvey s where s.user.id = :user2) B
-           on S.confrontSurveyNum = B.surveyNum
-        where A.answer = B.answer
-   """)
-  List<MatchedSurveyAnswerInterface> getMatchedSurveyNum(Long user1, Long user2);
+    select S.id as surveyId, A.answer as answer
+    from Survey S, AnsweredSurvey A, AnsweredSurvey B
+    where S.surveyNum = A.surveyNum
+      and S.confrontSurveyNum = B.surveyNum
+      and A.user.id = :user1
+      and B.user.id = :user2
+      and A.answer = B.answer
+  """)
+  List<MatchedSurveyAnswerInterface> getMatchedSurveyNum(@Param("user1") Long user1, @Param("user2") Long user2);
 
   long countByUser(User user);
 
