@@ -17,12 +17,20 @@ import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.FeedImageRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import javax.imageio.ImageIO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bytedeco.javacv.FFmpegFrameGrabber;
+import org.bytedeco.javacv.Frame;
+import org.bytedeco.javacv.Java2DFrameConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
@@ -153,7 +161,7 @@ public class ImageService {
     }
 
     // 업데이트 key 얻기
-    String imageUrl = getOriginalFilename(profile.getImageUrl());
+    String imageUrl = getFilenameFromS3ImageUrl(profile.getImageUrl());
 
     // s3에 이미지 삭제
     deleteImageInS3(imageUrl);
@@ -191,7 +199,7 @@ public class ImageService {
         continue;
       }
 
-      String imageUrl = uploadImageToS3(file.getImage(), "snaps");
+      String imageUrl = uploadImageToS3(file.getImage(), "feeds");
       FeedImage feedImage = FeedImage.builder()
           .imageUrl(imageUrl)
           .description(file.getContent())
@@ -199,6 +207,7 @@ public class ImageService {
           .build();
       feedImages.add(feedImage);
     }
+
     List<FeedImage> savedFeedImages = feedImageRepository.saveAll(feedImages);
 
     return savedFeedImages.stream()
@@ -227,7 +236,7 @@ public class ImageService {
     profileRepository.delete(profile);
 
     // 키 조회 및 s3 삭제
-    String imageUrl = getOriginalFilename(profile.getImageUrl());
+    String imageUrl = getFilenameFromS3ImageUrl(profile.getImageUrl());
     deleteImageInS3(imageUrl);
   }
 
@@ -241,7 +250,7 @@ public class ImageService {
   }
 
   /**
-   * snap 이미지 crud
+   * feed 이미지 crud
    */
   public List<GetImageUrlResponseDto> getAllFeedImageUrls(Long userId){
     User user = userRepository.findById(userId).orElseThrow(() -> new RingoException(
@@ -271,13 +280,13 @@ public class ImageService {
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, feedImage.getUser().getId());
       throw new RingoException("업데이트 할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
-    String imageUrl = getOriginalFilename(feedImage.getImageUrl());
+    String imageUrl = getFilenameFromS3ImageUrl(feedImage.getImageUrl());
 
     //s3에 이미지 삭제
     deleteImageInS3(imageUrl);
 
     // s3에 새로운 이미지 업로드
-    imageUrl = uploadImageToS3(file, "snaps");
+    imageUrl = uploadImageToS3(file, "feeds");
 
     // snap_images 테이블에 변경된 사진 url 저장
     feedImage.setImageUrl(imageUrl);
@@ -306,7 +315,7 @@ public class ImageService {
     feedImageRepository.delete(feedImage);
 
     // 키 조회 및 s3 값 삭제
-    String imageUrl = getOriginalFilename(feedImage.getImageUrl());
+    String imageUrl = getFilenameFromS3ImageUrl(feedImage.getImageUrl());
     deleteImageInS3(imageUrl);
   }
 
@@ -352,41 +361,52 @@ public class ImageService {
   }
 
   public  String uploadImageToS3(MultipartFile file, String type){
-    String originalFilename = file.getOriginalFilename();
-    if(originalFilename != null && originalFilename.contains(".")){
-      originalFilename = originalFilename.substring(originalFilename.lastIndexOf("."));
-    }
 
-    LocalDate now = LocalDate.now();
-    String path = type + "/" + now.getYear() + "/" +
-                  now.getYear() + "-" + now.getMonthValue() + "/" +
-                  now + "/";
-
-    String filename = path + UUID.randomUUID() + "_image_" + originalFilename;
-
-    String imageUrl;
+    String filename = getFilenameByAppendFilePath(file, type);
 
     try {
+      byte[] imageByte = checkImageFormatAndGetAppropriateImageByte(file);
+
       PutObjectRequest putObjectRequest = PutObjectRequest.builder()
           .bucket(bucket)
           .key(filename)
           .contentType(file.getContentType())
-          .contentLength(file.getSize())
+          .contentLength((long) imageByte.length)
           .build();
 
       // S3 업로드
       amazonS3Client.putObject(
           putObjectRequest,
-          RequestBody.fromInputStream(file.getInputStream(), file.getSize())
+          RequestBody.fromInputStream(new ByteArrayInputStream(imageByte), file.getSize())
       );
 
-      imageUrl = "https://" + bucket + ".s3." + region + ".amazonaws.com/" + filename;
+      return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + filename;
     }catch (Exception e){
       log.error("S3 이미지 업로드 실패. bucket: {}, filename: {}, contentType: {}", bucket, filename, file.getContentType(), e);
       throw new RingoException("s3에 이미지 업로드 하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
 
-    return imageUrl;
+  public String getFilenameByAppendFilePath(MultipartFile file, String type){
+
+    String imageFormat = getImageFileFormatContainingDot(file);
+
+    LocalDate now = LocalDate.now();
+
+    String path = type + "/" + now.getYear() + "/" +
+        now.getYear() + "-" + now.getMonthValue() + "/" +
+        now + "/";
+
+     return path + UUID.randomUUID() + "_image" + imageFormat;
+  }
+
+  public String getImageFileFormatContainingDot(MultipartFile file){
+    String imageFormat = file.getOriginalFilename();
+    if(imageFormat != null && imageFormat.contains(".")){
+      imageFormat = imageFormat.substring(imageFormat.lastIndexOf("."));
+      return imageFormat;
+    }
+    throw new RingoException("파일의 확장자가 없습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
   }
 
   public boolean hasPermissionOnImage(User user, Long accessUserId){
@@ -400,20 +420,20 @@ public class ImageService {
   }
 
   @Async
-  public void deleteImageInS3(String imageUrl){
+  public void deleteImageInS3(String filename){
     try {
       DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
           .bucket(bucket)
-          .key(imageUrl)
+          .key(filename)
           .build();
       amazonS3Client.deleteObject(deleteObjectRequest);
     }catch (Exception e){
-      log.error("s3에 이미지를 삭제하는데 실패하였습니다. bucket: {}, image_url: {}", bucket, imageUrl, e);
+      log.error("s3에 이미지를 삭제하는데 실패하였습니다. bucket: {}, image_url: {}", bucket, filename, e);
       throw new RingoException("s3에 이미지를 삭제하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  public String getOriginalFilename(String ImageUrl){
+  public String getFilenameFromS3ImageUrl(String ImageUrl){
     return  ImageUrl.substring(ImageUrl.lastIndexOf("amazonaws.com/") + 14);
   }
 
@@ -435,12 +455,12 @@ public class ImageService {
     feedImageRepository.save(image);
   }
 
-  public boolean isUnmoderateImage(MultipartFile file) {
+  public boolean isUnmoderateImage(MultipartFile image) {
     byte[] imageBytes;
     try {
-      imageBytes = file.getBytes();
+      imageBytes = checkImageFormatAndGetAppropriateImageByte(image);
     }catch (Exception e){
-      log.error("선정성 검사 중 이미지를 바이트로 변환하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
+      log.error("선정성 검사 중 이미지를 바이트로 변환하는데 실패하였습니다. filename: {}", image.getOriginalFilename(), e);
       throw new RingoException("선정성 검사 중 파일을 바이트로 변환하지 못하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     try {
@@ -466,7 +486,7 @@ public class ImageService {
             || (parent != null && (parent.contains("Nudity") || parent.contains("Sexual") || parent.contains("Suggestive")));
       });
     }catch (Exception e){
-      log.error("이미지의 선정성 검사를 하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
+      log.error("이미지의 선정성 검사를 하는데 실패하였습니다. filename: {}", image.getOriginalFilename(), e);
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -475,7 +495,7 @@ public class ImageService {
     try {
       Profile profile = profileRepository.findByUser(user)
           .orElseThrow(() -> new RingoException("유저의 프로필이 존재하지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-      String profileUrl = getOriginalFilename(profile.getImageUrl());
+      String profileUrl = getFilenameFromS3ImageUrl(profile.getImageUrl());
       GetObjectRequest getObjectRequest = GetObjectRequest.builder()
           .bucket(bucket)
           .key(profileUrl)
@@ -491,8 +511,11 @@ public class ImageService {
 
   public boolean isSamePerson(byte[] source, MultipartFile target){
     try{
+
+      byte[] targetImageByte = checkImageFormatAndGetAppropriateImageByte(target);
+
       Image sourceImage = Image.builder().bytes(SdkBytes.fromByteArray(source)).build();
-      Image targetImage = Image.builder().bytes(SdkBytes.fromByteArray(target.getBytes())).build();
+      Image targetImage = Image.builder().bytes(SdkBytes.fromByteArray(targetImageByte)).build();
 
       CompareFacesRequest request = CompareFacesRequest.builder()
           .sourceImage(sourceImage)
@@ -515,13 +538,13 @@ public class ImageService {
     }
   }
 
-  public boolean existsFaceInImage(MultipartFile file){
+  public boolean existsFaceInImage(MultipartFile targetImage){
     Image image;
     try {
-      byte[] imageBytes = file.getBytes();
+      byte[] imageBytes = checkImageFormatAndGetAppropriateImageByte(targetImage);
       image = Image.builder().bytes(SdkBytes.fromByteArray(imageBytes)).build();
     }catch (Exception e){
-      log.error("이미지의 얼굴 여부 검수 중 파일을 바이트로 변환하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
+      log.error("이미지의 얼굴 여부 검수 중 파일을 바이트로 변환하는데 실패하였습니다. filename: {}", targetImage.getOriginalFilename(), e);
       throw new RingoException("파일을 바이트로 변환하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     try {
@@ -530,7 +553,52 @@ public class ImageService {
       List<FaceDetail> faceDetails = result.faceDetails();
       return !faceDetails.isEmpty();
     }catch (Exception e){
-      log.error("이미지의 얼굴 존재여부를 검수하는데 실패하였습니다. filename: {}", file.getOriginalFilename(), e);
+      log.error("이미지의 얼굴 존재여부를 검수하는데 실패하였습니다. filename: {}", targetImage.getOriginalFilename(), e);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  public byte[] checkImageFormatAndGetAppropriateImageByte(MultipartFile image){
+    String imageFormat = getImageFileFormatContainingDot(image);
+    if (imageFormat.equalsIgnoreCase(".HEIC")){
+      return convertHEICToJPG(image);
+    }
+    try {
+      return image.getBytes();
+    }catch (Exception e){
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  public byte[] convertHEICToJPG(MultipartFile image){
+    try{
+      byte[] inputByte = image.getBytes();
+      ByteArrayInputStream bais = new ByteArrayInputStream(inputByte);
+      FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(bais);
+
+      grabber.start();
+      Frame frame = grabber.grabImage();
+
+      Java2DFrameConverter converter = new Java2DFrameConverter();
+      BufferedImage bufferedImage = converter.convert(frame);
+
+      if (bufferedImage ==  null){
+        throw new RingoException("frame을 buffer image로 변환하지 못함", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      BufferedImage rgb = new BufferedImage(bufferedImage.getWidth(), bufferedImage.getHeight(), BufferedImage.TYPE_INT_RGB);
+      Graphics2D graphics2D = rgb.createGraphics();
+      graphics2D.drawImage(bufferedImage, 0, 0, null);
+      graphics2D.dispose();
+
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      boolean ok = ImageIO.write(rgb, "jpg", baos);
+      if (!ok) throw new RingoException("JPG encoder를 찾지 못함", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+
+      return baos.toByteArray();
+
+
+    } catch (Exception e) {
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
