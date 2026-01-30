@@ -15,11 +15,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Configuration
 public class WebConfig {
 
-  @Value("${self-auth.url}")
-  private String apiUrl;
-
-  @Value("${discord.webhook.alert.url}")
-  private String discordWebhookAlertUrl;
 
   @Bean
   public RestTemplate restTemplate(RestTemplateBuilder builder) {
@@ -28,18 +23,6 @@ public class WebConfig {
         .build();
   }
 
-  @Bean
-  public WebClient selfAuthWebClient(WebClient.Builder builder) {
-    return builder
-        .baseUrl(apiUrl)
-        .build();
-  }
-
-  @Bean WebClient discordWebClient(WebClient.Builder builder) {
-    return builder
-        .baseUrl(discordWebhookAlertUrl)
-        .build();
-  }
 
   @Bean
   public ObjectMapper objectMapper(){

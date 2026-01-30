@@ -52,14 +52,15 @@ public class SelfAuthService {
   private final ObjectMapper objectMapper;
   private final UserRepository userRepository;
   private final RedisUtils redisUtils;
-  private final WebClient selfAuthWebClient;
-
 
   @Value("${self-auth.client_id}")
   private String clientId;
 
   @Value("${self-auth.client_secret}")
   private String clientSecret;
+
+  @Value("${self-auth.url}")
+  private String selfAuthApiUrl;
 
   @Value("${self-auth.return_url}")
   private String returnUrl;
@@ -68,12 +69,14 @@ public class SelfAuthService {
   private String productId;
 
   public String getAccessToken(){
-    String apiUri = "/digital/niceid/oauth/oauth/token";
+    String uriPath = "/digital/niceid/oauth/oauth/token";
     String auth = "Basic " + Base64.getEncoder().encodeToString((clientId+":"+clientSecret).getBytes());
 
     MultiValueMap<String, Object> params = new LinkedMultiValueMap<>();
     params.add("grant_type", "client_credentials");
     params.add("scope", "default");
+
+    WebClient webClient = WebClient.create();
 
     /*
      *  Authorization : Basic + Base64(clientId:clientSecret)
@@ -81,9 +84,9 @@ public class SelfAuthService {
      */
     GetAccessTokenResponseDto response;
     try{
-      response = selfAuthWebClient
+      response = webClient
           .post()
-          .uri(apiUri)
+          .uri(selfAuthApiUrl + uriPath)
           .contentType(MediaType.APPLICATION_FORM_URLENCODED)
           .header(HttpHeaders.AUTHORIZATION, auth)
           .body(BodyInserters.fromValue(params))
@@ -92,16 +95,16 @@ public class SelfAuthService {
           .timeout(Duration.ofSeconds(5))
           .block();
     } catch (Exception e) {
-      log.error("POST : " + apiUri + ":: 요청을 보내는데 실패하였습니다.");
+      log.error("POST : " + uriPath + ":: 요청을 보내는데 실패하였습니다.");
       log.error("액세스 토큰 조회 중 예외 발생", e);
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     if (response == null) {
-      log.error("POST : {} :: 응답값이 null입니다.", apiUri);
+      log.error("POST : {} :: 응답값이 null입니다.", uriPath);
       throw new RingoException("본인인증 api response의 값이 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     else if(!response.getDataHeader().resultCd().equals("1200")){
-      log.error("POST : " + apiUri + ":: response:result_cd : " +  response.getDataHeader().resultCd());
+      log.error("POST : " + uriPath + ":: response:result_cd : " +  response.getDataHeader().resultCd());
       throw new RingoException("본인인증 api의 응답값에서 정상 토큰을 얻지 못하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -112,15 +115,16 @@ public class SelfAuthService {
    * access token으로 메세지를 암호화 및 복호화하는데 필요한 토큰을 얻는다.
    */
   public CryptoTokenInfo getCryptoTokenInfo(String accessToken) throws NoSuchAlgorithmException {
-    String apiUri = "digital/niceid/api/v1.0/common/crypto/token";
+
+    String uriPath = "digital/niceid/api/v1.0/common/crypto/token";
 
     long timestamp = System.currentTimeMillis()/1000;
     String auth = "bearer " + Base64.getEncoder().encodeToString((accessToken +":" + timestamp + ":" + clientId).getBytes());
 
-    String createCryptoTokenInfoRequestTransactionId = UUID.randomUUID().toString();
+    String cryptoTokenInfoCreateRequestTransactionId = UUID.randomUUID().toString();
 
     SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
-    String createCryptoTokenInfoRequestDateTime = sdf.format(timestamp);
+    String cryptoTokenInfoCreateRequestDateTime = sdf.format(timestamp);
 
     /*
      *  Authorization : bearer + Base64(accessToken:timestamp:clientId)
@@ -147,8 +151,8 @@ public class SelfAuthService {
         .dataBody(
             GetCryptoTokenRequestDto.DataBody
                 .builder()
-                .requestDateTime(createCryptoTokenInfoRequestDateTime)
-                .requestNum(createCryptoTokenInfoRequestTransactionId)
+                .requestDateTime(cryptoTokenInfoCreateRequestDateTime)
+                .requestNum(cryptoTokenInfoCreateRequestTransactionId)
                 .encryptMode("1")
                 .build()
         )
@@ -158,11 +162,12 @@ public class SelfAuthService {
      *  암호화 토큰 요청
      */
     GetCryptoTokenResponseDto response;
+    WebClient webClient = WebClient.create();
     try{
-      log.info("POST : " + apiUri + "암호화 토큰 생성 정보 요청을 진행합니다.");
-      response = selfAuthWebClient
+      log.info("POST : " + uriPath + "암호화 토큰 생성 정보 요청을 진행합니다.");
+      response = webClient
           .post()
-          .uri(apiUri)
+          .uri(selfAuthApiUrl + uriPath)
           .contentType(MediaType.APPLICATION_FORM_URLENCODED)
           .header(HttpHeaders.AUTHORIZATION, auth)
           .header("ProductId", productId)
@@ -173,7 +178,7 @@ public class SelfAuthService {
           .block();
 
     }catch (Exception e){
-      log.error("POST : " + apiUri + ":: 요청을 보내는데 실패하였습니다.");
+      log.error("POST : " + uriPath + ":: 요청을 보내는데 실패하였습니다.");
       log.error("암호화 토큰 정보 요청 중 예외 발생", e);
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -183,7 +188,7 @@ public class SelfAuthService {
         || response.getDataBody().responseMsg().startsWith("EAPI")
         || !response.getDataBody().resultCd().equals("0000")
     ){
-      if (response != null ) log.error("POST : " + apiUri + ":: response:result_cd : " +  response.getDataHeader().resultCd());
+      if (response != null ) log.error("POST : " + uriPath + ":: response:result_cd : " +  response.getDataHeader().resultCd());
       throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     /*
@@ -194,8 +199,8 @@ public class SelfAuthService {
     String responseCryptoTokenValue = response.getDataBody().tokenVal();
 
 
-    String token = createCryptoTokenInfoRequestDateTime.trim() +
-        createCryptoTokenInfoRequestTransactionId.trim() +
+    String token = cryptoTokenInfoCreateRequestDateTime.trim() +
+        cryptoTokenInfoCreateRequestTransactionId.trim() +
         responseCryptoTokenValue.trim();
     MessageDigest hashFunction = MessageDigest.getInstance("SHA-256");
     hashFunction.update(token.getBytes());
