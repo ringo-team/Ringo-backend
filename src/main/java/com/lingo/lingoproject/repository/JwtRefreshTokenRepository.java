@@ -10,4 +10,6 @@ public interface JwtRefreshTokenRepository extends JpaRepository<JwtRefreshToken
   Optional<JwtRefreshToken> findByUser(User user);
 
   void deleteByUser(User user);
+
+  boolean existsByUser(User user);
 }

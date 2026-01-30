@@ -3,6 +3,7 @@ package com.lingo.lingoproject.security.oauth.google;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.security.TokenType;
+import com.lingo.lingoproject.security.controller.dto.SignupResponseDto;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.exception.RingoException;
@@ -29,9 +30,18 @@ public class GoogleLoginController {
     log.info("step=구글_로그인_콜백_시작, status=SUCCESS");
     try {
       User user = googleLoginService.saveUserLoginInfo(code);
+
+      if (!jwtUtil.hasJwtRefreshToken(user)){
+        return ResponseEntity.status(HttpStatus.OK).body(
+            new SignupResponseDto(user.getId(), ErrorCode.SUCCESS.getCode())
+            );
+      }
+
       String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
       String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);
-      jwtUtil.saveRefreshToken(refreshToken, user);
+
+      jwtUtil.saveJwtRefreshToken(user, refreshToken);
+
       log.info("userId={}, step=구글_로그인_콜백_완료, status=SUCCESS", user.getId());
       return ResponseEntity.ok(new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refreshToken));
     } catch (Exception e) {

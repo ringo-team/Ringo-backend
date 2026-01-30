@@ -9,18 +9,18 @@ import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.oauth.OAuthUtils;
 import com.lingo.lingoproject.security.oauth.kakao.dto.KakaoTokenResponseDto;
 import com.lingo.lingoproject.security.oauth.kakao.dto.KakaoUserInfoResponseDto;
+import java.time.Duration;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @Service
 @RequiredArgsConstructor
@@ -35,23 +35,29 @@ public class KakaoLoginService {
   @Value("${oauth.kakao.redirect_uri}")
   private String redirectUri;
 
-  private final RestTemplate restTemplate;
   private final OAuthUtils oAuthUtils;
   private final UserRepository userRepository;
 
   public String getKakaoAccessToken(String code){
+    WebClient webClient = WebClient.create();
     MultiValueMap<String, Object> params = new LinkedMultiValueMap<>();
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
     params.add("grant_type", "authorization_code");
     params.add("client_id", clientId);
     params.add("redirect_uri", redirectUri);
     params.add("code", code);
-    HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(params, headers);
-    KakaoTokenResponseDto response = null;
+
+    KakaoTokenResponseDto response;
     try {
-      response = restTemplate.exchange(KAKAO_TOKEN_URL, HttpMethod.POST,
-          request, KakaoTokenResponseDto.class).getBody();
+      response = webClient
+          .post()
+          .uri(KAKAO_TOKEN_URL)
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .body(BodyInserters.fromValue(params))
+          .retrieve()
+          .bodyToMono(KakaoTokenResponseDto.class)
+          .timeout(Duration.ofSeconds(5))
+          .block();
     }catch (Exception e){
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -62,15 +68,25 @@ public class KakaoLoginService {
   }
 
   public User saveUserLoginInfo(String code){
+
+    WebClient webClient = WebClient.create();
+
     String token = getKakaoAccessToken(code);
-    HttpHeaders headers = new HttpHeaders();
-    headers.set("Authorization", "Bearer " + token);
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-    HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(headers);
-    KakaoUserInfoResponseDto response = null;
+
+    KakaoUserInfoResponseDto response;
+
     try{
-      response = restTemplate.exchange(KAKAO_USER_INFO_URL, HttpMethod.GET,
-          request, KakaoUserInfoResponseDto.class).getBody();
+      response = webClient
+          .get()
+          .uri(KAKAO_USER_INFO_URL)
+          .headers(httpHeaders -> {
+            httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            httpHeaders.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+          })
+          .retrieve()
+          .bodyToMono(KakaoUserInfoResponseDto.class)
+          .timeout(Duration.ofSeconds(5))
+          .block();
     }catch (Exception e){
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -78,14 +94,10 @@ public class KakaoLoginService {
       throw new RingoException("Kakao user info response is null", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
     Optional<User> user = userRepository.findByLoginId(response.id().toString());
-    User loginUser = null;
-    if(user.isEmpty()){
-      loginUser = oAuthUtils.signup(response.id().toString());
-    }
-    else{
-      loginUser = user.get();
-    }
+    User loginUser = user.orElseGet(() -> oAuthUtils.signup(response.id().toString()));
+
     oAuthUtils.login(loginUser);
+
     return loginUser;
   }
 }

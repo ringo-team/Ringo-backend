@@ -9,18 +9,18 @@ import com.lingo.lingoproject.security.oauth.OAuthUtils;
 import com.lingo.lingoproject.security.oauth.google.dto.GoogleTokenResponseDto;
 import com.lingo.lingoproject.security.oauth.google.dto.GoogleUserInfoResponseDto;
 import jakarta.transaction.Transactional;
+import java.time.Duration;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @Service
 @RequiredArgsConstructor
@@ -39,22 +39,31 @@ public class GoogleLoginService {
   @Value("${oauth.google.redirect_uri}")
   private String redirectUri;
 
-  private final RestTemplate restTemplate;
   private final OAuthUtils oAuthUtils;
 
   public String getGoogleAccessToken(String code){
+
+    WebClient webClient = WebClient.create();
+
     MultiValueMap<String, Object> params = new LinkedMultiValueMap<>();
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
     params.add("code", code);
     params.add("client_id", clientId);
     params.add("client_secret", clientSecret);
     params.add("redirect_uri", redirectUri);
     params.add("grant_type", "authorization_code");
-    HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(params, headers);
-    GoogleTokenResponseDto response = null;
+
+    GoogleTokenResponseDto response;
     try{
-      response = restTemplate.exchange(GOOGLE_TOKEN_URL, HttpMethod.POST, request, GoogleTokenResponseDto.class).getBody();
+      response = webClient
+          .post()
+          .uri(GOOGLE_TOKEN_URL)
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .body(BodyInserters.fromValue(params))
+          .retrieve()
+          .bodyToMono(GoogleTokenResponseDto.class)
+          .timeout(Duration.ofSeconds(5))
+          .block();
     }catch (Exception e){
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -70,18 +79,27 @@ public class GoogleLoginService {
    */
   @Transactional
   public User saveUserLoginInfo(String code){
+
+    WebClient webClient = WebClient.create();
+
     //1
     String token = getGoogleAccessToken(code);
 
     //2
-    HttpHeaders headers = new HttpHeaders();
-    headers.set("Authorization", "Bearer " + token);
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-    HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(headers);
-    GoogleUserInfoResponseDto response = null;
+    GoogleUserInfoResponseDto response;
+
     try{
-      response = restTemplate.exchange(GOOGLE_GMAIL_URL, HttpMethod.GET,
-          request, GoogleUserInfoResponseDto.class).getBody();
+      response = webClient
+          .get()
+          .uri(GOOGLE_GMAIL_URL)
+          .headers(httpHeaders -> {
+            httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            httpHeaders.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+          })
+          .retrieve()
+          .bodyToMono(GoogleUserInfoResponseDto.class)
+          .timeout(Duration.ofSeconds(5))
+          .block();
     }catch (Exception e){
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -91,13 +109,9 @@ public class GoogleLoginService {
 
     // 3
     Optional<User> user = userRepository.findByLoginId(response.loginId());
-    User loginUser = null;
+    User loginUser = user.orElseGet(() -> oAuthUtils.signup(response.loginId()));
 
-    if(user.isEmpty()){
-      loginUser = oAuthUtils.signup(response.loginId());
-    }else{
-      loginUser = user.get();
-    }
+
     // 로그인을 진행한다.
     oAuthUtils.login(loginUser);
     return loginUser;

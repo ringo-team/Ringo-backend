@@ -76,12 +76,14 @@ public class JwtUtil {
     }
   }
 
-  public void saveRefreshToken(String token, User user){
-    JwtRefreshToken jwtRefreshToken = JwtRefreshToken.builder()
-        .refreshToken(token)
-        .user(user)
-        .build();
-    jwtRefreshTokenRepository.save(jwtRefreshToken);
+  public boolean hasJwtRefreshToken(User user){
+    return jwtRefreshTokenRepository.existsByUser(user);
   }
 
+  public void saveJwtRefreshToken(User user, String refreshToken){
+    JwtRefreshToken jwtRefreshToken = jwtRefreshTokenRepository
+        .findByUser(user).orElseThrow(() -> new RingoException("리프레시 토큰 객체가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+    jwtRefreshToken.setRefreshToken(refreshToken);
+    jwtRefreshTokenRepository.save(jwtRefreshToken);
+  }
 }
