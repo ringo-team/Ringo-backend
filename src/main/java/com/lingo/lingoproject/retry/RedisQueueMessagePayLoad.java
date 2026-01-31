@@ -12,6 +12,6 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Getter@Setter
 public class RedisQueueMessagePayLoad {
-  String message;
+  String content;
   Integer retryCount;
 }

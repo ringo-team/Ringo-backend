@@ -10,11 +10,13 @@ import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.DeadLetterFcmMessageRepository;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class FcmRetryQueueService extends RedisQueueService{
 
@@ -43,7 +45,7 @@ public class FcmRetryQueueService extends RedisQueueService{
             .setNotification(
                 Notification.builder()
                     .setTitle(log.getTitle())
-                    .setBody(log.getMessage())
+                    .setBody(log.getContent())
                     .build()
             )
             .build();
@@ -52,7 +54,7 @@ public class FcmRetryQueueService extends RedisQueueService{
         if (log.getRetryCount() >= 3){
           DeadLetterFcmMessage letter = DeadLetterFcmMessage.from(log);
           super.deadLetterFcmMessageRepository.save(letter);
-          discordService.sendMessageToDiscordChannel("webhook", "데드레터 큐에 fcm 엔티티가 쌓였습니다.");
+          discordService.sendMessageToDiscordChannel("데드레터 큐에 fcm 엔티티가 쌓였습니다.");
           throw new RingoException("데드레터큐에 fcm 엔티티가 쌓였습니다.",
               ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }

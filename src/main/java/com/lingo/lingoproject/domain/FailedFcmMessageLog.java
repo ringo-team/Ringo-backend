@@ -46,7 +46,7 @@ public class FailedFcmMessageLog extends RedisQueueMessagePayLoad {
         .errorMessage(exception.getMessage())
         .errorCause(exception.getCause() != null ? exception.getCause().getMessage() : null)
         .title(title)
-        .message(message)
+        .content(message)
         .retryCount(0)
         .build();
   }

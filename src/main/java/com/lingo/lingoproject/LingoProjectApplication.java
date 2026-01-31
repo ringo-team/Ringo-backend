@@ -7,6 +7,7 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableJpaAuditing
@@ -14,6 +15,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @EnableCaching
 @EnableJpaRepositories("com.lingo.lingoproject.repository")
 @EnableMongoRepositories("com.lingo.lingoproject.mongo_repository")
+@EnableScheduling
 public class LingoProjectApplication {
 
   public static void main(String[] args) {

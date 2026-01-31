@@ -16,4 +16,7 @@ public class Recommendation {
   private String name;
 
   private String category;
+
+  private String location;
+
 }

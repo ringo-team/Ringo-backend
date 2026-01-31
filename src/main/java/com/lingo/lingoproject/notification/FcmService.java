@@ -77,7 +77,7 @@ public class FcmService {
           .token(token.getToken())
           .errorMessage(e.getMessage())
           .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
-          .message(body)
+          .content(body)
           .title(title)
           .retryCount(RETRY_COUNT)
           .build();
