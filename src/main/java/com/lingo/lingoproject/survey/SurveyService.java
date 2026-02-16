@@ -108,6 +108,7 @@ public class SurveyService {
 
   public void saveSurveyResponse(JsonListWrapper<UploadSurveyRequestDto> responses, User user){
     List<AnsweredSurvey> list = new ArrayList<>();
+
     Map<Integer, AnsweredSurvey> alreadyAnsweredSurveys = answeredSurveyRepository.findAllByUser(user)
         .stream()
         .collect(Collectors.toMap(AnsweredSurvey::getSurveyNum, Function.identity(), (a, b) -> b));

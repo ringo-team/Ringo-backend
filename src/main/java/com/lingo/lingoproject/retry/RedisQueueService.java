@@ -26,7 +26,7 @@ public class RedisQueueService {
   public void pushToQueue(String key, RedisQueueMessagePayLoad payload){
     switch (key) {
       case "FCM" -> redisTemplate.opsForList().leftPush(keyForFcm, payload);
-      case "DISCORD" -> redisTemplate.opsForList().rightPush(keyForDiscord, payload);
+      case "DISCORD" -> redisTemplate.opsForList().leftPush(keyForDiscord, payload);
       default -> throw new RingoException("적절하지 않은 키 값입니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

@@ -18,7 +18,10 @@ public class ExceptionMessage extends Timestamp {
 
   private String message;
 
-  public ExceptionMessage(String message){
+  private String errorCode;
+
+  public ExceptionMessage(String message, String errorCode){
     this.message = message;
+    this.errorCode = errorCode;
   }
 }

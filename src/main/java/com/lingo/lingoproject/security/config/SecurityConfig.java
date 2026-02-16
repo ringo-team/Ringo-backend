@@ -93,11 +93,11 @@ public class SecurityConfig {
 
   @Bean
   public CustomAuthenticationManager customAuthenticationManager() {
-    return new CustomAuthenticationManager((CustomAuthenticationProvider) authenticationProvider());
+    return new CustomAuthenticationManager(authenticationProvider());
   }
 
   @Bean
-  public AuthenticationProvider authenticationProvider(){
+  public CustomAuthenticationProvider authenticationProvider(){
     return new CustomAuthenticationProvider(customUserDetailService, passwordEncoder());
   }
 

@@ -1,7 +1,6 @@
 package com.lingo.lingoproject.security.jwt;
 
 
-import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.exception.ErrorCode;
@@ -15,7 +14,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

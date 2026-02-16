@@ -85,8 +85,7 @@ public class ImageService {
   public GetImageUrlResponseDto uploadProfileImage(MultipartFile file, Long  userId) {
 
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("프로필을 업로드하던 중 유저를 찾을 수 없습니다.",
-            ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("프로필을 업로드하던 중 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     if (!existsFaceInImage(file)){
       throw new RingoException("프로필에 얼굴이 존재하지 않습니다.",

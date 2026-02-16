@@ -22,9 +22,20 @@ public class RingoExceptionController {
 
   @ExceptionHandler(RingoException.class)
   public ResponseEntity<ResultMessageResponseDto> handleRingoException(RingoException e){
-    log.error(e.getMessage(), e);
-    exceptionMessageRepository.save(new ExceptionMessage(e.getMessage()));
+    if (e.getStatus().equals(HttpStatus.INTERNAL_SERVER_ERROR)) {
+      log.error(e.getMessage(), e);
+    } else {
+      log.warn(e.getMessage(), e);
+    }
+    exceptionMessageRepository.save(new ExceptionMessage(e.getMessage(), e.getStatus().toString()));
     return ResponseEntity.status(e.getStatus()).body(new ResultMessageResponseDto(e.getErrorCode().getCode(), "오류가 발생했습니다."));
+  }
+
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity<ResultMessageResponseDto> handleLeftException(Exception e){
+    log.error(e.getMessage(), e);
+    exceptionMessageRepository.save(new ExceptionMessage(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR.toString()));
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResultMessageResponseDto(ErrorCode.INTERNAL_SERVER_ERROR.getCode(), "오류가 발생했습니다."));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

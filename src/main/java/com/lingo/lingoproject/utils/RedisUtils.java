@@ -69,7 +69,7 @@ public class RedisUtils {
         new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), value));
   }
 
-  public boolean containsRecommendedUser(String key){
+  public boolean containsRecommendedUserForCumulativeSurvey(String key){
     return redisTemplate.hasKey("recommend::" + key);
   }
 

@@ -4,6 +4,7 @@ import com.lingo.lingoproject.domain.AnsweredSurvey;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
 import com.lingo.lingoproject.match.dto.MatchedSurveyAnswerInterface;
+import com.lingo.lingoproject.match.dto.RelatedSurveyAnswerPairInterface;
 import com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -21,21 +22,16 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
 
   @Query(value = """ 
         select
-            s.category,
+            S.category,
             avg(1 - abs(A.answer-B.answer)/4.0) as avgAnswer
-        from surveys s
-        join (
-            select *
-            from answered_surveys s1
-            where s1.user_id = :user1
-        ) A on s.survey_num = A.survey_num
-        join (
-            select *
-            from answered_surveys s2
-            where s2.user_id = :user2
-        ) B on s.confront_survey_num = B.survey_num
-        group by s.category
-        """, nativeQuery = true)
+        from Survey S, AnsweredSurvey A, AnsweredSurvey B
+        where S.surveyNum = A.surveyNum
+          and S.confrontSurveyNum = B.surveyNum
+          and A.user.id = :user1
+          and B.user.id = :user2
+          and A.answer = B.answer
+        group by S.category
+        """)
   List<MatchScoreResultInterface> calcMatchScore(@Param("user1") Long user1, @Param("user2") Long user2);
 
   @Query(value = """
@@ -48,6 +44,16 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
       and A.answer = B.answer
   """)
   List<MatchedSurveyAnswerInterface> getMatchedSurveyNum(@Param("user1") Long user1, @Param("user2") Long user2);
+
+  @Query(value = """
+        select S.id as surveyId, A.answer as answer, B.answer as confrontAnswer
+        from Survey S, AnsweredSurvey A, AnsweredSurvey B
+        where S.surveyNum = A.surveyNum
+          and S.confrontSurveyNum = B.surveyNum
+          and A.user.id = :user1
+          and B.user.id = :user2
+  """)
+  List<RelatedSurveyAnswerPairInterface> getRelatedSurveyAnswerPairs(Long user1, Long user2);
 
   long countByUser(User user);
 

@@ -249,13 +249,19 @@ public class LoginService {
 
   @Transactional
   public void logout(User user, String accessToken){
-    // redis의 blacklist에 저장해 놓는다.
-    redisUtils.saveLogoutUserList(accessToken.substring(7), "true");
-
     /*
      * 로그아웃 시 refresh 토큰에 관한 정보도 삭제하여 토큰 재발급을 막는다.
      */
-    jwtRefreshTokenRepository.deleteByUser(user);
+    JwtRefreshToken refreshToken = jwtRefreshTokenRepository.findByUser(user)
+        .orElseThrow(() -> new RingoException("리프레시 토큰을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+
+    refreshToken.setRefreshToken(null);
+
+    jwtRefreshTokenRepository.save(refreshToken);
+
+    // redis의 blacklist에 저장해 놓는다.
+    redisUtils.saveLogoutUserList(accessToken.substring(7), "true");
+
 
   }
 

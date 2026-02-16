@@ -9,6 +9,7 @@ import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Matching;
 import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.Recommendation;
+import com.lingo.lingoproject.domain.ScrappedUser;
 import com.lingo.lingoproject.domain.Survey;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.UserAccessLog;
@@ -18,10 +19,11 @@ import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.domain.enums.NotificationType;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.match.dto.GetScrappedUserResponseDto;
+import com.lingo.lingoproject.match.dto.RelatedSurveyAnswerPairInterface;
 import com.lingo.lingoproject.notification.FcmService;
 import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchScoreResultInterface;
-import com.lingo.lingoproject.match.dto.MatchedSurveyAnswerInterface;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.match.dto.SaveMatchingRequestMessageRequestDto;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
@@ -32,6 +34,7 @@ import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.RecommendationRepository;
+import com.lingo.lingoproject.repository.ScrappedUserRepository;
 import com.lingo.lingoproject.repository.SurveyRepository;
 import com.lingo.lingoproject.repository.UserAccessLogRepository;
 import com.lingo.lingoproject.repository.UserMatchingLogRepository;
@@ -79,6 +82,7 @@ public class MatchService {
   private final RedisTemplate<String, Object> redisTemplate;
   private final SurveyRepository surveyRepository;
   private final RecommendationRepository recommendationRepository;
+  private final ScrappedUserRepository scrappedUserRepository;
 
   private final int MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY = 4;
   private final int MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY = 4;
@@ -197,7 +201,7 @@ public class MatchService {
     Long userId = user.getId();
 
     // 캐시 조회
-    if(redisUtils.containsRecommendedUser(userId.toString())){
+    if(redisUtils.containsRecommendedUserForCumulativeSurvey(userId.toString())){
       List<GetUserProfileResponseDto> responses = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
       if (responses.size() == MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY) return responses;
     }
@@ -324,7 +328,7 @@ public class MatchService {
 
     Long userId = user.getId();
 
-    if(redisUtils.containsRecommendedUser(userId.toString())){
+    if(redisUtils.containsRecommendedUserForCumulativeSurvey(userId.toString())){
       List<GetUserProfileResponseDto> responses = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
       removeRecommendedUserFromList(responses, recommendedUserId);
       redisUtils.saveRecommendedUserForCumulativeSurvey(userId.toString(), responses);
@@ -554,14 +558,11 @@ public class MatchService {
 
   @Transactional
   public List<String> getMatchedReason(Long user1, Long user2){
-    List<MatchedSurveyAnswerInterface> matchedSurveys = answeredSurveyRepository.getMatchedSurveyNum(user1, user2);
+
     List<Integer> higherAnswer = List.of(3, 4, 5);
-    return matchedSurveys.stream()
-        .sorted((s1, s2) -> {
-          int score1 = answerToScore(s1.getAnswer());
-          int score2 = answerToScore(s2.getAnswer());
-          return score2 - score1;
-        })
+
+    return getSortedRelatedAnswerPairs(user1, user2)
+        .stream()
         .map( as -> {
           Survey survey = surveyRepository.findById(as.getSurveyId())
               .orElseThrow(() -> new RingoException("적절하지 않은 설문아이디입니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
@@ -577,23 +578,72 @@ public class MatchService {
         .toList();
   }
 
-  public void getRecommendationForMatchedPreference()
-  {
+  public List<RelatedSurveyAnswerPairInterface> getSortedRelatedAnswerPairs(Long user1, Long user2){
+    List<RelatedSurveyAnswerPairInterface> matchedSurveys = answeredSurveyRepository.getRelatedSurveyAnswerPairs(user1, user2);
+    return matchedSurveys.stream()
+        .filter(s -> Math.abs(s.getAnswer() - s.getConfrontAnswer()) <= 2 )
+        .sorted((s1, s2) -> {
+          int score1 = getRelatedAnswerPairToScore(s1.getAnswer(), s1.getConfrontAnswer());
+          int score2 = getRelatedAnswerPairToScore(s2.getAnswer(), s1.getConfrontAnswer());
+          return score2 - score1;
+        })
+        .toList();
+  }
 
+  /*
+   * 쌍문항에서 같은 응답을 할수록 그리고 극단적인 응답을 할수록
+   * 높은 점수를 부여하여 매칭에 원인이 되는 문항이 될 확률이 높아지도록 함
+   *
+   * (5, 5) -> 15, (5, 4) -> 12, (5, 3) -> 5
+   * (4, 4) -> 13, (4, 3) -> 10, (4, 2) -> 3
+   * (3, 3) -> 10, (3, 1) -> 5
+   * (2, 2) -> 13, (2, 1) -> 12
+   * (1, 1) -> 15
+   */
+  public int getRelatedAnswerPairToScore(int answer, int confrontAnswer){
+    int score = 0;
+
+    // 동일한
+    if (Math.abs(answer - confrontAnswer) == 0) score += 10;
+    else if (Math.abs(answer - confrontAnswer) == 1) score += 7;
+    else score += 0;
+
+    if ((answer == 5 || answer == 1) || (confrontAnswer == 5 || confrontAnswer == 1)) score += 5;
+    else if ((answer == 4 || answer == 2) || (confrontAnswer == 4 || confrontAnswer == 2)) score += 3;
+
+    return score;
+  }
+
+  public List<Recommendation> getRecommendationForMatchedPreference(Long user1, Long user2) {
+    List<Integer> higherAnswer = List.of(3, 4, 5);
+
+    return getSortedRelatedAnswerPairs(user1, user2)
+        .stream()
+        .map(as ->{
+          Survey survey = surveyRepository.findById(as.getSurveyId()).orElseThrow(() -> new RingoException("설문을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+          Integer answer = as.getAnswer();
+          if (higherAnswer.contains(answer)) {
+            return getRecommendationListByCategory(survey.getCategoryForHigherAnswer());
+          }
+          return getRecommendationListByCategory(survey.getCategoryForLowerAnswer());
+        })
+        .flatMap(Collection::stream)
+        .limit(1000)
+        .toList();
   }
 
   public List<Recommendation> getRecommendationsForIndividualSurvey(User user){
     List<AnsweredSurvey> answeredSurveyList = answeredSurveyRepository.findAllByUser(user);
-    List<Integer> higherAnswer = List.of(3, 4, 5);
+
     return answeredSurveyList.stream()
         .sorted((s1, s2) -> {
-          int score1 = answerToScore(s1.getAnswer());
-          int score2 = answerToScore(s2.getAnswer());
+          int score1 = getAnswerToScore(s1.getAnswer());
+          int score2 = getAnswerToScore(s2.getAnswer());
           return score2 - score1;
         })
-        .map(s ->{
+        .map(s -> {
           Survey survey = surveyRepository.findBySurveyNum(s.getSurveyNum());
-          if (higherAnswer.contains(s.getAnswer())){
+          if (List.of(3, 4, 5).contains(s.getAnswer())){
             String category = survey.getCategoryForHigherAnswer();
             return getRecommendationListByCategory(category);
           }
@@ -607,22 +657,62 @@ public class MatchService {
         .toList();
   }
 
-  public int answerToScore(int answer){
+  /*
+   *  1, 5 번처럼 극단적인 값에 더 높은 점수를 부여함
+   */
+  public int getAnswerToScore(int answer){
     if (answer == 1 || answer == 5) return 1;
     else if (answer == 2 || answer == 4) return 0;
     else return -1;
   }
 
-  public List<Recommendation> getRecommendationListByCategory(String category){
+  public List<Recommendation> getRecommendationListByCategory(String categorys){
     List<Recommendation> list = new ArrayList<>();
-    List<String> categoryList = Arrays.stream(category.split(",")).toList();
-    categoryList.forEach(c -> {
-      List<Recommendation> recommendations = recommendationRepository.findAllByCategoryContainingIgnoreCase(
-          c);
+    List<String> categoryList = Arrays.stream(categorys.split(",")).toList();
+    categoryList.forEach(category -> {
+      List<Recommendation> recommendations = recommendationRepository.findAllByCategoryContainingIgnoreCase(category);
       list.addAll(recommendations);
     });
     return list;
   }
 
+  public void scrapUser(Long recommendedUserId, User user){
+    Long userId = user.getId();
+
+    List<Long> recommendUserIdListForCumulativeSurvey = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString()).stream().map(GetUserProfileResponseDto::getUserId).toList();
+    List<Long> recommendUserIdListForDailySurvey = redisUtils.getRecommendUserForDailySurvey(userId.toString()).stream().map(GetUserProfileResponseDto::getUserId).toList();;
+
+    List<Long> recommededUserIdList = new ArrayList<>();
+    recommededUserIdList.addAll(recommendUserIdListForCumulativeSurvey);
+    recommededUserIdList.addAll(recommendUserIdListForDailySurvey);
+
+    if (!recommededUserIdList.contains(recommendedUserId)) return;
+
+    User recommendedUser = userRepository.findById(recommendedUserId).orElseThrow(() -> new RingoException("유저를 스크랩하던 도중 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+
+    scrappedUserRepository.save(
+        ScrappedUser.builder()
+            .user(user)
+            .scrappedUser(recommendedUser)
+            .build()
+    );
+  }
+
+  public List<GetScrappedUserResponseDto> getScrappedUser(User user){
+    return scrappedUserRepository.findAllByUser(user)
+        .stream()
+        .map(ScrappedUser::getUser)
+        .map(scrappedUser -> {
+          Profile profile = profileRepository.findByUser(scrappedUser).orElseThrow(() -> new RingoException("스크랩 유저를 찾던 중 유저의 프로필을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+          return new GetScrappedUserResponseDto(
+              user.getNickname(),
+              user.getAge(),
+              profile.getImageUrl(),
+              profile.getIsVerified() ? 1 : 0
+          );
+        })
+        .toList();
+
+  }
 
 }
