@@ -89,9 +89,6 @@ dependencies {
     annotationProcessor "jakarta.annotation:jakarta.annotation-api"
     annotationProcessor "jakarta.persistence:jakarta.persistence-api"
 
-    // aws secret-manager
-    implementation("io.awspring.cloud:spring-cloud-aws-starter-secrets-manager:3.4.0")
-
     // fcm
     implementation 'com.google.firebase:firebase-admin:9.7.0'
 
@@ -109,6 +106,7 @@ dependencies {
     // heic to jpg
     implementation "org.bytedeco:ffmpeg-platform:7.1.1-1.5.12"
     implementation "org.bytedeco:javacv-platform:1.5.12"
+
 
 }
 dependencyManagement {
