@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.lingo.lingoproject.exception.RingoException;
 
 @RestController
 @RequestMapping("/admin")
@@ -47,18 +46,10 @@ public class AdminController {
 
       @Parameter(description = "페이지 크기", example = "5")
       @RequestParam int size){
-    try {
-      log.info("page={}, size={}, step=관리자_유저정보_조회_시작, status=SUCCESS", page, size);
-      List<GetUserInfoResponseDto> dtos = userService.getPageableUserInfo(page, size);
-      log.info("page={}, size={}, count={}, step=관리자_유저정보_조회_완료, status=SUCCESS", page, size, dtos.size());
-      return ResponseEntity.status(HttpStatus.OK).body(dtos);
-    } catch (Exception e) {
-      log.error("page={}, size={}, step=관리자_유저정보_조회_실패, status=FAILED", page, size, e);
-      if (e instanceof RingoException re){
-        throw re;
-      }
-      throw new RingoException("관리자 유저 정보 조회에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    log.info("page={}, size={}, step=관리자_유저정보_조회_시작, status=SUCCESS", page, size);
+    List<GetUserInfoResponseDto> dtos = userService.getPageableUserInfo(page, size);
+    log.info("page={}, size={}, count={}, step=관리자_유저정보_조회_완료, status=SUCCESS", page, size, dtos.size());
+    return ResponseEntity.status(HttpStatus.OK).body(dtos);
   }
 
   @Operation(summary = "신고조회", description = "조건에 따라 필터링된 신고된 유저 조회")
@@ -105,20 +96,11 @@ public class AdminController {
       @RequestParam(required = false)
       String finishedAt
   ){
-    try {
-      log.info("step=신고정보_조회_시작, status=SUCCESS, userId={}, reportedUserStatus={}, reportIntensity={}, ordering={}, startedAt={}, finishedAt={}", userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt);
-      List<GetReportInfoResponseDto> list = reportService.getReportInfos(new GetReportInfoRequestDto(
-          userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt
-      ));
-      log.info("count={}, step=신고정보_조회_완료, status=SUCCESS", list.size());
-      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
-    } catch (Exception e) {
-      log.error("step=신고정보_조회_실패, status=FAILED", e);
-      if (e instanceof RingoException re){
-        throw re;
-      }
-      throw new RingoException("신고 정보를 조회하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    log.info("step=신고정보_조회_시작, status=SUCCESS, userId={}, reportedUserStatus={}, reportIntensity={}, ordering={}, startedAt={}, finishedAt={}", userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt);
+    List<GetReportInfoResponseDto> list = reportService.getReportInfos(new GetReportInfoRequestDto(userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt));
+    log.info("count={}, step=신고정보_조회_완료, status=SUCCESS", list.size());
+
+    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
   }
 
 
@@ -141,20 +123,11 @@ public class AdminController {
 
       @AuthenticationPrincipal User admin
   ){
-    try {
+    log.info("adminId={}, reportId={}, step=신고조치_시작, status=SUCCESS", admin.getId(), reportId);
+    reportService.suspendUser(reportId, reportedUserStatus, admin.getId());
+    log.info("adminId={}, reportId={}, step=신고조치_완료, status=SUCCESS", admin.getId(), reportId);
 
-      log.info("adminId={}, reportId={}, step=신고조치_시작, status=SUCCESS", admin.getId(), reportId);
-      reportService.suspendUser(reportId, reportedUserStatus, admin.getId());
-      log.info("adminId={}, reportId={}, step=신고조치_완료, status=SUCCESS", admin.getId(), reportId);
-
-      return ResponseEntity.status(HttpStatus.OK).body("성공적으로 신고조치가 완료되었습니다.");
-    } catch (Exception e) {
-      log.error("adminId={}, reportId={}, step=신고조치_실패, status=FAILED", admin.getId(), reportId, e);
-      if (e instanceof RingoException re){
-        throw re;
-      }
-      throw new RingoException("신고 조치에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    return ResponseEntity.status(HttpStatus.OK).body("성공적으로 신고조치가 완료되었습니다.");
   }
 
 }

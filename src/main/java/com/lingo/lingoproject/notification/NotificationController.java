@@ -63,23 +63,13 @@ public class NotificationController {
       throw new RingoException("토큰을 refresh할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
-    try {
+    log.info("userId={}, step=리프레시_토큰_시작, status=SUCCESS", user.getId());
+    fcmService.refreshFcmToken(dto, user);
+    log.info("userId={}, step=리프레시_토큰_완료, status=SUCCESS", user.getId());
 
-      log.info("userId={}, step=리프레시_토큰_시작, status=SUCCESS", user.getId());
-      fcmService.refreshFcmToken(dto, user);
-      log.info("userId={}, step=리프레시_토큰_완료, status=SUCCESS", user.getId());
-
-      return ResponseEntity.status(HttpStatus.OK)
-          .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "토큰이 정상적으로 저장되었습니다.")
-      );
-
-    }catch (Exception e){
-      log.error("userId={}, step=리프레시_토큰_실패, status=FAILED", user.getId(), e);
-      if (e instanceof RingoException re){
-        throw re;
-      }
-      throw new RingoException("토큰을 리프레시하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    return ResponseEntity.status(HttpStatus.OK)
+        .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "토큰이 정상적으로 저장되었습니다.")
+        );
   }
 
   @ApiResponses(
@@ -109,20 +99,12 @@ public class NotificationController {
 
       @AuthenticationPrincipal User user
   ){
-    try {
-      log.info("userId={}, notificationType={}, step=유저알림_수신_여부_변경_시작, status=SUCCESS", user.getId(), type);
-      fcmService.alterNotificationOption(user, type);
-      log.info("userId={}, notificationType={}, step=유저알림_수신_여부_변경_완료, status=SUCCESS", user.getId(), type);
+    log.info("userId={}, notificationType={}, step=유저알림_수신_여부_변경_시작, status=SUCCESS", user.getId(), type);
+    fcmService.alterNotificationOption(user, type);
+    log.info("userId={}, notificationType={}, step=유저알림_수신_여부_변경_완료, status=SUCCESS", user.getId(), type);
 
-      return ResponseEntity.status(HttpStatus.OK)
-          .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "유저 알림 수신 여부를 성공적으로 변경하였습니다."));
-    }catch (Exception e){
-      log.error("userId={}, notificationType={}, step=알림수신_여부_변경_실패, status=FAILED", user.getId(), type, e);
-      if (e instanceof RingoException re){
-        throw re;
-      }
-      throw new RingoException("알림수신 여부를 변경하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    return ResponseEntity.status(HttpStatus.OK)
+        .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "유저 알림 수신 여부를 성공적으로 변경하였습니다."));
   }
 
   @ApiResponses(
@@ -150,22 +132,14 @@ public class NotificationController {
 
       @AuthenticationPrincipal User user
   ){
-    try{
-      if (!userId.equals(user.getId())){
-        throw new RingoException("조회 권한이 없는 유저입니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-      }
-
-      log.info("userId={}, step=알림_조회_시작, status=SUCCESS", user.getId());
-      List<GetNotificationResponseDto> dto = fcmService.getNotificationMessage(user);
-      log.info("userId={}, step=알림_조회_완료, status=SUCCESS", user.getId());
-
-      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), dto));
-    }catch (Exception e){
-      log.error("userId={}, step=알림_조회_실패, status=FAILED", user.getId(), e);
-      if (e instanceof RingoException re){
-        throw re;
-      }
-      throw new RingoException("알림을 조회하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    if (!userId.equals(user.getId())){
+      throw new RingoException("조회 권한이 없는 유저입니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
+
+    log.info("userId={}, step=알림_조회_시작, status=SUCCESS", user.getId());
+    List<GetNotificationResponseDto> dto = fcmService.getNotificationMessage(user);
+    log.info("userId={}, step=알림_조회_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), dto));
   }
 }

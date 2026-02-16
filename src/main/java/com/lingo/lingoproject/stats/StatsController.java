@@ -14,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.lingo.lingoproject.exception.RingoException;
 
 @RestController
 @Slf4j
@@ -28,39 +27,22 @@ public class StatsController {
   @Operation(summary = "일일 방문객 수 조회")
   @GetMapping
   public ResponseEntity<GetTodayVisitorStatsRequestDto> getTodayNumberOfVisitor(){
-    try {
-      log.info("step=일일_방문자수_조회_시작, status=SUCCESS");
-      long countOfTodayVisitors = statService.getTodayNumberOfVisitor();
-      float ratioOfTodayMaleVisitor = statService.getTodayMaleRatioOfVisitor();
-      float ratioOfTodayFemaleVisitor = 100 - ratioOfTodayMaleVisitor;
-      log.info("step=일일_방문자수_조회_완료, status=SUCCESS, count={}, maleRatio={}, femaleRatio={}", countOfTodayVisitors, ratioOfTodayMaleVisitor, ratioOfTodayFemaleVisitor);
+    log.info("step=일일_방문자수_조회_시작, status=SUCCESS");
+    long countOfTodayVisitors = statService.getTodayNumberOfVisitor();
+    float ratioOfTodayMaleVisitor = statService.getTodayMaleRatioOfVisitor();
+    float ratioOfTodayFemaleVisitor = 100 - ratioOfTodayMaleVisitor;
+    log.info("step=일일_방문자수_조회_완료, status=SUCCESS, count={}, maleRatio={}, femaleRatio={}", countOfTodayVisitors, ratioOfTodayMaleVisitor, ratioOfTodayFemaleVisitor);
 
-      return ResponseEntity.status(HttpStatus.OK).body(new GetTodayVisitorStatsRequestDto(countOfTodayVisitors, ratioOfTodayMaleVisitor, ratioOfTodayFemaleVisitor));
-    } catch (Exception e) {
-      log.error("step=일일_방문자수_조회_실패, status=FAILED", e);
-      if (e instanceof RingoException re) {
-        throw re;
-      }
-      throw new RingoException("일일 방문자 수 조회에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    return ResponseEntity.status(HttpStatus.OK).body(new GetTodayVisitorStatsRequestDto(countOfTodayVisitors, ratioOfTodayMaleVisitor, ratioOfTodayFemaleVisitor));
   }
 
   @Operation(summary = "일주일 간 일일 방문객 수 조회")
   @GetMapping("/daily")
   public ResponseEntity<JsonListWrapper<GetDailyNumberOfVisitorRequestDto>> getDailyNumberOfVisitor(){
-    try {
-      log.info("step=주간_방문자수_조회_시작, status=SUCCESS");
-      List<GetDailyNumberOfVisitorRequestDto> visitors = statService.getDailyNumberOfVisitorForWeek();
-      log.info("count={}, step=주간_방문자수_조회_완료, status=SUCCESS", visitors.size());
-      return ResponseEntity.status(HttpStatus.OK)
-          .body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), visitors));
-    } catch (Exception e) {
-      log.error("step=주간_방문자수_조회_실패, status=FAILED", e);
-      if (e instanceof RingoException re) {
-        throw re;
-      }
-      throw new RingoException("주간 방문자 수 조회에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    log.info("step=주간_방문자수_조회_시작, status=SUCCESS");
+    List<GetDailyNumberOfVisitorRequestDto> visitors = statService.getDailyNumberOfVisitorForWeek();
+    log.info("count={}, step=주간_방문자수_조회_완료, status=SUCCESS", visitors.size());
+    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), visitors));
   }
 
 }
