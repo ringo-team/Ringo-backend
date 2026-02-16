@@ -1,4 +1,19 @@
 services:
+  springboot:
+    image: jaeyunchung26/ringo-app:1.9
+    container_name: ringo-app
+    ports:
+      - "8080:8080"
+    restart: always
+    networks:
+      - ringo-network
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ringo_mysql?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 1234
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+
   mysql:
     image: mysql:8.0
     container_name: Ringo-database
@@ -10,6 +25,8 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - ringo-network
 
   redis:
     image: redis:6.2.6-alpine
@@ -19,6 +36,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - ringo-network
 
   prometheus:
     image: prom/prometheus:latest
@@ -30,7 +49,7 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
     networks:
-      - monitoring-net
+      - ringo-network
 
   grafana:
     image: grafana/grafana:latest
@@ -41,15 +60,13 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     networks:
-      - monitoring-net
+      - ringo-network
     depends_on:
       - prometheus
 
 networks:
-  monitoring-net:
+  ringo-network:
     driver: bridge
-
-
 
 volumes:
   mysql_data:
