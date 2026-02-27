@@ -6,30 +6,30 @@ import com.lingo.lingoproject.chat.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomMemberInfoResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
+import com.lingo.lingoproject.chat.dto.SaveAppointmentRequestDto;
+import com.lingo.lingoproject.domain.Appointment;
 import com.lingo.lingoproject.domain.Chatroom;
 import com.lingo.lingoproject.domain.ChatroomParticipant;
 import com.lingo.lingoproject.domain.FailedChatMessageLog;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.Message;
-import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
+import com.lingo.lingoproject.repository.AppointmentRepository;
 import com.lingo.lingoproject.repository.ChatroomParticipantRepository;
 import com.lingo.lingoproject.repository.ChatroomRepository;
 import com.lingo.lingoproject.mongo_repository.MessageRepository;
 import com.lingo.lingoproject.repository.FailedChatMessageLogRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
-import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.GenericUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -40,7 +40,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -53,12 +52,11 @@ public class ChatService {
   private final MessageRepository messageRepository;
   private final UserRepository userRepository;
   private final ChatroomParticipantRepository chatroomParticipantRepository;
-  private final GenericUtils genericUtils;
   private final MatchingRepository matchingRepository;
   private final RedisTemplate<String, Object> redisTemplate;
-  private final ProfileRepository profileRepository;
   private final HashtagRepository hashtagRepository;
   private final FailedChatMessageLogRepository failedChatMessageLogRepository;
+  private final AppointmentRepository appointmentRepository;
 
 
   public GetChatResponseDto getChatMessages(User user, Long chatroomId, int page, int size){
@@ -90,12 +88,10 @@ public class ChatService {
     User second = participants.get(1).getParticipant();
     User otherChatroomMember = first.getId().equals(user.getId()) ? second : first;
 
-    // 상대방 유저 프로필 조회
-    Profile userProfile = profileRepository.findByUser(otherChatroomMember).orElse(null);
     List<String> hashtags = hashtagRepository.findAllByUser(otherChatroomMember).stream()
         .map(Hashtag::getHashtag).toList();
     GetChatroomMemberInfoResponseDto memberInfo = GetChatroomMemberInfoResponseDto.builder()
-        .profileUrl(userProfile != null ? userProfile.getImageUrl() : null)
+        .profileUrl(otherChatroomMember.getProfile().getImageUrl())
         .userId(otherChatroomMember.getId())
         .nickname(otherChatroomMember.getNickname())
         .hashtag(hashtags)
@@ -108,15 +104,22 @@ public class ChatService {
         .build();
   }
 
-  public Boolean existReceiverInChatroom(Long senderId, Long receiverId, Long roomId) {
+  public List<Long> getExistChatroomMemberIdList(List<User> roomMembers, Long roomId) {
 
     try {
-      ValueOperations<String, Object> ops = redisTemplate.opsForValue();
 
-      return ops.getOperations().hasKey("connect::" + receiverId + "::" + roomId);
+      List<Long> result = new ArrayList<>();
+
+      for (User member : roomMembers){
+        String key = "connect::" + member.getId() + "::" + roomId;
+
+        if (redisTemplate.hasKey(key)) result.add(member.getId());
+      }
+
+      return result;
 
     }catch (Exception e){
-      log.error("senderId={}, chatroomId={}, step=메세제_저장, status=FAILED",  senderId, roomId, e);
+      log.error("chatroomId={}, step=메세제_저장, status=FAILED", roomId, e);
       throw new RingoException("채팅방에 접속해있는 멤버 확인 중 오류가 발생했습니다.", ErrorCode.INTERNAL_SERVER_ERROR,  HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -157,9 +160,7 @@ public class ChatService {
   public Chatroom createChatroom(CreateChatroomRequestDto dto){
 
     // 채팅 타입 검사
-    if(!genericUtils.isContains(ChatType.values(), dto.chatType())){
-      throw new RingoException("적절하지 않은 채팅타입이 입력되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
-    }
+    ChatType chatType = GenericUtils.validateAndReturnEnumValue(ChatType.values(), dto.chatType());
 
     // 유저 조회
     User user1 = userRepository.findById(dto.user1Id())
@@ -177,7 +178,7 @@ public class ChatService {
     // 채팅방 생성 및 저장
     Chatroom chatroom = Chatroom.builder()
         .chatroomName(dto.user1Id() + "_" +dto.user2Id())
-        .type(ChatType.valueOf(dto.chatType()))
+        .type(chatType)
         .build();
     Chatroom savedChatroom = chatroomRepository.save(chatroom);
 
@@ -210,7 +211,7 @@ public class ChatService {
           .map(chatroomParticipant -> {
 
             // 참여자가 앱을 탈퇴했으면 "알 수 없음" 으로 변경
-            if(chatroomParticipant.getIsWithdrawn()) {
+            if(chatroomParticipant.isWithdrawn()) {
               User participant = chatroomParticipant.getParticipant();
               participant.setNickname("알 수 없음");
               return participant;
@@ -231,10 +232,6 @@ public class ChatService {
       Optional<Message> lastMessage = messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(
           chatroom.getId());
 
-      // 채팅 상대방 유저의 프로필 사진을 조회
-      Profile chatOpponentProfile = profileRepository.findByUser(chatOpponent)
-          .orElseThrow(() -> new RingoException("프로필을 찾는 도중 유저를 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-
       // 마지막 메세지 전송 시기
       String lastSendDateTime = null;
       if (lastMessage.isPresent()){
@@ -245,7 +242,7 @@ public class ChatService {
       responseDtoList.add(GetChatroomResponseDto.builder()
           .chatroomId(chatroom.getId())
           .chatOpponent(chatOpponent.getNickname())
-          .chatOpponentProfileUrl(chatOpponentProfile.getImageUrl())
+          .chatOpponentProfileUrl(chatOpponent.getProfile().getImageUrl())
           .lastChatMessage(lastMessage.map(Message::getContent).orElse(null))
           .NumberOfNotReadMessages(numberOfNotReadMessages)
           .lastSendDateTime(lastSendDateTime)
@@ -278,7 +275,7 @@ public class ChatService {
     // 채팅방 참여자 유저 id 조회
     List<Long> userIds = chatroomParticipantRepository.findAllByChatroom(chatroom)
         .stream()
-        .filter(cp -> !cp.getIsWithdrawn())
+        .filter(cp -> !cp.isWithdrawn())
         .map(ChatroomParticipant::getParticipant)
         .map(User::getId)
         .toList();
@@ -291,7 +288,7 @@ public class ChatService {
         .orElseThrow(() -> new RingoException("채팅방에 초대된 유저를 찾는 중 채팅방가 존재하지 않습니다", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
     return chatroomParticipantRepository.findAllByChatroom(chatroom)
         .stream()
-        .filter(participant -> !participant.getIsWithdrawn())
+        .filter(participant -> !participant.isWithdrawn())
         .map(ChatroomParticipant::getParticipant)
         .toList();
   }
@@ -304,5 +301,44 @@ public class ChatService {
     List<String> messageIdList = messageRepository.findNotReadMessages(roomId, userId)
         .stream().map(Message::getId).toList();
     messageRepository.insertMemberIdInMessage(messageIdList, userId);
+  }
+
+  // 약속 잡기
+  public GetChatMessageResponseDto saveAppointment(SaveAppointmentRequestDto dto){
+    User register = userRepository.findById(dto.registerId()).orElseThrow(
+        () -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)
+    );
+    Chatroom chatroom = chatroomRepository.findById(dto.chatroomId()).orElseThrow(
+        () -> new RingoException("채팅방을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST)
+    );
+    if (!isMemberInChatroom(chatroom.getId(), register.getId())){
+      throw new RingoException("채팅방 멤버만 약속을 잡을 수 있습니다", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    }
+
+    Appointment appointment = Appointment.builder()
+        .chatroom(chatroom)
+        .register(register)
+        .place(dto.place())
+        .appointmentTime(LocalDateTime.parse(dto.appointmentTime()))
+        .alertTime(dto.isAlert() == 1 ? LocalDateTime.parse(dto.alertTime()) : null)
+        .isAlert(dto.isAlert() == 1)
+        .build();
+
+    Appointment saveAppointment = appointmentRepository.save(appointment);
+
+    return GetChatMessageResponseDto.builder()
+        .content("일정이 등록되었어요")
+        .appointmentTime(saveAppointment.getAppointmentTime())
+        .place(saveAppointment.getPlace())
+        .type("APPOINTMENT")
+        .build();
+  }
+
+  public List<Appointment> getAlertChatrooms(){
+    return appointmentRepository.findAllByAlertTimeBeforeAndIsAlert(LocalDateTime.now(), true);
+  }
+
+  public void saveAlertOffAppointment(List<Appointment> appointments){
+    appointmentRepository.saveAll(appointments);
   }
 }

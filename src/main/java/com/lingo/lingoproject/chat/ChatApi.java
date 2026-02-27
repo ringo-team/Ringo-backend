@@ -5,8 +5,9 @@ import com.lingo.lingoproject.chat.dto.CreateChatroomResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatMessageResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatResponseDto;
 import com.lingo.lingoproject.chat.dto.GetChatroomResponseDto;
+import com.lingo.lingoproject.chat.dto.SaveAppointmentRequestDto;
 import com.lingo.lingoproject.domain.User;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,8 +38,8 @@ public interface ChatApi {
    * 유저가 어떤 {roomId}에 접속하면 레디스에 connect::{userId}::{roomId} / true 를 저장해놓는다.
    */
   @Operation(
-      summary = "채팅방 메세지 불러오기",
-      description = "채팅방 메세지들을 불러오는 api"
+      summary = "채팅방 메세지 조회",
+      description = "채팅방 메세지들을 조회하는 api"
   )
   @ApiResponses(
       value = {
@@ -70,7 +71,7 @@ public interface ChatApi {
       }
   )
   @GetMapping("/users/{userId}/chatrooms")
-  ResponseEntity<JsonListWrapper<GetChatroomResponseDto>> getChatrooms(
+  ResponseEntity<ApiListResponseDto<GetChatroomResponseDto>> getChatrooms(
       @Parameter(description = "유저id", example = "5") @PathVariable(value = "userId") Long userId,
       @AuthenticationPrincipal User user
     );
@@ -98,4 +99,14 @@ public interface ChatApi {
   @MessageMapping("/{roomId}")
   void sendMessage(@DestinationVariable Long roomId, GetChatMessageResponseDto chatMessageDto);
 
+  @PostMapping("/appointments")
+  @ApiResponses(
+      value = {
+          @ApiResponse(responseCode = "0000", description = "성공", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
+          @ApiResponse(responseCode = "E0004", description = "해당 id로 채팅방을 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
+          @ApiResponse(responseCode = "E0003", description = "약속을 등록할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
+          @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
+      }
+  )
+  ResponseEntity<ResultMessageResponseDto> saveAppointment(@RequestBody SaveAppointmentRequestDto dto, @AuthenticationPrincipal User user);
 }

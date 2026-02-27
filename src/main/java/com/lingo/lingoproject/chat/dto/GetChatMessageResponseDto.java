@@ -3,6 +3,7 @@ package com.lingo.lingoproject.chat.dto;
 
 import com.lingo.lingoproject.domain.Message;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -30,6 +31,10 @@ public class GetChatMessageResponseDto {
   @Schema(description = "채팅 읽은 사람 리스트", example = "[\"12\", \"25\"]")
   List<Long> readerIds;
 
+  String type;
+  LocalDateTime appointmentTime;
+  String place;
+
   public static GetChatMessageResponseDto from(Long chatroomId, Message m){
     return GetChatMessageResponseDto.builder()
         .chatroomId(chatroomId)
@@ -37,6 +42,7 @@ public class GetChatMessageResponseDto {
         .content(m.getContent())
         .createdAt(m.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
         .readerIds(m.getReaderIds())
+        .type("PLAIN")
         .build();
   }
 }
