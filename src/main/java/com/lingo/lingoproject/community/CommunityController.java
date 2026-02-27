@@ -1,0 +1,101 @@
+package com.lingo.lingoproject.community;
+
+import com.lingo.lingoproject.community.dto.CommentRequestDto;
+import com.lingo.lingoproject.community.dto.CommentResponseDto;
+import com.lingo.lingoproject.community.dto.GetCommentResponseDto;
+import com.lingo.lingoproject.community.dto.GetPostResponseDto;
+import com.lingo.lingoproject.community.dto.SavePostRequestDto;
+import com.lingo.lingoproject.community.dto.SavePostResponseDto;
+import com.lingo.lingoproject.community.dto.UpdateCommentRequestDto;
+import com.lingo.lingoproject.community.dto.UpdatePostRequestDto;
+import com.lingo.lingoproject.community.dto.UpdatePostResponseDto;
+import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.exception.ErrorCode;
+import com.lingo.lingoproject.utils.ResultMessageResponseDto;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+@Slf4j
+@RestController()
+@RequiredArgsConstructor
+public class CommunityController implements CommunityApi {
+
+  private final CommunityService communityService;
+
+  @Override
+  public ResponseEntity<List<GetPostResponseDto>> getPost(Long recommendationId, String topic, int page, int size, User user) {
+    log.info("userId={}, step=게시물_조회_시작, status=SUCCESS", user.getId());
+    List<GetPostResponseDto> response = communityService.getPost(recommendationId, topic, page, size);
+    log.info("userId={}, step=게시물_조회_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
+  public ResponseEntity<SavePostResponseDto> post(SavePostRequestDto dto, List<MultipartFile> images, User user) {
+    log.info("userId={}, step=게시물_게시_시작, status=SUCCESS", user.getId());
+    SavePostResponseDto response = communityService.post(dto, images);
+    log.info("userId={}, step=게시물_게시_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> deletePost(Long postId, User user) {
+    log.info("userId={}, step=게시물_삭제_시작, status=SUCCESS", user.getId());
+    communityService.deletePost(postId, user);
+    log.info("userId={}, step=게시물_삭제_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "게시물을 성공적으로 삭제했습니다."));
+  }
+
+  @Override
+  public ResponseEntity<UpdatePostResponseDto> updatePost(Long postId, UpdatePostRequestDto dto, User user) {
+    log.info("userId={}, step=게시물_업데이트_시작, status=SUCCESS", user.getId());
+    UpdatePostResponseDto response = communityService.updatePost(postId, dto, user);
+    log.info("userId={}, step=게시물_업데이트_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
+  public ResponseEntity<List<GetCommentResponseDto>> getComments(Long postId, User user) {
+    log.info("userId={}, step=댓글_조회_시작, status=SUCCESS", user.getId());
+    List<GetCommentResponseDto> response = communityService.getComments(postId);
+    log.info("userId={}, step=댓글_조회_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
+  public ResponseEntity<CommentResponseDto> comment(CommentRequestDto dto, User user) {
+    log.info("userId={}, step=댓글_업로드_시작, status=SUCCESS", user.getId());
+    CommentResponseDto response = communityService.comment(dto);
+    log.info("userId={}, step=댓글_업로드_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> updateComment(UpdateCommentRequestDto dto, User user) {
+    log.info("userId={}, step=댓글_업데이트_시작, status=SUCCESS", user.getId());
+    communityService.updateComment(dto, user);
+    log.info("userId={}, step=댓글_업데이트_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "댓글 성공적으로 업데이트하였습니다."));
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> deleteComment(Long commentId, User user) {
+    log.info("userId={}, step=댓글_삭제_시작, status=SUCCESS", user.getId());
+    communityService.deleteComment(commentId, user);
+    log.info("userId={}, step=댓글_삭제_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "댓글 성공적으로 삭제하였습니다."));
+  }
+}
