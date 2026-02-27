@@ -19,9 +19,12 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -152,9 +155,9 @@ public class SurveyService {
     // 일정기간까지는 정해진 설문을 제공한다.
     int numberOfAnswerSurveys = (int) answeredSurveyRepository.countByUser(user);
     if (numberOfAnswerSurveys < SIGNUP_NUMBER_OF_SURVEYS + NUMBER_OF_DAILY_SURVEYS * MAX_SURVEY_STARTER_DAYS){
-      List<Survey> surveys = surveyRepository.findAllBySurveyNumBetween
-          (numberOfAnswerSurveys + 1, numberOfAnswerSurveys + NUMBER_OF_DAILY_SURVEYS);
-      List<GetSurveyResponseDto> results = surveys.stream()
+      List<GetSurveyResponseDto> results = surveyRepository.findAllBySurveyNumBetween
+          (numberOfAnswerSurveys + 1, numberOfAnswerSurveys + NUMBER_OF_DAILY_SURVEYS)
+          .stream()
           .map(GetSurveyResponseDto::from)
           .toList();
       redisUtils.cacheUntilMidnight("recommend-for-daily-survey::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), results));
@@ -163,11 +166,13 @@ public class SurveyService {
 
     // 무작위로 설문을 제공한다.
     int numberOfSurveys = (int) surveyRepository.count();
-    Random random = new Random(System.currentTimeMillis());
-    List<Integer> randomSelectedSurveyNums = new ArrayList<>();
-    for (int i = 0; i < NUMBER_OF_DAILY_SURVEYS; i++){
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    Set<Integer> randomSelectedSurveyNums = new HashSet<>();
+
+    while (randomSelectedSurveyNums.size() < NUMBER_OF_DAILY_SURVEYS){
       randomSelectedSurveyNums.add(random.nextInt(numberOfSurveys) + 1);
     }
+
     List<Survey> randomSurveys = surveyRepository.findAllBySurveyNumIn(randomSelectedSurveyNums);
     List<GetSurveyResponseDto> results = randomSurveys.stream()
         .map(GetSurveyResponseDto::from)

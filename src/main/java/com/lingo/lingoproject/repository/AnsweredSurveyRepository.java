@@ -9,7 +9,6 @@ import com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -72,5 +71,5 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
 
   List<AnsweredSurvey> findAllByUserAndUpdatedAtAfter(User user, LocalDateTime updatedAtAfter);
 
-  List<AnsweredSurvey> findAllByUserNotInAndAnswerAndSurveyNumIn(Collection<User> users, Integer answer, Collection<Integer> surveyNums);
+  List<AnsweredSurvey> findAllByUserIdNotInAndAnswerAndSurveyNumIn(Collection<Long> users, Integer answer, Collection<Integer> surveyNums);
 }

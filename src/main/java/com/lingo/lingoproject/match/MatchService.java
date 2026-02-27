@@ -52,6 +52,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -114,7 +115,7 @@ public class MatchService {
             "매칭을 요청 받은 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     // 매칭 점수 계산
-    float matchingScore = calcMatchScore(requestedUser.getId(), requestUser.getId());
+    float matchingScore = calculateMatchScore(requestedUser.getId(), requestUser.getId());
     log.info("requestUserId={}, requestedUserId={}, matchingScore={}, step=매칭요청, status=SUCCESS", requestUser.getId(), requestedUser.getId(), matchingScore);
 
     // 매칭 내용 저장
@@ -181,10 +182,13 @@ public class MatchService {
   }
 
   @Transactional
-  public void syncRedisAllActiveUsers(){
+  public void cacheAllActiveUserIds(){
     LocalDateTime startDay = LocalDate.now().minusDays(ACTIVE_DAY_DURATION).atStartOfDay();
     List<Long> activeUserIds = userAccessLogRepository.findAllByCreateAtAfter(startDay)
-        .stream().map(UserAccessLog::getUserId).toList();
+        .stream()
+        .map(UserAccessLog::getUserId)
+        .distinct()
+        .toList();
     redisTemplate.delete(REDIS_ACTIVE_USER_IDS);
     redisTemplate.opsForValue().set(
         REDIS_ACTIVE_USER_IDS,
@@ -206,17 +210,12 @@ public class MatchService {
       if (responses.size() == MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY) return responses;
     }
 
-    ApiListResponseDto<Long> redisListWrapper = (ApiListResponseDto<Long>) redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS);
-    List<Long> activeUserIds = redisListWrapper != null ? redisListWrapper.getList() : null;
+    List<Long> activeUserIds = getActiveUserIds();
 
     // 레디스에 존재하는 active 유저(14일 안에 접속한 유저)를 가져온다.
-    if (activeUserIds == null || activeUserIds.isEmpty()){
-      syncRedisAllActiveUsers();
-      activeUserIds = ((ApiListResponseDto<Long>) redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS))
-          .getList().stream().map(v -> (long) v).collect(Collectors.toList());
-    }else{
-      activeUserIds = ((ApiListResponseDto<Long>) redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS))
-          .getList().stream().map(v -> (long) v).collect(Collectors.toList());;
+    if (activeUserIds.isEmpty()){
+      cacheAllActiveUserIds();
+      activeUserIds = getActiveUserIds();
     }
 
     // 이성추천에서 배제해야할 유저를 가져온다.
@@ -225,30 +224,44 @@ public class MatchService {
 
 
     // 임계치 이상의 매칭도를 가진 유저를 랜덤으로 4명 추천해준다.
-    List<Long> closeRelationUserIds = activeUserIds
+    List<Long> userIdsWithHighMatchScore = activeUserIds
         .stream()
         .map(id -> {
-          float matchingScore = calcMatchScore(userId, id);
+          float matchingScore = calculateMatchScore(userId, id);
           return new UserMatchingScoreMapping(id, matchingScore);
         })
         .filter(m -> m.matchingScore >= LIMIT_OF_MATCHING_SCORE)
         .map(UserMatchingScoreMapping::getId)
         .collect(Collectors.toList());
 
-    Collections.shuffle(closeRelationUserIds);
-    closeRelationUserIds = closeRelationUserIds.subList(0, MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY);
+
+    int n = Math.min(userIdsWithHighMatchScore.size(), MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY);
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+
+    for (int i = 0; i < n; i++){
+      int j = random.nextInt(i, userIdsWithHighMatchScore.size());
+      Collections.swap(userIdsWithHighMatchScore, i, j);
+    }
+    userIdsWithHighMatchScore = userIdsWithHighMatchScore.subList(0, n);
 
     // 추천된 이성의 프로필을 set에 저장한다.
     Set<GetUserProfileResponseDto> recommendedUserProfileSet = new HashSet<>();
-    userRepository.findAllByIdIn(closeRelationUserIds)
-        .forEach(recommendedUser -> addUserProfileToCollection(recommendedUserProfileSet, user, recommendedUser));
-
-    List<GetUserProfileResponseDto> recommendUserList = new ArrayList<>(recommendedUserProfileSet);
+    userRepository.findAllByIdIn(userIdsWithHighMatchScore)
+        .forEach(recommendedUser -> makeUserProfileAndAddInCollection(recommendedUserProfileSet, user, recommendedUser));
+    List<GetUserProfileResponseDto> recommendedUserList = new ArrayList<>(recommendedUserProfileSet);
 
     // 캐시 저장
-    redisUtils.cacheUntilMidnight("recommend::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), recommendUserList));
+    redisUtils.cacheUntilMidnight("recommend::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), recommendedUserList));
 
-    return recommendUserList;
+    return recommendedUserList;
+  }
+
+  private List<Long> getActiveUserIds(){
+    Object cache = redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS);
+    if (cache instanceof ApiListResponseDto<?> dto){
+      return new ArrayList<>((List<Long>) dto.getList());
+    }
+    return new ArrayList<>();
   }
 
   static class UserMatchingScoreMapping {
@@ -288,6 +301,9 @@ public class MatchService {
 
     Collections.shuffle(todayAnsweredSurveys);
 
+    // 추천되지 않아야할 유저를 조회
+    List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(user.getId());
+
     // 유저와 유사한 응답을 한 이성을 추천해줌
     List<GetUserProfileResponseDto> recommendUserProfileList = new ArrayList<>();
     for (AnsweredSurvey todayAnsweredSurvey : todayAnsweredSurveys) {
@@ -295,13 +311,10 @@ public class MatchService {
       // 4명만 추천해줌
       if (recommendUserProfileList.size() == MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY) break;
 
-      // 추천되지 않아야할 유저를 조회
-      List<User> excludedUsers = convertIdListToUserList(getExcludedUserIdsForRecommendation(user.getId()));
-
       int answer = todayAnsweredSurvey.getSurveyNum();
       // 유사한 (+/- 1) 응답을 한 유저들을 조회
-      List<AnsweredSurvey> matchingAnsweredSurveyList = answeredSurveyRepository.findAllByUserNotInAndAnswerAndSurveyNumIn(
-          excludedUsers,
+      List<AnsweredSurvey> matchingAnsweredSurveyList = answeredSurveyRepository.findAllByUserIdNotInAndAnswerAndSurveyNumIn(
+          excludedUserIds,
           todayAnsweredSurvey.getAnswer(),
           List.of(answer, answer + 1, answer - 1)
       );
@@ -310,13 +323,12 @@ public class MatchService {
       if (matchingAnsweredSurveyList.isEmpty()){ continue; }
 
       // 유사한 응답을 한 유저들 중 한 사람을 뽑음
-      Collections.shuffle(matchingAnsweredSurveyList);
-      User recommendedUser = matchingAnsweredSurveyList.isEmpty() ?
-          null : matchingAnsweredSurveyList.getFirst().getUser();
-      if (recommendedUser == null) continue;
+      ThreadLocalRandom random = ThreadLocalRandom.current();
+      int n = random.nextInt(matchingAnsweredSurveyList.size());
+      User recommendedUser = matchingAnsweredSurveyList.get(n).getUser();
 
       // recommendUserProfileList에 유저 프로필 정보를 저장함
-      addUserProfileToCollection(recommendUserProfileList, user, recommendedUser);
+      makeUserProfileAndAddInCollection(recommendUserProfileList, user, recommendedUser);
     }
 
     // 캐시 저장
@@ -328,22 +340,20 @@ public class MatchService {
 
     Long userId = user.getId();
 
-    if(redisTemplate.hasKey("recommend::" + userId)){
-      List<GetUserProfileResponseDto> responses = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
-      removeRecommendedUserFromList(responses, recommendedUserId);
-      redisUtils.cacheUntilMidnight("recommend::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), responses));
-    }
-
-    if (redisTemplate.hasKey("recommend-for-daily-survey::" + userId)){
-      List<GetUserProfileResponseDto> responses = redisUtils.getRecommendUserForDailySurvey(userId.toString());
-      removeRecommendedUserFromList(responses, recommendedUserId);
-      redisUtils.cacheUntilMidnight("recommend-for-daily-survey::" + userId,
-          new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), responses));
-    }
+    getCacheDataAndSetHideFlag("recommend::", userId, recommendedUserId);
+    getCacheDataAndSetHideFlag("recommend-for-daily-survey::", userId, recommendedUserId);
 
   }
 
-  public void removeRecommendedUserFromList(List<GetUserProfileResponseDto> responses, Long recommendedUserId){
+  private void getCacheDataAndSetHideFlag(String redisKeyPrefix, Long userId, Long recommendedUserId){
+    if(redisTemplate.hasKey(redisKeyPrefix + userId)){
+      List<GetUserProfileResponseDto> responses = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
+      setHideFlagOnUserProfile(responses, recommendedUserId);
+      redisUtils.cacheUntilMidnight(redisKeyPrefix + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), responses));
+    }
+  }
+
+  private void setHideFlagOnUserProfile(List<GetUserProfileResponseDto> responses, Long recommendedUserId){
     for (GetUserProfileResponseDto response : responses){
       if (response.getUserId().equals(recommendedUserId)){
         response.setHide(HIDE_PROFILE_FLAG);
@@ -352,7 +362,7 @@ public class MatchService {
     }
   }
 
-  public void addUserProfileToCollection(Collection<GetUserProfileResponseDto> collection, User user, User recommendedUser){
+  public void makeUserProfileAndAddInCollection(Collection<GetUserProfileResponseDto> collection, User user, User recommendedUser){
     Profile profile = recommendedUser.getProfile();
 
     List<String> hashtags = hashtagRepository.findAllByUser(recommendedUser)
@@ -363,7 +373,7 @@ public class MatchService {
     UserAccessLog access = userAccessLogRepository.findFirstByUserIdOrderByCreateAtDesc(recommendedUser.getId());
     long daysFromLastAccess = ChronoUnit.DAYS.between(access.getCreateAt(), LocalDate.now());
 
-    float matchingScore = calcMatchScore(user.getId(), recommendedUser.getId());
+    float matchingScore = calculateMatchScore(user.getId(), recommendedUser.getId());
 
     collection.add(
         GetUserProfileResponseDto.builder()
@@ -420,12 +430,9 @@ public class MatchService {
     
     return new ArrayList<>(excludedUserId);
   }
-  
-  public List<User> convertIdListToUserList(List<Long> idList){
-    return userRepository.findAllByIdIn(idList);
-  }
 
-  public float calcMatchScore(Long user1Id, Long user2Id){
+
+  public float calculateMatchScore(Long user1Id, Long user2Id){
     List<MatchScoreResultInterface> list = answeredSurveyRepository.calcMatchScore(user1Id, user2Id);
     float score = 0;
     for(MatchScoreResultInterface result : list){
