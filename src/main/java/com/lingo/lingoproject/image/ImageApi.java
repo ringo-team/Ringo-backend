@@ -1,10 +1,10 @@
 package com.lingo.lingoproject.image;
 
 import com.lingo.lingoproject.domain.User;
-import com.lingo.lingoproject.image.dto.FeedImageDataListDto;
+import com.lingo.lingoproject.image.dto.UploadAllFeedImageRequestDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -83,14 +83,14 @@ public interface ImageApi {
 
   @Operation(summary = "피드 사진 일괄 업로드")
   @ApiResponses(value = {
-      @ApiResponse(responseCode = "0000", description = "업로드 성공", content = @Content(schema = @Schema(implementation = JsonListWrapper.class))),
+      @ApiResponse(responseCode = "0000", description = "업로드 성공", content = @Content(schema = @Schema(implementation = ApiListResponseDto.class))),
       @ApiResponse(responseCode = "E0007", description = "잘못된 유저 id 파라미터", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E0012", description = "업로드 사진 개수 초과", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @PostMapping(value = "/feeds", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadFeedImages(
-      @Parameter(description = "이미지 파일들 업로드") @ModelAttribute FeedImageDataListDto images,
+  ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> uploadFeedImages(
+      @Parameter(description = "이미지 파일들 업로드") @ModelAttribute UploadAllFeedImageRequestDto images,
       @Parameter(description = "유저 id", example = "5") @RequestParam("userId") Long userId
 
       //@AuthenticationPrincipal User user
@@ -98,12 +98,12 @@ public interface ImageApi {
 
   @Operation(summary = "피드 이미지 조회.", description = "유저가 올린 모든 피드 사진을 조회")
   @ApiResponses(value = {
-      @ApiResponse(responseCode = "0000", description = "조회 성공", content = @Content(schema = @Schema(implementation = JsonListWrapper.class))),
+      @ApiResponse(responseCode = "0000", description = "조회 성공", content = @Content(schema = @Schema(implementation = ApiListResponseDto.class))),
       @ApiResponse(responseCode = "E0005", description = "id로 유저를 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @GetMapping("users/{userId}/feeds")
-  ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> getAllFeedImageUrls(
+  ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> getAllFeedImageUrls(
       @Parameter(description = "유저 Id", example = "5") @PathVariable(value = "userId") Long userId
   );
 

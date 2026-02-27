@@ -8,13 +8,12 @@ import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.AnsweredSurveyRepository;
 import com.lingo.lingoproject.repository.SurveyRepository;
-import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
 import com.lingo.lingoproject.survey.dto.UploadSurveyRequestDto;
 import com.lingo.lingoproject.utils.GenericUtils;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.RedisUtils;
 import java.io.InputStream;
 import java.time.LocalDate;
@@ -31,6 +30,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,14 +41,13 @@ import org.springframework.web.multipart.MultipartFile;
 public class SurveyService {
 
   private final SurveyRepository surveyRepository;
-  private final GenericUtils genericUtils;
   private final AnsweredSurveyRepository answeredSurveyRepository;
-  private final UserRepository userRepository;
   private final RedisUtils redisUtils;
 
   private final int SIGNUP_NUMBER_OF_SURVEYS = 12;
   private final int MAX_SURVEY_STARTER_DAYS = 10;
   private final int NUMBER_OF_DAILY_SURVEYS = 5;
+  private final RedisTemplate<String, Object> redisTemplate;
 
   public void uploadSurveyExcel(MultipartFile file){
     List<Survey> surveyList = new ArrayList<>();
@@ -60,10 +59,8 @@ public class SurveyService {
       for(Row row : sheet){
         String categoryValue = row.getCell(2).getStringCellValue();
         if (categoryValue.isEmpty()) break;
-        if(!genericUtils.isContains(SurveyCategory.values(), categoryValue)){
-          throw new RingoException("적절하지 않은 카테고리가 입력되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
-        }
-        SurveyCategory category = SurveyCategory.valueOf(categoryValue);
+
+        SurveyCategory category = GenericUtils.validateAndReturnEnumValue(SurveyCategory.values(), categoryValue);
         Survey survey = Survey.builder()
             .surveyNum((int) (row.getCell(0).getNumericCellValue()))
             .confrontSurveyNum((int) (row.getCell(1).getNumericCellValue()))
@@ -92,9 +89,9 @@ public class SurveyService {
     String content = dto.content();
     String category = dto.category();
 
-    genericUtils.validateAndSetStringValue(purpose, survey::setPurpose);
-    genericUtils.validateAndSetStringValue(content, survey::setContent);
-    genericUtils.validateAndSetEnum(category, SurveyCategory.values(), survey::setCategory, SurveyCategory.class);
+    GenericUtils.validateAndSetStringValue(purpose, survey::setPurpose);
+    GenericUtils.validateAndSetStringValue(content, survey::setContent);
+    GenericUtils.validateAndSetEnum(category, SurveyCategory.values(), survey::setCategory);
 
     surveyRepository.save(survey);
   }
@@ -106,7 +103,7 @@ public class SurveyService {
         .toList();
   }
 
-  public void saveSurveyResponse(JsonListWrapper<UploadSurveyRequestDto> responses, User user){
+  public void saveSurveyResponse(ApiListResponseDto<UploadSurveyRequestDto> responses, User user){
     List<AnsweredSurvey> list = new ArrayList<>();
 
     Map<Integer, AnsweredSurvey> alreadyAnsweredSurveys = answeredSurveyRepository.findAllByUser(user)
@@ -148,7 +145,7 @@ public class SurveyService {
     }
 
     // 캐시 조회
-    if (redisUtils.containsUserDailySurvey(userId.toString())){
+    if (redisTemplate.hasKey("dailySurvey::" + user.getId())){
       return redisUtils.getUserDailySurvey(userId.toString());
     }
 
@@ -160,7 +157,7 @@ public class SurveyService {
       List<GetSurveyResponseDto> results = surveys.stream()
           .map(GetSurveyResponseDto::from)
           .toList();
-      redisUtils.saveUserDailySurvey(userId.toString(), results);
+      redisUtils.cacheUntilMidnight("recommend-for-daily-survey::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), results));
       return results;
     }
 
@@ -177,7 +174,8 @@ public class SurveyService {
         .toList();
 
     // 캐시 저장
-    redisUtils.saveUserDailySurvey(userId.toString(), results);
+    redisUtils.cacheUntilMidnight("dailySurvey::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), results));
+
     return results;
   }
 

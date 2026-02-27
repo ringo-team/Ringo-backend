@@ -2,11 +2,11 @@ package com.lingo.lingoproject.image;
 
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.ErrorCode;
-import com.lingo.lingoproject.image.dto.FeedImageDataListDto;
+import com.lingo.lingoproject.image.dto.UploadAllFeedImageRequestDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
 import com.lingo.lingoproject.user.UserService;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -74,7 +74,8 @@ public class ImageController implements ImageApi{
   }
 
 
-  public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadFeedImages(FeedImageDataListDto images, Long userId
+  public ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> uploadFeedImages(
+      UploadAllFeedImageRequestDto images, Long userId
       //@AuthenticationPrincipal User user
   ){
 //    if (!userId.equals(user.getId())){
@@ -85,15 +86,15 @@ public class ImageController implements ImageApi{
     List<GetImageUrlResponseDto> dtos = imageService.uploadFeedImages(images.getList(), userId);
     log.info("userId={}, step=피드_업로드_완료, status=SUCCESS", userId);
 
-    return ResponseEntity.status(HttpStatus.CREATED).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), dtos));
+    return ResponseEntity.status(HttpStatus.CREATED).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));
   }
 
-  public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> getAllFeedImageUrls(Long userId){
+  public ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> getAllFeedImageUrls(Long userId){
     log.info("userId={}, step=피드_조회_시작, status=SUCCESS", userId);
     List<GetImageUrlResponseDto> responses = imageService.getAllFeedImageUrls(userId);
     log.info("userId={}, step=피드_조회_완료, status=SUCCESS", userId);
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), responses));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), responses));
   }
 
 

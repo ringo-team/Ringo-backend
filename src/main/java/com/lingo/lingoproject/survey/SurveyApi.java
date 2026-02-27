@@ -5,7 +5,7 @@ import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
 import com.lingo.lingoproject.survey.dto.UploadSurveyRequestDto;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -49,7 +49,7 @@ public interface SurveyApi {
 
   @Operation(summary = "설문지 조회")
   @GetMapping("/surveys")
-  ResponseEntity<JsonListWrapper<GetSurveyResponseDto>> getSurveys();
+  ResponseEntity<ApiListResponseDto<GetSurveyResponseDto>> getSurveys();
 
   @Operation(summary = "설문지 응답 저장", description = "유저가 진행한 설문지 응답 저장")
   @ApiResponses(value = {
@@ -59,7 +59,7 @@ public interface SurveyApi {
   })
   @PostMapping("/users/{userId}/surveys/responses")
   ResponseEntity<ResultMessageResponseDto> saveSurveyResponse(
-      @RequestBody JsonListWrapper<UploadSurveyRequestDto> responses,
+      @RequestBody ApiListResponseDto<UploadSurveyRequestDto> responses,
       @PathVariable(value = "userId") Long userId,
       @AuthenticationPrincipal User user);
 
@@ -70,7 +70,7 @@ public interface SurveyApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @GetMapping("/users/{userId}/surveys/daily")
-  ResponseEntity<JsonListWrapper<GetSurveyResponseDto>> getDailySurveys(
+  ResponseEntity<ApiListResponseDto<GetSurveyResponseDto>> getDailySurveys(
       @PathVariable(value = "userId") Long userId,
       @AuthenticationPrincipal User user
   );
@@ -82,7 +82,7 @@ public interface SurveyApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @GetMapping("users/{userId}/surveys")
-  ResponseEntity<JsonListWrapper<GetUserSurveyResponseDto>> getUserSurveyResponses(
+  ResponseEntity<ApiListResponseDto<GetUserSurveyResponseDto>> getUserSurveyResponses(
       @PathVariable Long userId, @AuthenticationPrincipal User user
   );
 }

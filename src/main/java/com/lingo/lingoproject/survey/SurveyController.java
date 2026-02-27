@@ -7,7 +7,7 @@ import com.lingo.lingoproject.survey.dto.GetSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.GetUserSurveyResponseDto;
 import com.lingo.lingoproject.survey.dto.UpdateSurveyRequestDto;
 import com.lingo.lingoproject.survey.dto.UploadSurveyRequestDto;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -45,16 +45,16 @@ public class SurveyController implements SurveyApi{
         ErrorCode.SUCCESS.getCode(), "성공적으로 수정하였습니다."));
   }
 
-  public ResponseEntity<JsonListWrapper<GetSurveyResponseDto>> getSurveys(){
+  public ResponseEntity<ApiListResponseDto<GetSurveyResponseDto>> getSurveys(){
     log.info("step=설문지_조회_시작, status=SUCCESS");
     List<GetSurveyResponseDto> list = surveyService.getSurveys();
     log.info("step=설문지_조회_완료, status=SUCCESS");
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), list));
   }
 
   public ResponseEntity<ResultMessageResponseDto> saveSurveyResponse(
-      JsonListWrapper<UploadSurveyRequestDto> responses,
+      ApiListResponseDto<UploadSurveyRequestDto> responses,
       Long userId,
       User user){
     if (!user.getId().equals(userId)){
@@ -69,7 +69,7 @@ public class SurveyController implements SurveyApi{
         ErrorCode.SUCCESS.getCode(), "정상적으로 설문지 응답이 저장되었습니다."));
   }
 
-  public ResponseEntity<JsonListWrapper<GetSurveyResponseDto>> getDailySurveys(
+  public ResponseEntity<ApiListResponseDto<GetSurveyResponseDto>> getDailySurveys(
       Long userId, User user
   ){
     if (!user.getId().equals(userId)){
@@ -80,10 +80,10 @@ public class SurveyController implements SurveyApi{
     List<GetSurveyResponseDto> dto = surveyService.getDailySurveys(user);
     log.info("userId={}, step=일일_설문_조회_완료, status=SUCCESS", userId);
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), dto));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dto));
   }
 
-  public ResponseEntity<JsonListWrapper<GetUserSurveyResponseDto>> getUserSurveyResponses(Long userId, User user){
+  public ResponseEntity<ApiListResponseDto<GetUserSurveyResponseDto>> getUserSurveyResponses(Long userId, User user){
     if (!(userId.equals(user.getId()) || user.getRole().equals(Role.ADMIN))) {
       throw new RingoException("설문 응답 결과를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
@@ -92,6 +92,6 @@ public class SurveyController implements SurveyApi{
     List<GetUserSurveyResponseDto> result = surveyService.getUserSurveyResponses(user);
     log.info("userId={}, step=유저_설문_응답_조회_완료, status=SUCCESS", user.getId());
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), result));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result));
   }
 }

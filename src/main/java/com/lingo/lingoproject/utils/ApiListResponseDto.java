@@ -8,11 +8,11 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class JsonListWrapper<T> {
+public class ApiListResponseDto<T> {
   private String result;
   private List<T> list;
 
-  public JsonListWrapper(String result, List<T> list) {
+  public ApiListResponseDto(String result, List<T> list) {
     this.result = result;
     this.list = list;
   }

@@ -7,7 +7,7 @@ import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.match.dto.RequestMatchingResponseDto;
 import com.lingo.lingoproject.match.dto.SaveMatchingRequestMessageRequestDto;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -67,7 +67,7 @@ public interface MatchingApi {
       }
   )
   @GetMapping("users/{userId}/match-requests") // 나를 지목한 사람
-  ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> getMatchRequestsByDirection(
+  ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> getMatchRequestsByDirection(
       @Parameter(description = "유저id", example = "5") @PathVariable(value = "userId") Long userId,
       @Parameter(description = "SENT 경우 내가 매칭 요청한 사람, RECEIVED 경우 나에게 매칭 요청한 사람", example = "SENT", schema = @Schema(allowableValues = {"SENT", "RECEIVED"})) @RequestParam(value = "direction") String direction,
       @AuthenticationPrincipal User user);
@@ -80,7 +80,7 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의")
   })
   @GetMapping("/users/{userId}/recommendations")
-  ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>>  recommendByCumulativeSurveys(
+  ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>>  recommendByCumulativeSurveys(
       @Parameter(description = "유저id", example = "5") @PathVariable(value = "userId") Long userId,
       @AuthenticationPrincipal User user);
 
@@ -90,7 +90,7 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @GetMapping("/users/{userId}/recommendations/daily-survey")
-  ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> recommendByDailySurvey(
+  ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> recommendByDailySurvey(
       @PathVariable(value = "userId") Long userId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "매칭 삭제")
@@ -158,7 +158,7 @@ public interface MatchingApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @GetMapping("/user/{userId}/scrap")
-  ResponseEntity<JsonListWrapper<GetScrappedUserResponseDto>> getScrappedUser(
+  ResponseEntity<ApiListResponseDto<GetScrappedUserResponseDto>> getScrappedUser(
       @Parameter(description = "요청하는 유저 아이디", example = "5") @PathVariable(value = "userId") Long userId,
       @AuthenticationPrincipal User user
   );

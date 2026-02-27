@@ -10,7 +10,7 @@ import com.lingo.lingoproject.match.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.match.dto.MatchingRequestDto;
 import com.lingo.lingoproject.match.dto.RequestMatchingResponseDto;
 import com.lingo.lingoproject.match.dto.SaveMatchingRequestMessageRequestDto;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +55,7 @@ public class MatchController implements MatchingApi {
   }
 
 
-  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> getMatchRequestsByDirection(Long userId, String direction, User user) {
+  public ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> getMatchRequestsByDirection(Long userId, String direction, User user) {
     if (!userId.equals(user.getId())) {
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
       throw new RingoException("본인의 매칭 정보만 확인할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
@@ -68,12 +68,12 @@ public class MatchController implements MatchingApi {
     };
     log.info("userId={}, direction={}, step=매칭_요청_확인_완료, status=SUCCESS", userId, direction);
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), responseDtoList));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), responseDtoList));
   }
 
 
 
-  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>>  recommendByCumulativeSurveys(Long userId, User user) {
+  public ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>>  recommendByCumulativeSurveys(Long userId, User user) {
     if (!userId.equals(user.getId())) {
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
@@ -82,10 +82,10 @@ public class MatchController implements MatchingApi {
     List<GetUserProfileResponseDto> rtnList = matchService.recommendByCumulativeSurvey(user);
     log.info("userId={}, step=이성_추천_시작, status=SUCCESS", userId);
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), rtnList));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), rtnList));
   }
 
-  public ResponseEntity<JsonListWrapper<GetUserProfileResponseDto>> recommendByDailySurvey(Long userId, User user
+  public ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> recommendByDailySurvey(Long userId, User user
   ){
     if (!userId.equals(user.getId())) {
       log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
@@ -95,7 +95,7 @@ public class MatchController implements MatchingApi {
     List<GetUserProfileResponseDto> rtnList = matchService.recommendUserByDailySurvey(user);
     log.info("userId={}, step=설문_기반_이성_추천_완료, status=SUCCESS", user.getId());
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), rtnList));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), rtnList));
   }
 
 
@@ -146,7 +146,7 @@ public class MatchController implements MatchingApi {
   }
 
   @Override
-  public ResponseEntity<JsonListWrapper<GetScrappedUserResponseDto>> getScrappedUser(Long userId, User user) {
+  public ResponseEntity<ApiListResponseDto<GetScrappedUserResponseDto>> getScrappedUser(Long userId, User user) {
     // 유저 검증
     if (!userId.equals(user.getId())){
       throw new RingoException("자신이 스크랩한 유저만 확인할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
@@ -155,7 +155,7 @@ public class MatchController implements MatchingApi {
     List<GetScrappedUserResponseDto> result = matchService.getScrappedUser(user);
     log.info("userId={}, step=스크랩된_유저_완료, status=SUCCESS", user.getId());
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), result));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result));
   }
 
 }

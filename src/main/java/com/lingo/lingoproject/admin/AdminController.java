@@ -8,7 +8,7 @@ import com.lingo.lingoproject.report.dto.GetReportInfoRequestDto;
 import com.lingo.lingoproject.report.dto.GetReportInfoResponseDto;
 import com.lingo.lingoproject.user.UserService;
 import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -54,7 +54,7 @@ public class AdminController {
 
   @Operation(summary = "신고조회", description = "조건에 따라 필터링된 신고된 유저 조회")
   @GetMapping("/reports")
-  public ResponseEntity<JsonListWrapper<GetReportInfoResponseDto>> getReportInfos(
+  public ResponseEntity<ApiListResponseDto<GetReportInfoResponseDto>> getReportInfos(
       @Parameter(description = "신고자 혹은 피신고자의 id", example = "5")
       @RequestParam(required = false)
       Long userId,
@@ -100,7 +100,7 @@ public class AdminController {
     List<GetReportInfoResponseDto> list = reportService.getReportInfos(new GetReportInfoRequestDto(userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt));
     log.info("count={}, step=신고정보_조회_완료, status=SUCCESS", list.size());
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), list));
   }
 
 

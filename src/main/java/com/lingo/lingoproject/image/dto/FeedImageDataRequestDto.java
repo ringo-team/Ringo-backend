@@ -6,6 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Data
 public class FeedImageDataRequestDto {
+
   @Schema(format = "binary", description = "이미지 파일")
   private MultipartFile image;
 

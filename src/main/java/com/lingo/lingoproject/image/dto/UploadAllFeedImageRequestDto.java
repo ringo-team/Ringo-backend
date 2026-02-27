@@ -4,6 +4,6 @@ import java.util.List;
 import lombok.Data;
 
 @Data
-public class FeedImageDataListDto {
+public class UploadAllFeedImageRequestDto {
   private List<FeedImageDataRequestDto> list;
 }
