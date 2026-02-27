@@ -13,7 +13,9 @@ import com.lingo.lingoproject.repository.impl.ReportRepositoryImpl;
 import com.lingo.lingoproject.user.UserService;
 import com.lingo.lingoproject.utils.RedisUtils;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +31,7 @@ public class ReportService {
   private final int MINOR_ACCOUNT_SUSPENSION_INTERVAL_DAY = 2;
   private final int RISKY_ACCOUNT_SUSPENSION_INTERVAL_DAY = 3;
   private final int SEVERE_ACCOUNT_SUSPENSION_INTERVAL_DAY = 7;
+  private final RedisTemplate<String, Object> redisTemplate;
 
   public void report(SaveReportRequestDto dto){
     if (reportRepository.existsByReportUserIdAndReportedUserIdAndReportedUserStatus(
@@ -63,15 +66,15 @@ public class ReportService {
         break;
       case "MINOR_ACCOUNT_SUSPENSION":
         report.setReportedUserStatus(ReportStatus.MINOR_ACCOUNT_SUSPENSION);
-        redisUtils.suspendUser(report.getReportedUserId(), MINOR_ACCOUNT_SUSPENSION_INTERVAL_DAY);
+        redisTemplate.opsForValue().set("suspension::" + report.getReportedUserId(), true, MINOR_ACCOUNT_SUSPENSION_INTERVAL_DAY, TimeUnit.DAYS);
         break;
       case "RISKY_ACCOUNT_SUSPENSION":
         report.setReportedUserStatus(ReportStatus.RISKY_ACCOUNT_SUSPENSION);
-        redisUtils.suspendUser(report.getReportedUserId(), RISKY_ACCOUNT_SUSPENSION_INTERVAL_DAY);
+        redisTemplate.opsForValue().set("suspension::" + report.getReportedUserId(), true, RISKY_ACCOUNT_SUSPENSION_INTERVAL_DAY, TimeUnit.DAYS);
         break;
       case "SEVERE_ACCOUNT_SUSPENSION":
         report.setReportedUserStatus(ReportStatus.SEVERE_ACCOUNT_SUSPENSION);
-        redisUtils.suspendUser(report.getReportedUserId(), SEVERE_ACCOUNT_SUSPENSION_INTERVAL_DAY);
+        redisTemplate.opsForValue().set("suspension::" + report.getReportedUserId(), true, SEVERE_ACCOUNT_SUSPENSION_INTERVAL_DAY, TimeUnit.DAYS);
         break;
       case "PERMANENT_ACCOUNT_SUSPENSION":
         report.setReportedUserStatus(ReportStatus.PERMANENT_ACCOUNT_SUSPENSION);

@@ -34,9 +34,6 @@ import org.hibernate.annotations.DynamicInsert;
     name = "PROFILES",
     indexes = {
         @Index(name = "idx_profiles_user_id", columnList = "user_id")
-    },
-    uniqueConstraints = {
-        @UniqueConstraint(name = "ux_profiles_user_id", columnNames = {"user_id"})
     }
 )
 @DynamicInsert
@@ -46,12 +43,13 @@ public class Profile extends Timestamp {
   private Long id;
 
   @OneToOne
-  @JoinColumn(name = "user_id")
+  @JoinColumn(name = "user_id", unique = true)
   private User user;
 
   private String imageUrl;
+
   private String description;
 
   @ColumnDefault(value = "false")
-  private Boolean isVerified;
+  private boolean isVerified = false;
 }

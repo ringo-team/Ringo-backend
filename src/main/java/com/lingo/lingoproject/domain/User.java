@@ -19,6 +19,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -66,17 +68,23 @@ public class User extends Timestamp implements UserDetails {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(unique = true)
+  @Column(length = 15, unique = true)
   private String nickname;
 
+  @Column(length = 10)
   private String name;
 
-  @Column(unique = true)
+  @Column(length = 20, unique = true)
   private String loginId;
+  @Column(length = 20)
   private String password;
 
-  @Column(unique = true)
+  @Column(length = 13, unique = true)
   private String phoneNumber;
+
+  @OneToOne
+  @JoinColumn(name = "profile_id")
+  private Profile profile;
 
 
   /**
@@ -88,6 +96,7 @@ public class User extends Timestamp implements UserDetails {
    * 5: KT 알뜰폰
    * 6: LGU+ 알뜰폰
    */
+  @Column(length = 10)
   private String mobileCarrier;
 
   @Enumerated(EnumType.STRING)
@@ -102,14 +111,20 @@ public class User extends Timestamp implements UserDetails {
   private Gender gender;
 
 
+  @Column(length = 5)
   private String height;
+
   private Integer age;
 
-  private String residenceFirstPlace;
-  private String residenceSecondPlace;
+  @Column(length = 10)
+  private String residenceProvince;
+  @Column(length = 10)
+  private String residenceCity;
 
-  private String activityLocFirstPlace;
-  private String activityLocSecondPlace;
+  @Column(length = 10)
+  private String activityLocProvince;
+  @Column(length = 10)
+  private String activityLocCity;
 
 
   @Enumerated(EnumType.STRING)
@@ -128,6 +143,7 @@ public class User extends Timestamp implements UserDetails {
   @Column(length = 100)
   private String biography;
 
+  @Column(length = 10)
   private String job;
 
   /**
@@ -139,21 +155,23 @@ public class User extends Timestamp implements UserDetails {
   @Enumerated(EnumType.STRING)
   private SignupStatus status;
 
+  @Column(length = 10)
   private String friendInvitationCode;
 
   // 마케팅 수신 동의 여부
   @ColumnDefault(value = "false")
-  private Boolean isMarketingReceptionConsent;
+  private boolean isMarketingReceptionConsent = false;
 
+  @Column(length = 10)
   private String mbti;
 
   public void setUserInfo(SignupUserInfoDto dto){
     this.nickname = dto.nickname();
     this.gender = Gender.valueOf(dto.gender().toUpperCase());
-    this.residenceFirstPlace = dto.address().city();
-    this.residenceSecondPlace = dto.address().district();
-    this.activityLocFirstPlace = dto.activeAddress().city();
-    this.activityLocSecondPlace = dto.activeAddress().district();
+    this.residenceProvince = dto.address().city();
+    this.residenceCity = dto.address().district();
+    this.activityLocProvince = dto.activeAddress().city();
+    this.activityLocCity = dto.activeAddress().district();
     this.job = dto.job();
     this.height = dto.height();
     this.isSmoking = Smoking.valueOf(dto.isSmoking());

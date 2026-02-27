@@ -15,6 +15,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -56,7 +57,8 @@ public class SecurityConfig {
 
 
   @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain filterChain(HttpSecurity http,
+      RedisTemplate<String, Object> redisTemplate) throws Exception {
     http
         .cors((cors) -> cors.configurationSource(corsConfigurationSource()))
         .authorizeHttpRequests(authorize ->
@@ -67,7 +69,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated())
         .formLogin(AbstractHttpConfigurer::disable)
         .csrf(AbstractHttpConfigurer::disable)
-        .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, redisUtils, userRepository, blockedUserRepository), UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, redisTemplate, userRepository, blockedUserRepository), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(new CustomAuthenticationFilter(customAuthenticationManager(), objectMapper, authenticationConverter()), JwtAuthenticationFilter.class)
         .addFilterBefore(new ExceptionHandlerFilter(), CustomAuthenticationFilter.class)
         .sessionManagement(session -> session.sessionCreationPolicy(

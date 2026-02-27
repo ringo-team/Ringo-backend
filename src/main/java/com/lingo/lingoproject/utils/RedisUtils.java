@@ -9,12 +9,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -25,115 +22,56 @@ public class RedisUtils {
 
   private final RedisTemplate<String, Object> redisTemplate;
 
-  public void saveDecryptKeyObject(String key, Object value){
-    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.set(key,value, 30, TimeUnit.MINUTES);
-  }
 
   public DecryptKeyObject getDecryptKeyObject(String key){
-    DecryptKeyObject savedDecryptedKey = null;
     try {
-      savedDecryptedKey = (DecryptKeyObject) redisTemplate.opsForValue().get(key);
+
+      return  (DecryptKeyObject) redisTemplate.opsForValue().get(key);
+
     } catch (Exception e) {
       log.error("본인인증 api에서 복호화 정보를 역질렬화하던 중 오류가 발생하였습니다.");
       log.error("key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedDecryptedKey;
-  }
-
-  public void saveSelfAuthCompletionMark(String userId){
-    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.set("self-auth::" + userId,true, 30, TimeUnit.MINUTES);
-  }
-
-  public boolean isCompleteSelfAuth(String userId){
-    return redisTemplate.hasKey("self-auth::" + userId);
-  }
-
-  public void saveLogoutUserList(String key, String value){
-    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.set("logoutUser::" + key, value, 1, TimeUnit.DAYS);
-  }
-
-  public boolean containsLogoutUserList(String key){
-    return redisTemplate.hasKey("logoutUser::" + key);
-  }
-
-  public Set<String> getLogoutUsers(){
-    return redisTemplate.keys("logoutUser::*");
-  }
-
-  public void saveRecommendedUserForCumulativeSurvey(String key, List<GetUserProfileResponseDto> value){
-    cacheUntilMidnight("recommend::" + key,
-        new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), value));
-  }
-
-  public boolean containsRecommendedUserForCumulativeSurvey(String key){
-    return redisTemplate.hasKey("recommend::" + key);
   }
 
   public List<GetUserProfileResponseDto> getRecommendedUserForCumulativeSurvey(String key){
-    JsonListWrapper<GetUserProfileResponseDto> savedRecommendUserList = null;
     try {
-      savedRecommendUserList = (JsonListWrapper<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);
+
+      ApiListResponseDto<GetUserProfileResponseDto> savedRecommendUserList = (ApiListResponseDto<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);
+      return savedRecommendUserList != null ? savedRecommendUserList.getList() : null;
+
     } catch (Exception e) {
       log.error("추천 유저 캐시 역직렬화 실패. key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedRecommendUserList != null ? savedRecommendUserList.getList() : null;
   }
 
-  public void saveRecommendUserForDailySurvey(String key, List<GetUserProfileResponseDto> value){
-    cacheUntilMidnight("recommend-for-daily-survey::" + key,
-        new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), value));
-  }
 
-  public boolean containsRecommendUserForDailySurvey(String key){
-    return redisTemplate.hasKey("recommend-for-daily-survey::" + key);
-  }
 
   public List<GetUserProfileResponseDto> getRecommendUserForDailySurvey(String key){
-    JsonListWrapper<GetUserProfileResponseDto> savedRecommendUserList = null;
     try {
-      savedRecommendUserList = (JsonListWrapper<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend-for-daily-survey::" + key);
+
+      ApiListResponseDto<GetUserProfileResponseDto> savedRecommendUserList = (ApiListResponseDto<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend-for-daily-survey::" + key);
+      return savedRecommendUserList != null ? savedRecommendUserList.getList() : null;
+
     } catch (Exception e) {
       log.error("일일 설문 추천 캐시 역직렬화 실패. key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedRecommendUserList != null ? savedRecommendUserList.getList() : null;
   }
 
-  public void saveUserDailySurvey(String key, List<GetSurveyResponseDto> value){
-    cacheUntilMidnight("dailySurvey::" + key, new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), value));
-  }
-
-  public boolean containsUserDailySurvey(String key){
-    return redisTemplate.hasKey("dailySurvey::" + key);
-  }
 
   public List<GetSurveyResponseDto> getUserDailySurvey(String key){
-    JsonListWrapper<GetSurveyResponseDto> savedUserDailySurveyList = null;
     try {
-      savedUserDailySurveyList = (JsonListWrapper<GetSurveyResponseDto>) redisTemplate.opsForValue().get("dailySurvey::" + key);
+
+      ApiListResponseDto<GetSurveyResponseDto> savedUserDailySurveyList = (ApiListResponseDto<GetSurveyResponseDto>) redisTemplate.opsForValue().get("dailySurvey::" + key);
+      return savedUserDailySurveyList != null ? savedUserDailySurveyList.getList() : null;
+
     }catch (Exception e){
       log.error("일일 설문 캐시 역직렬화 실패. key: {}", key, e);
       throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    return savedUserDailySurveyList != null ? savedUserDailySurveyList.getList() : null;
-  }
-
-  public void suspendUser(Long userId, int day){
-    ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-    ops.set("suspension::" + userId, true, day, TimeUnit.DAYS);
-  }
-
-  public boolean isSuspendedUser(Long userId){
-    return redisTemplate.hasKey("suspension::" + userId);
-  }
-
-  public Set<String> getSuspendedUsers(){
-    return redisTemplate.keys("suspension::*");
   }
 
   public void cacheUntilMidnight(String key, Object value) {

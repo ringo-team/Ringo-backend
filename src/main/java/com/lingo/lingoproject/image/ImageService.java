@@ -126,8 +126,7 @@ public class ImageService {
   public GetImageUrlResponseDto getProfileImageUrl(Long userId){
     User user = userRepository.findById(userId).orElseThrow(() -> new RingoException(
         "유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
-    Profile profile = profileRepository.findByUser(user).orElseThrow(() -> new RingoException(
-        "유저가 프로필을 가지지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+    Profile profile = user.getProfile();
     return new GetImageUrlResponseDto(
         ErrorCode.SUCCESS.getCode(),
         profile.getImageUrl(),
@@ -241,8 +240,9 @@ public class ImageService {
 
   @Transactional
   public void deleteProfileImageByUser(User user){
-    Profile profile = profileRepository.findByUser(user).orElseThrow(() -> new RingoException(
-        "프로필을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+
+    Profile profile = user.getProfile();
+
     profileRepository.delete(profile);
 
     deleteImageInS3(profile.getImageUrl());
@@ -493,9 +493,7 @@ public class ImageService {
 
   public boolean verifyProfileImage(MultipartFile targetImage, User user){
     try {
-      Profile profile = profileRepository.findByUser(user)
-          .orElseThrow(() -> new RingoException("유저의 프로필이 존재하지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-      String profileUrl = getFilenameFromS3ImageUrl(profile.getImageUrl());
+      String profileUrl = getFilenameFromS3ImageUrl(user.getProfile().getImageUrl());
       GetObjectRequest getObjectRequest = GetObjectRequest.builder()
           .bucket(bucket)
           .key(profileUrl)

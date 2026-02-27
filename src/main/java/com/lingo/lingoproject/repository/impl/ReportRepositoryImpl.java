@@ -16,7 +16,6 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +29,6 @@ public class ReportRepositoryImpl{
   private final JPAQueryFactory jpaQueryFactory;
 
   private final QReport report = QReport.report;
-  private final GenericUtils genericUtils;
 
   public List<GetReportInfoResponseDto> findReportInfo(GetReportInfoRequestDto dto){
 
@@ -56,22 +54,25 @@ public class ReportRepositoryImpl{
     }
 
     // where 문 신고 상태 옵션
-    if(validate(dto.reportedUserStatus(), ReportStatus.values())
+    if(validate(dto.reportedUserStatus())
     ){
-      builder.and(report.reportedUserStatus.eq(ReportStatus.valueOf(dto.reportedUserStatus())));
+      ReportStatus status = GenericUtils.validateAndReturnEnumValue(ReportStatus.values(), dto.reportedUserStatus());
+      builder.and(report.reportedUserStatus.eq(status));
     }
 
     // where 문 신고 강도 옵션
-    if (validate(dto.reportIntensity(), ReportIntensity.values())
+    if (validate(dto.reportIntensity())
     ){
-      builder.and(report.reportIntensity.eq(ReportIntensity.valueOf(dto.reportIntensity())));
+      ReportIntensity intensity = GenericUtils.validateAndReturnEnumValue(ReportIntensity.values(), dto.reportIntensity());
+      builder.and(report.reportIntensity.eq(intensity));
     }
 
     // where 문 신고 정렬 옵션
     OrderSpecifier<?> ordering = null;
-    if (validate(dto.ordering(), ReportOrdering.values())
+    if (validate(dto.ordering())
     ){
-      ordering = switch (ReportOrdering.valueOf(dto.ordering())) {
+      ReportOrdering reportOrdering = GenericUtils.validateAndReturnEnumValue(ReportOrdering.values(), dto.ordering());
+      ordering = switch (reportOrdering) {
         case ReportOrdering.CREATED_AT_ASC -> report.createdAt.asc();
         case ReportOrdering.CREATED_AT_DESC -> report.createdAt.desc();
         case ReportOrdering.INTENSITY_ASC -> report.reportIntensity.asc();
@@ -100,9 +101,5 @@ public class ReportRepositoryImpl{
     if (property == null || property.isBlank()) return false;
     return true;
   }
-  public <E extends Enum<E>> boolean validate(String property, E[] values){
-    if (property == null || property.isBlank()) return false;
-    if (!genericUtils.isContains(values, property)) return false;
-    return true;
-  }
+
 }

@@ -48,5 +48,5 @@ public class ChatroomParticipant {
   private User participant;
 
   @ColumnDefault(value = "false")
-  private Boolean isWithdrawn;
+  private boolean isWithdrawn = false;
 }

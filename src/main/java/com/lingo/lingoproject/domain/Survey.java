@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.domain;
 
 import com.lingo.lingoproject.domain.enums.SurveyCategory;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -32,12 +33,16 @@ public class Survey {
 
   @Enumerated(EnumType.STRING)
   private SurveyCategory category;
+  @Column(length = 100)
   private String purpose;
+  @Column(length = 100)
   private String content;
 
+  @Column(length = 100)
   private String matchedReasonForHigherAnswer;
+  @Column(length = 100)
   private String matchedReasonForLowerAnswer;
 
-  private String categoryForHigherAnswer;
-  private String categoryForLowerAnswer;
+  private String keywordForHigherAnswer;
+  private String keywordForLowerAnswer;
 }

@@ -35,7 +35,7 @@ public class UserAccessLog{
   @Column(updatable = false)
   private Long userId;
 
-  @Column(updatable = false)
+  @Column(length = 10, updatable = false)
   private String username;
 
   @Enumerated(EnumType.STRING)

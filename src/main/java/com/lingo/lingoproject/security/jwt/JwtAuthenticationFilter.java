@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,7 +26,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final JwtUtil jwtUtil;
-  private final RedisUtils redisUtils;
+  private final RedisTemplate<String, Object> redisTemplate;
   private final UserRepository userRepository;
   private final BlockedUserRepository blockedUserRepository;
 
@@ -42,12 +43,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           .orElseThrow(() -> new RingoException("유효하지 않은 토큰입니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN));
 
       // 로그아웃한 유저가 기존 토큰으로 접근하려고 할때 접근을 차단함
-      if(redisUtils.containsLogoutUserList(accessToken)){
+      if(redisTemplate.hasKey("logoutUser::" + accessToken)){
         throw new RingoException("유효하지 않은 토큰 입니다.", ErrorCode.LOGOUT, HttpStatus.FORBIDDEN);
       }
 
       // 계정 정지된 사람일 경우 접근을 차단함
-      if (redisUtils.isSuspendedUser(user.getId())){
+      if (redisTemplate.hasKey("suspension::" + user.getId())){
         throw new RingoException("계정이 정지된 유저입니다.", ErrorCode.BLOCKED, HttpStatus.FORBIDDEN);
       }
 

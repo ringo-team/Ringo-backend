@@ -29,5 +29,5 @@ public class UserPoint {
   private User user;
 
   @ColumnDefault(value = "0")
-  private int point;
+  private Integer point;
 }

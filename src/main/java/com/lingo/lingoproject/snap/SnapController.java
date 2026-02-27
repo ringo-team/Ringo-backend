@@ -7,7 +7,7 @@ import com.lingo.lingoproject.snap.dto.ApplySnapShootingRequestDto;
 import com.lingo.lingoproject.snap.dto.GetPhotographerInfosResponseDto;
 import com.lingo.lingoproject.snap.dto.UpdatePhotographerExampleImagesInfoRequestDto;
 import com.lingo.lingoproject.snap.dto.SavePhotographerInfoRequestDto;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -80,7 +80,7 @@ public class SnapController {
 
   @Operation(summary = "촬영 예시 사진 업로드")
   @PostMapping(value = "photographers/{photographerId}/example-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public ResponseEntity<JsonListWrapper<GetImageUrlResponseDto>> uploadPhotographerExampleImages(
+  public ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> uploadPhotographerExampleImages(
       @Parameter(description = "이미지 파일들 업로드")
       @RequestParam(value = "images") List<MultipartFile> images,
 
@@ -94,7 +94,7 @@ public class SnapController {
       log.info("photographerId={}, step=작가_예시사진_업로드_완료, status=SUCCESS", photographerId);
 
       return ResponseEntity.status(HttpStatus.CREATED)
-          .body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), dtos));
+          .body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));
 
     } catch (Exception e) {
       log.error("photographerId={}, step=작가_예시사진_업로드_실패, status=FAILED", photographerId, e);
@@ -128,7 +128,7 @@ public class SnapController {
 
   @Operation(summary = "작가 정보 가져오기")
   @GetMapping("/photographer-infos")
-  public ResponseEntity<JsonListWrapper<GetPhotographerInfosResponseDto>> getPhotographerInfos(){
+  public ResponseEntity<ApiListResponseDto<GetPhotographerInfosResponseDto>> getPhotographerInfos(){
     List<GetPhotographerInfosResponseDto> list;
     try {
 
@@ -136,7 +136,7 @@ public class SnapController {
       list = snapService.getPhotographerInfos();
       log.info("step=작가_정보_조회_완료, status=SUCCESS");
 
-      return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), list));
+      return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), list));
 
     } catch (Exception e) {
       log.error("step=작가_정보_조회_실패, status=FAILED", e);

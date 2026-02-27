@@ -4,6 +4,8 @@ import com.lingo.lingoproject.domain.enums.ChatType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -28,12 +30,14 @@ public class Chatroom {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
+  @Column(length = 30)
   private String chatroomName;
 
   @CreationTimestamp
   @Column(updatable = false, nullable = false)
   private LocalDateTime createdDate;
 
+  @Enumerated(value = EnumType.STRING)
   private ChatType type;
 
 }

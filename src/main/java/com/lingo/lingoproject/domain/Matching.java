@@ -34,15 +34,15 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
     indexes = {
         @Index(
             name = "idx_matchings_req_reqd_status",
-            columnList = "request_user, requested_user, matchingStatus"
+            columnList = "request_user_id, requested_user_id, matchingStatus"
         ),
         @Index(
             name = "idx_matchings_request_user",
-            columnList = "request_user"
+            columnList = "request_user_id"
         ),
         @Index(
             name = "idx_matchings_requested_user",
-            columnList = "requested_user"
+            columnList = "requested_user_id"
         )
     }
 )
@@ -52,14 +52,16 @@ public class Matching {
   private Long id;
 
   @ManyToOne
-  @JoinColumn(name = "request_user")
+  @JoinColumn(name = "request_user_id")
   private User requestUser;
 
   @ManyToOne
-  @JoinColumn(name =  "requested_user")
+  @JoinColumn(name =  "requested_user_id")
   private User requestedUser;
 
   private float matchingScore;
+
+  @Column(length = 250)
   private String matchingRequestMessage;
 
   @CreationTimestamp

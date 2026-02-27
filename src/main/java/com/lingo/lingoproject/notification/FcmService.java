@@ -36,7 +36,6 @@ public class FcmService {
   private final NotificationRepository notificationRepository;
 
   private final int RETRY_COUNT = 0;
-  private final GenericUtils genericUtils;
 
   public void refreshFcmToken(SaveFcmTokenRequestDto dto, User user){
     FcmToken fcmToken = fcmTokenRepository.findByUser(user)
@@ -89,11 +88,7 @@ public class FcmService {
 
   public void alterNotificationOption(User user, String notificationType){
 
-    if(!genericUtils.isContains(NotificationType.values(), notificationType)){
-      throw new RingoException("잘못된 알림 타입이 왔습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
-    }
-
-    NotificationType type = NotificationType.valueOf(notificationType);
+    NotificationType type = GenericUtils.validateAndReturnEnumValue(NotificationType.values(), notificationType);
 
     if(notificationOptionOutUserRepository.existsByUserAndType(user, type)){
       notificationOptionOutUserRepository.deleteAllByUserAndType(user, type);

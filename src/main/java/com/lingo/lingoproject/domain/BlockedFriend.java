@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.domain;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -39,5 +40,6 @@ public class BlockedFriend {
   상대방 B의 blocking list에
   A의  전화번호가 들어있으면 안됨
    */
+  @Column(length = 13)
   private String phoneNumber;
 }

@@ -30,6 +30,8 @@ public class SnapApply {
 
   private LocalDateTime snapStartedAt;
   private Integer duration;
+
+
   private String snapLocation;
   private String meetingLocation;
   private String keyword;

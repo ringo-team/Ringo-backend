@@ -33,12 +33,15 @@ public class Notification {
   private User user;
 
   private NotificationType type;
+
+  @Column(length = 100)
   private String title;
+  @Column(length = 100)
   private String message;
 
   @ColumnDefault(value = "false")
-  private Boolean isRead;
+  private boolean isRead = false;
 
   @ColumnDefault(value = "false")
-  private Boolean isFinished;
+  private boolean isFinished = false;
 }

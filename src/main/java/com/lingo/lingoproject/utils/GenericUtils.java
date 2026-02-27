@@ -1,31 +1,31 @@
 package com.lingo.lingoproject.utils;
 
+import com.lingo.lingoproject.exception.ErrorCode;
+import com.lingo.lingoproject.exception.RingoException;
 import java.util.function.Consumer;
-import org.springframework.stereotype.Component;
+import org.springframework.http.HttpStatus;
 
-@Component
 public class GenericUtils {
 
-  public <T> boolean isContains(T[] array, String value) {
+  public static <T> T validateAndReturnEnumValue(T[] array, String value) {
     for (T item : array) {
       if (item.toString().equals(value)) {
-        return true;
+        return item;
       }
     }
-    return false;
+    throw new RingoException("적절하지 않은 값이 요청되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
   }
 
-  public <E extends Enum<E>> void validateAndSetEnum(
+  public static <E> void validateAndSetEnum(
       String property,
       E[] values,
-      Consumer<E> setter,
-      Class<E> clazz){
+      Consumer<E> setter
+      ){
     if (property == null) return;
-    if (!isContains(values, property)) return;
-    setter.accept(E.valueOf(clazz, property));
+    setter.accept(validateAndReturnEnumValue(values, property));
   }
 
-  public void validateAndSetStringValue(
+  public static void validateAndSetStringValue(
       String property,
       Consumer<String> setter
   ){

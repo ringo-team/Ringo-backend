@@ -6,7 +6,7 @@ import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.notification.dto.GetNotificationResponseDto;
 import com.lingo.lingoproject.notification.dto.SaveFcmTokenRequestDto;
 import com.lingo.lingoproject.repository.UserRepository;
-import com.lingo.lingoproject.utils.JsonListWrapper;
+import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -126,7 +126,7 @@ public class NotificationController {
       }
   )
   @GetMapping("/notifications")
-  public ResponseEntity<JsonListWrapper<GetNotificationResponseDto>> getUserNotification(
+  public ResponseEntity<ApiListResponseDto<GetNotificationResponseDto>> getUserNotification(
       @Parameter(name = "유저 id", description = "알림을 조회할 유저의 id")
       @RequestParam(value = "userId") Long userId,
 
@@ -140,6 +140,6 @@ public class NotificationController {
     List<GetNotificationResponseDto> dto = fcmService.getNotificationMessage(user);
     log.info("userId={}, step=알림_조회_완료, status=SUCCESS", user.getId());
 
-    return ResponseEntity.status(HttpStatus.OK).body(new JsonListWrapper<>(ErrorCode.SUCCESS.getCode(), dto));
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dto));
   }
 }

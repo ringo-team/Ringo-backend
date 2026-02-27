@@ -25,6 +25,7 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -35,6 +36,7 @@ import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -52,6 +54,7 @@ public class SelfAuthService {
   private final ObjectMapper objectMapper;
   private final UserRepository userRepository;
   private final RedisUtils redisUtils;
+  private final RedisTemplate<String, Object> redisTemplate;
 
   @Value("${self-auth.client_id}")
   private String clientId;
@@ -245,7 +248,7 @@ public class SelfAuthService {
         .initialValueForDecryption(initialValueForEncryption)
         .hmacKeyForIntegrityCheck(hmacKeyForIntegrityCheck)
         .build();
-    redisUtils.saveDecryptKeyObject(tokenInfo.getTokenVersionId(), object);
+    redisTemplate.opsForValue().set(tokenInfo.getTokenVersionId(), object, 30, TimeUnit.MINUTES);
 
     /*
      * 요청 데이터(plainRequestData)에는 다음과 같은 정보가 포함된다.
@@ -354,6 +357,6 @@ public class SelfAuthService {
     user.setUserSelfAuthInfo(userSelfAuthInfo);
     userRepository.save(user);
 
-    redisUtils.saveSelfAuthCompletionMark(user.getId().toString());
+    redisTemplate.opsForValue().set("self-auth::" + user.getId(),true, 30, TimeUnit.MINUTES);
   }
 }

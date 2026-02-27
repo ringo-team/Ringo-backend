@@ -6,6 +6,7 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -28,9 +29,12 @@ public class DeadLetterFcmMessage {
   private Long id;
 
   private String token;
+
+  @Lob
   private String errorMessage;
   private String errorCause;
   private String message;
+  @Column(length = 20)
   private String userLoginId;
   private Integer retryCount;
   private String title;

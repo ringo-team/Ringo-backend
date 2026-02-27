@@ -1,6 +1,5 @@
 package com.lingo.lingoproject.security.services;
 
-import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.FcmToken;
 import com.lingo.lingoproject.domain.Hashtag;
 import com.lingo.lingoproject.domain.JwtRefreshToken;
@@ -13,7 +12,6 @@ import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.domain.enums.Smoking;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.repository.BlockedUserRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
@@ -26,23 +24,22 @@ import com.lingo.lingoproject.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.security.dto.RegenerateTokenResponseDto;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.utils.GenericUtils;
-import com.lingo.lingoproject.utils.RedisUtils;
 import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -57,10 +54,7 @@ public class LoginService {
   private final UserRepository userRepository;
   private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
   private final PasswordEncoder passwordEncoder;
-  private final RedisUtils redisUtils;
-  private final GenericUtils genericUtils;
   private final HashtagRepository hashtagRepository;
-  private final BlockedUserRepository blockedUserRepository;
   private final UserPointRepository userPointRepository;
   private final FcmTokenRepository fcmTokenRepository;
 
@@ -70,6 +64,7 @@ public class LoginService {
       "ISTJ", "ISTP", "ISFJ", "ISFP",
       "INTJ", "INTP", "INFJ", "INFP"
   );
+  private final RedisTemplate<String, Object> redisTemplate;
 
   public LoginResponseDto login(LoginInfoDto dto){
 
@@ -157,15 +152,10 @@ public class LoginService {
   @Transactional
   public void saveUserInfo(SignupUserInfoDto dto){
 
-    if(!genericUtils.isContains(Smoking.values(), dto.isSmoking())){
-      throw new RingoException("흡연 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
-    }
-    if (!genericUtils.isContains(Drinking.values(), dto.isDrinking())){
-      throw new RingoException("음주 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
-    }
-    if (!genericUtils.isContains(Religion.values(), dto.religion())){
-      throw new RingoException("종교 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
-    }
+    GenericUtils.validateAndReturnEnumValue(Smoking.values(), dto.isSmoking());
+    GenericUtils.validateAndReturnEnumValue(Drinking.values(), dto.isDrinking());
+    GenericUtils.validateAndReturnEnumValue(Religion.values(), dto.religion());
+
     if (!MBTI.contains(dto.mbti().toUpperCase())){
       throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
@@ -260,7 +250,7 @@ public class LoginService {
     jwtRefreshTokenRepository.save(refreshToken);
 
     // redis의 blacklist에 저장해 놓는다.
-    redisUtils.saveLogoutUserList(accessToken.substring(7), "true");
+    redisTemplate.opsForValue().set("logoutUser::" + accessToken.substring(7), true, 1, TimeUnit.DAYS);;
 
 
   }
