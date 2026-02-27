@@ -5,6 +5,7 @@ import com.lingo.lingoproject.user.dto.GetFriendInvitationCodeResponseDto;
 import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
 import com.lingo.lingoproject.user.dto.GetUserLoginIdResponseDto;
 import com.lingo.lingoproject.user.dto.ResetPasswordRequestDto;
+import com.lingo.lingoproject.user.dto.SaveMembershipRequestDto;
 import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,7 +37,7 @@ public interface UserApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
       }
   )
-  @DeleteMapping("/{userId}")
+  @DeleteMapping("/users/{userId}")
   ResponseEntity<ResultMessageResponseDto> deleteUser(
       @Parameter(description = "유저id", example = "4") @PathVariable Long userId,
 
@@ -55,7 +56,7 @@ public interface UserApi {
           @ApiResponse(responseCode = "E0003", description = "아이디를 조회할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("/find-id")
+  @GetMapping("/users/find-id")
   ResponseEntity<GetUserLoginIdResponseDto> findUserLoginId(@AuthenticationPrincipal User user);
 
   @Operation(summary = "유저 password 재설정", description = "본인인증 성공한 유저 password 재설정")
@@ -64,7 +65,7 @@ public interface UserApi {
           @ApiResponse(responseCode = "E0003", description = "비밀번호를 재설정할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PatchMapping("reset-password")
+  @PatchMapping("/users/reset-password")
   ResponseEntity<ResultMessageResponseDto> resetPassword(@RequestBody ResetPasswordRequestDto dto, @AuthenticationPrincipal User user);
 
   @Operation(summary = "유저 정보 조회", description = "프로필에 존재하는 유저 정보를 조회하는 api")
@@ -74,7 +75,7 @@ public interface UserApi {
           @ApiResponse(responseCode = "E0005", description = "해당 userId는 가입된 유저의 아이디가 아닙니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("/{userId}")
+  @GetMapping("/users/{userId}")
   ResponseEntity<GetUserInfoResponseDto> getUserInfo(@PathVariable(value = "userId") Long userId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "유저 정보 업데이트", description = "수정할 수 있는 유저 정보를 업데이트 하는 api")
@@ -82,7 +83,7 @@ public interface UserApi {
           @ApiResponse(responseCode = "0000", description = "업데이트 성공", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PatchMapping()
+  @PatchMapping("/users")
   ResponseEntity<ResultMessageResponseDto> updateUserInfo(@RequestBody UpdateUserInfoRequestDto dto, @AuthenticationPrincipal User user);
 
   @Operation(summary = "친구초대코드 조회")
@@ -90,7 +91,7 @@ public interface UserApi {
           @ApiResponse(responseCode = "0000", description = "조회 성공", content = @Content(schema = @Schema(implementation = GetFriendInvitationCodeResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("invitation-code")
+  @GetMapping("/users/invitation-code")
   ResponseEntity<GetFriendInvitationCodeResponseDto> getInvitationCode(@AuthenticationPrincipal User user);
 
   @Operation(summary = "친구초대코드 입력", description = "친구초대코드 입력 및 보상 받기")
@@ -100,7 +101,7 @@ public interface UserApi {
           @ApiResponse(responseCode = "E0001", description = "잘못된 코드를 입력하였습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PostMapping("invitation-code")
+  @PostMapping("/users/invitation-code")
   ResponseEntity<ResultMessageResponseDto> inputInvitationCodeAndGetReward(@AuthenticationPrincipal User user, @RequestParam String code);
 
 
@@ -109,7 +110,7 @@ public interface UserApi {
           @ApiResponse(responseCode = "0000", description = "업데이트 성공", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PostMapping("dormant")
+  @PostMapping("/users/dormant")
   ResponseEntity<ResultMessageResponseDto> updateDormantAccount(@AuthenticationPrincipal User user);
 
   @Operation(summary = "유저의 접근정보를 저장합니다.", description = "유저가 앱을 실행할 때 이 api를 호출합니다.")
@@ -117,7 +118,14 @@ public interface UserApi {
           @ApiResponse(responseCode = "0000", description = "저장 성공", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PostMapping("access")
+  @PostMapping("/users/access")
   ResponseEntity<ResultMessageResponseDto> saveUserAccessLog(@AuthenticationPrincipal User user);
 
+  @Operation(summary = "멤버십을 구독합니다.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "0000", description = "성공", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
+      @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
+  })
+  @PostMapping("/memberships")
+  ResponseEntity<ResultMessageResponseDto> saveMembership(@RequestBody SaveMembershipRequestDto dto, @AuthenticationPrincipal User user);
 }

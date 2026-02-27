@@ -4,11 +4,13 @@ import com.lingo.lingoproject.domain.BlockedUser;
 import com.lingo.lingoproject.domain.DormantAccount;
 import com.lingo.lingoproject.domain.FriendInvitationLog;
 import com.lingo.lingoproject.domain.Hashtag;
+import com.lingo.lingoproject.domain.MemberShipLog;
 import com.lingo.lingoproject.domain.Profile;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.UserAccessLog;
 import com.lingo.lingoproject.domain.Withdrawer;
 import com.lingo.lingoproject.domain.enums.Drinking;
+import com.lingo.lingoproject.domain.enums.MemberShipType;
 import com.lingo.lingoproject.domain.enums.Religion;
 import com.lingo.lingoproject.domain.enums.Smoking;
 import com.lingo.lingoproject.exception.ErrorCode;
@@ -25,6 +27,7 @@ import com.lingo.lingoproject.repository.FriendInvitationLogRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
 import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
+import com.lingo.lingoproject.repository.MemberShipLogRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
 import com.lingo.lingoproject.repository.UserAccessLogRepository;
 import com.lingo.lingoproject.repository.UserPointRepository;
@@ -35,7 +38,9 @@ import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
 import com.lingo.lingoproject.utils.GenericUtils;
 import com.lingo.lingoproject.utils.RedisUtils;
 import jakarta.transaction.Transactional;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,6 +50,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -73,13 +79,14 @@ public class UserService {
   private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
   private final ChatroomParticipantRepository chatroomParticipantRepository;
   private final UserAccessLogRepository userAccessLogRepository;
-  private final GenericUtils genericUtils;
   private final WithdrawerRepository withdrawerRepository;
   private final FriendInvitationLogRepository friendInvitationLogRepository;
   private final UserPointRepository userPointRepository;
   private final FcmTokenRepository fcmTokenRepository;
   private final ProfileRepository profileRepository;
   private final HashtagRepository hashtagRepository;
+  private final RedisTemplate<String, Object> redisTemplate;
+  private final MemberShipLogRepository memberShipLogRepository;
 
   @Transactional
   public void deleteUser(User user, String reason, String feedback) {
@@ -115,7 +122,8 @@ public class UserService {
 
   public String findUserLoginId(User user) {
     Long userId = user.getId();
-    boolean isAuthenticated = redisUtils.isCompleteSelfAuth(userId.toString());
+    boolean isAuthenticated = redisTemplate.hasKey("self-auth::" + userId);
+
     if (isAuthenticated) {
       return user.getUsername();
     } else {
@@ -126,7 +134,7 @@ public class UserService {
   public void resetPassword(String password, User user) {
     Long userId = user.getId();
 
-    boolean isAuthenticated = redisUtils.isCompleteSelfAuth(userId.toString());
+    boolean isAuthenticated = redisTemplate.hasKey("self-auth::" + userId);
     if (isAuthenticated) {
       user.setPassword(password);
       userRepository.save(user);
@@ -135,44 +143,44 @@ public class UserService {
     }
   }
 
-  public GetUserInfoResponseDto getUserInfo(Long userId, User user) {
+  public GetUserInfoResponseDto getUserInfo(Long findUserId, User user) {
 
-    List<GetUserProfileResponseDto> recommendedUsers = redisUtils.getRecommendedUserForCumulativeSurvey(user.getId().toString());
-    List<GetUserProfileResponseDto> recommendedUsersForDaily = redisUtils.getRecommendUserForDailySurvey(user.getId().toString());
-    List<GetUserProfileResponseDto> userList = new ArrayList<>();
+    List<Long> recommendedUsersForCumulation = redisUtils.getRecommendedUserForCumulativeSurvey(user.getId().toString())
+        .stream().map(GetUserProfileResponseDto::getUserId).toList();
+    List<Long> recommendedUsersForDaily = redisUtils.getRecommendUserForDailySurvey(user.getId().toString())
+        .stream().map(GetUserProfileResponseDto::getUserId).toList();
+    List<Long> userIdList = new ArrayList<>();
 
-    if (recommendedUsers != null) userList.addAll(recommendedUsers);
-    if (recommendedUsersForDaily != null) userList.addAll(recommendedUsersForDaily);
+    if (!recommendedUsersForCumulation.isEmpty()) userIdList.addAll(recommendedUsersForCumulation);
+    if (!recommendedUsersForDaily.isEmpty()) userIdList.addAll(recommendedUsersForDaily);
+    boolean hasCommunityPass = redisTemplate.hasKey("membership::" + user.getId());
 
-    List<Long> userIdList = userList.stream().map(GetUserProfileResponseDto::getUserId).toList();
-
-    if (!(userIdList.contains(userId) || userId.equals(user.getId()))){
+    if (!(userIdList.contains(findUserId) || findUserId.equals(user.getId()) || hasCommunityPass)){
       throw new RingoException("유저를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
-    User findedUser = userRepository.findById(userId).orElseThrow(
+    User findUser = userRepository.findById(findUserId).orElseThrow(
         () -> new RingoException("해당하는 유저가 존재하지 않습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)
     );
 
-    Profile profile = profileRepository.findByUser(findedUser)
-        .orElseThrow(() -> new RingoException("유저 정보 조회 중 프로필을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+    Profile profile = findUser.getProfile();
 
-    List<String> hashtags = hashtagRepository.findAllByUser(findedUser)
+    List<String> hashtags = hashtagRepository.findAllByUser(findUser)
         .stream().map(Hashtag::getHashtag).toList();
 
     return GetUserInfoResponseDto.builder()
-        .userId(findedUser.getId())
+        .userId(findUser.getId())
         .profile(profile.getImageUrl())
-        .birthday(findedUser.getBirthday().toString())
-        .gender(findedUser.getGender().toString())
-        .mbti(findedUser.getMbti())
-        .height(findedUser.getHeight())
-        .isDrinking(findedUser.getIsDrinking().toString())
-        .isSmoking(findedUser.getIsSmoking().toString())
-        .religion(findedUser.getReligion().toString())
-        .job(findedUser.getJob())
-        .nickname(findedUser.getNickname())
-        .biography(findedUser.getBiography())
+        .birthday(findUser.getBirthday().toString())
+        .gender(findUser.getGender().toString())
+        .mbti(findUser.getMbti())
+        .height(findUser.getHeight())
+        .isDrinking(findUser.getIsDrinking().toString())
+        .isSmoking(findUser.getIsSmoking().toString())
+        .religion(findUser.getReligion().toString())
+        .job(findUser.getJob())
+        .nickname(findUser.getNickname())
+        .biography(findUser.getBiography())
         .hashtags(hashtags)
         .result(ErrorCode.SUCCESS.getCode())
         .build();
@@ -188,13 +196,13 @@ public class UserService {
     String biography = dto.biography();
     String mbti     = dto.mbti();
 
-    genericUtils.validateAndSetEnum(drinking, Drinking.values(), user::setIsDrinking, Drinking.class);
-    genericUtils.validateAndSetEnum(smoking, Smoking.values(), user::setIsSmoking, Smoking.class);
-    genericUtils.validateAndSetEnum(religion, Religion.values(), user::setReligion, Religion.class);
+    GenericUtils.validateAndSetEnum(drinking, Drinking.values(), user::setIsDrinking);
+    GenericUtils.validateAndSetEnum(smoking, Smoking.values(), user::setIsSmoking);
+    GenericUtils.validateAndSetEnum(religion, Religion.values(), user::setReligion);
 
-    genericUtils.validateAndSetStringValue(height, user::setHeight);
-    genericUtils.validateAndSetStringValue(job, user::setJob);
-    genericUtils.validateAndSetStringValue(biography, user::setBiography);
+    GenericUtils.validateAndSetStringValue(height, user::setHeight);
+    GenericUtils.validateAndSetStringValue(job, user::setJob);
+    GenericUtils.validateAndSetStringValue(biography, user::setBiography);
 
     if (!MBTI.contains(mbti.toUpperCase())){
       throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
@@ -254,10 +262,8 @@ public class UserService {
   }
 
   public void updateUserProfileVerification(User user){
-    Profile profile = profileRepository.findByUser(user)
-        .orElseThrow(() -> new RingoException(
-            "userId=" + user.getId() + "프로필 검증 업데이트 중 프로필을 찾을 수 없는 오류가 발생했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-    profile.setIsVerified(true);
+    Profile profile = user.getProfile();
+    profile.setVerified(true);
     profileRepository.save(profile);
   }
 
@@ -305,5 +311,20 @@ public class UserService {
         .user(user)
         .build();
     dormantAccountRepository.save(dormantAccount);
+  }
+
+  public void saveMembership(int duration, User user){
+    redisTemplate.opsForValue().set("membership::" + user.getId(), true, Duration.of(duration, ChronoUnit.DAYS));
+    LocalDateTime endTime = LocalDateTime.now().plusDays(duration);
+    MemberShipLog log = MemberShipLog.builder()
+        .userId(user.getId())
+        .nickname(user.getNickname())
+        .username(user.getName())
+        .age(user.getAge())
+        .gender(user.getGender())
+        .type(MemberShipType.COMMUNITY_PASS)
+        .endTime(endTime)
+        .build();
+    memberShipLogRepository.save(log);
   }
 }
