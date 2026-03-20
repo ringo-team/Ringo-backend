@@ -97,10 +97,8 @@ public class LoginController implements LoginApi{
         .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "사용가능한 닉네임입니다."));
   }
 
-  public ResponseEntity<ResultMessageResponseDto> logout(User user, String token) {
-    log.info("userId={}, step=로그아웃_시작, status=SUCCESS", user.getId());
-    loginService.logout(user, token);
-    log.info("userId={}, step=로그아웃_완료, status=SUCCESS", user.getId());
+  public ResponseEntity<ResultMessageResponseDto> logout(HttpServletRequest request) {
+    loginService.logout(request);
 
     return ResponseEntity.status(HttpStatus.OK)
         .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "로그아웃이 완료되었습니다."));

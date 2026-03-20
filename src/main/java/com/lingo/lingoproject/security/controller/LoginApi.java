@@ -105,9 +105,6 @@ public interface LoginApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @GetMapping("/api/logout")
-  ResponseEntity<ResultMessageResponseDto> logout(
-      @AuthenticationPrincipal User user,
-      @RequestHeader(value = "Authorization") String token
-  );
+  ResponseEntity<ResultMessageResponseDto> logout(HttpServletRequest request);
 
 }

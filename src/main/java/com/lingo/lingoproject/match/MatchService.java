@@ -51,6 +51,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -207,7 +208,7 @@ public class MatchService {
     // 캐시 조회
     if(redisTemplate.hasKey("recommend::" + userId)){
       List<GetUserProfileResponseDto> responses = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
-      if (responses.size() == MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY) return responses;
+      if (responses != null && responses.size() == MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY) return responses;
     }
 
     List<Long> activeUserIds = getActiveUserIds();
@@ -348,6 +349,7 @@ public class MatchService {
   private void getCacheDataAndSetHideFlag(String redisKeyPrefix, Long userId, Long recommendedUserId){
     if(redisTemplate.hasKey(redisKeyPrefix + userId)){
       List<GetUserProfileResponseDto> responses = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
+      if (responses == null) return;
       setHideFlagOnUserProfile(responses, recommendedUserId);
       redisUtils.cacheUntilMidnight(redisKeyPrefix + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), responses));
     }
@@ -686,8 +688,19 @@ public class MatchService {
   public void scrapUser(Long recommendedUserId, User user){
     Long userId = user.getId();
 
-    List<Long> recommendUserIdListForCumulativeSurvey = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString()).stream().map(GetUserProfileResponseDto::getUserId).toList();
-    List<Long> recommendUserIdListForDailySurvey = redisUtils.getRecommendUserForDailySurvey(userId.toString()).stream().map(GetUserProfileResponseDto::getUserId).toList();;
+    List<Long> recommendUserIdListForCumulativeSurvey =
+        Optional.ofNullable(redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString()))
+            .orElseGet(Collections::emptyList)
+            .stream()
+            .map(GetUserProfileResponseDto::getUserId)
+            .toList();
+
+    List<Long> recommendUserIdListForDailySurvey =
+        Optional.ofNullable(redisUtils.getRecommendUserForDailySurvey(userId.toString()))
+            .orElseGet(Collections::emptyList)
+            .stream()
+            .map(GetUserProfileResponseDto::getUserId)
+            .toList();
 
     List<Long> recommededUserIdList = new ArrayList<>();
     recommededUserIdList.addAll(recommendUserIdListForCumulativeSurvey);

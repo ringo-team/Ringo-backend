@@ -2,6 +2,7 @@ package com.lingo.lingoproject.image;
 
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.ErrorCode;
+import com.lingo.lingoproject.image.dto.GetFeedImageInfoResponseDto;
 import com.lingo.lingoproject.image.dto.UploadAllFeedImageRequestDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
@@ -89,9 +90,9 @@ public class ImageController implements ImageApi{
     return ResponseEntity.status(HttpStatus.CREATED).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));
   }
 
-  public ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> getAllFeedImageUrls(Long userId){
+  public ResponseEntity<ApiListResponseDto<GetFeedImageInfoResponseDto>> getAllFeedImageUrls(Long userId){
     log.info("userId={}, step=피드_조회_시작, status=SUCCESS", userId);
-    List<GetImageUrlResponseDto> responses = imageService.getAllFeedImageUrls(userId);
+    List<GetFeedImageInfoResponseDto> responses = imageService.getAllFeedImageUrls(userId);
     log.info("userId={}, step=피드_조회_완료, status=SUCCESS", userId);
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), responses));

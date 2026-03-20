@@ -10,6 +10,7 @@ import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.dto.FeedImageDataRequestDto;
+import com.lingo.lingoproject.image.dto.GetFeedImageInfoResponseDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
 import com.lingo.lingoproject.repository.PhotographerImageRepository;
@@ -251,16 +252,17 @@ public class ImageService {
   /**
    * feed 이미지 crud
    */
-  public List<GetImageUrlResponseDto> getAllFeedImageUrls(Long userId){
+  public List<GetFeedImageInfoResponseDto> getAllFeedImageUrls(Long userId){
     User user = userRepository.findById(userId).orElseThrow(() -> new RingoException(
         "유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
     List<FeedImage> images = feedImageRepository.findAllByUser(user);
     return images.stream()
         .map(image ->
-            new GetImageUrlResponseDto(
+            new GetFeedImageInfoResponseDto(
                 ErrorCode.SUCCESS.getCode(),
                 image.getImageUrl(),
-                image.getId()
+                image.getId(),
+                image.getDescription()
             )
         )
         .toList();

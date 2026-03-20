@@ -8,8 +8,10 @@ import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.exception.RingoException;
 import io.swagger.v3.oas.annotations.Hidden;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,33 +26,21 @@ public class KakaoLoginController {
 
   private final KakaoLoginService kakaoLoginService;
   private final JwtUtil jwtUtil;
+  private final RedisTemplate<String, Object> redisTemplate;
 
 
   @GetMapping("/kakao/callback")
   public ResponseEntity<?> callback(@RequestParam String code){
-    try {
+    log.info("step=카카오_로그인_콜백_시작, status=SUCCESS");
+    User user = kakaoLoginService.saveUserLoginInfo(code);
 
-      log.info("step=카카오_로그인_콜백_시작, status=SUCCESS");
-      User user = kakaoLoginService.saveUserLoginInfo(code);
+    String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
+    String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);
 
-      if (!jwtUtil.hasJwtRefreshToken(user)){
-        return ResponseEntity.status(HttpStatus.OK).body(
-            new SignupResponseDto(user.getId(), ErrorCode.SUCCESS.getCode())
-        );
-      }
+    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refreshToken, 30, TimeUnit.DAYS);
 
-      String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
-      String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);
-      jwtUtil.saveJwtRefreshToken(user, refreshToken);
-      log.info("userId={}, step=카카오_로그인_콜백_완료, status=SUCCESS", user.getId());
+    log.info("userId={}, step=카카오_로그인_콜백_완료, status=SUCCESS", user.getId());
 
-      return ResponseEntity.ok(new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refreshToken));
-    } catch (Exception e) {
-      log.error("step=카카오_로그인_콜백_실패, status=FAILED", e);
-      if (e instanceof RingoException re){
-        throw re;
-      }
-      throw new RingoException("카카오 로그인 처리에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    return ResponseEntity.ok(new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refreshToken));
   }
 }

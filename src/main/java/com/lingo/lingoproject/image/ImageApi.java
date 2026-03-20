@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.image;
 
 import com.lingo.lingoproject.domain.User;
+import com.lingo.lingoproject.image.dto.GetFeedImageInfoResponseDto;
 import com.lingo.lingoproject.image.dto.UploadAllFeedImageRequestDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
@@ -103,7 +104,7 @@ public interface ImageApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @GetMapping("users/{userId}/feeds")
-  ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> getAllFeedImageUrls(
+  ResponseEntity<ApiListResponseDto<GetFeedImageInfoResponseDto>> getAllFeedImageUrls(
       @Parameter(description = "유저 Id", example = "5") @PathVariable(value = "userId") Long userId
   );
 

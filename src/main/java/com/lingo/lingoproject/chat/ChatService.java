@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import javax.swing.text.html.Option;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -58,7 +59,7 @@ public class ChatService {
   private final FailedChatMessageLogRepository failedChatMessageLogRepository;
   private final AppointmentRepository appointmentRepository;
 
-
+  
   public GetChatResponseDto getChatMessages(User user, Long chatroomId, int page, int size){
     // 페이지네이션
     Pageable pageable = PageRequest.of(page, size);
@@ -141,7 +142,6 @@ public class ChatService {
         .destination(destination + roomId)
         .userLoginId(userLoginId)
         .build();
-    messageRepository.delete(savedMessage);
     failedChatMessageLogRepository.save(failedFcmMessageLog);
   }
 
@@ -205,32 +205,32 @@ public class ChatService {
     for(Chatroom chatroom : chatrooms){
 
       // 채팅 상대방 유저 닉네임 조회
-      User chatOpponent = chatroomParticipantRepository
-          .findAllByChatroom(chatroom)
-          .stream()
-          .map(chatroomParticipant -> {
+      List<ChatroomParticipant> participants = chatroomParticipantRepository.findAllByChatroom(chatroom);
 
-            // 참여자가 앱을 탈퇴했으면 "알 수 없음" 으로 변경
-            if(chatroomParticipant.isWithdrawn()) {
-              User participant = chatroomParticipant.getParticipant();
-              participant.setNickname("알 수 없음");
-              return participant;
-            }
+      String nickname = null;
+      String imageUrl = null;
 
-            // 그 외의 경우 닉네임 조회
-            else return chatroomParticipant.getParticipant();
-          })
-          .filter(opponent -> !user.getId().equals(opponent.getId()))
-          .toList()
-          .getFirst();
+      ChatroomParticipant p1 = participants.get(0);
+      ChatroomParticipant p2 = participants.get(1);
+
+      if (!isMemberInChatroom(chatroom.getId(), user.getId())){
+        throw new RingoException("채팅방에 소속되지 않은 유저이거나 탈퇴된 유저입니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+      }
+
+      if (p1.isWithdrawn() || p2.isWithdrawn()){
+        nickname = "알 수 없음";
+      }
+      else{
+        User chatOpponent = p1.getParticipant().getId().equals(user.getId()) ? p2.getParticipant() : p1.getParticipant();
+        nickname = chatOpponent.getNickname();
+        imageUrl = chatOpponent.getProfile().getImageUrl();
+      }
 
       // 유저가 읽지 않은 메세지의 개수를 조회한다.
-      int numberOfNotReadMessages = messageRepository.findNumberOfNotReadMessages(chatroom.getId(),
-          user.getId());
+      int numberOfNotReadMessages = messageRepository.findNumberOfNotReadMessages(chatroom.getId(), user.getId());
 
       // 채팅방 마지막 메세지를 조회한다.
-      Optional<Message> lastMessage = messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(
-          chatroom.getId());
+      Optional<Message> lastMessage = messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(chatroom.getId());
 
       // 마지막 메세지 전송 시기
       String lastSendDateTime = null;
@@ -241,8 +241,8 @@ public class ChatService {
 
       responseDtoList.add(GetChatroomResponseDto.builder()
           .chatroomId(chatroom.getId())
-          .chatOpponent(chatOpponent.getNickname())
-          .chatOpponentProfileUrl(chatOpponent.getProfile().getImageUrl())
+          .chatOpponent(nickname)
+          .chatOpponentProfileUrl(imageUrl)
           .lastChatMessage(lastMessage.map(Message::getContent).orElse(null))
           .NumberOfNotReadMessages(numberOfNotReadMessages)
           .lastSendDateTime(lastSendDateTime)
@@ -273,12 +273,20 @@ public class ChatService {
         .orElseThrow(() -> new RingoException("채팅방을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     // 채팅방 참여자 유저 id 조회
-    List<Long> userIds = chatroomParticipantRepository.findAllByChatroom(chatroom)
-        .stream()
-        .filter(cp -> !cp.isWithdrawn())
-        .map(ChatroomParticipant::getParticipant)
-        .map(User::getId)
-        .toList();
+    List<ChatroomParticipant> participants = chatroomParticipantRepository.findAllByChatroom(chatroom);
+
+    List<Long> userIds = new ArrayList<>();
+
+    ChatroomParticipant p1 = participants.get(0);
+    ChatroomParticipant p2 = participants.get(1);
+
+    if (!p1.isWithdrawn()){
+      userIds.add(p1.getParticipant().getId());
+    }
+
+    if (!p2.isWithdrawn()){
+      userIds.add(p2.getParticipant().getId());
+    }
 
     return userIds.contains(userId);
   }

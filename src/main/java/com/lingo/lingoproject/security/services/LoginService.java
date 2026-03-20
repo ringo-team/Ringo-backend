@@ -2,7 +2,6 @@ package com.lingo.lingoproject.security.services;
 
 import com.lingo.lingoproject.domain.FcmToken;
 import com.lingo.lingoproject.domain.Hashtag;
-import com.lingo.lingoproject.domain.JwtRefreshToken;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.UserPoint;
 import com.lingo.lingoproject.domain.enums.Drinking;
@@ -14,7 +13,6 @@ import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
-import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.UserPointRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.TokenType;
@@ -25,6 +23,7 @@ import com.lingo.lingoproject.security.dto.RegenerateTokenResponseDto;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.utils.GenericUtils;
 import io.jsonwebtoken.Claims;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -41,7 +40,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -52,7 +50,6 @@ public class LoginService {
 
   private final JwtUtil jwtUtil;
   private final UserRepository userRepository;
-  private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
   private final PasswordEncoder passwordEncoder;
   private final HashtagRepository hashtagRepository;
   private final UserPointRepository userPointRepository;
@@ -68,24 +65,15 @@ public class LoginService {
 
   public LoginResponseDto login(LoginInfoDto dto){
 
-    if (SecurityContextHolder.getContext().getAuthentication() == null) {
-      throw new RingoException("유저가 인증되지 않았습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
-
     User user = userRepository.findByLoginId(dto.loginId())
-        .orElseThrow(() -> new RingoException(
-            "해당 로그인 아이디를 가진 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 로그인 아이디를 가진 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     // 토큰 재발급
     String access = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
 
     // 리프레시 토큰 업데이트
-    JwtRefreshToken tokenInfo = jwtRefreshTokenRepository.findByUser(user)
-        .orElseThrow(() -> new RingoException(
-            "유저의 리프레시 토큰을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-    tokenInfo.setRefreshToken(refresh);
-    jwtRefreshTokenRepository.save(tokenInfo);
+    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refresh, 30, TimeUnit.DAYS);
 
     return new  LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), access, refresh);
   }
@@ -99,23 +87,28 @@ public class LoginService {
 
     Claims claims =  jwtUtil.getClaims(refreshToken);
 
-    User user = userRepository.findByLoginId(claims.getSubject())
-        .orElseThrow(() -> new RingoException("해당 이메일을 가진 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+    Object redisToken = redisTemplate.opsForValue().get("redis::refresh::" + claims.getSubject());
+    String token = redisToken != null ? redisToken.toString() : null;
 
-    JwtRefreshToken tokenInfo = jwtRefreshTokenRepository.findByUser(user)
-        .orElseThrow(() -> new RingoException("토큰을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+    if (token == null) throw new RingoException("로그인하지 않은 유저입니다.", ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN);
 
-    if(!tokenInfo.getRefreshToken().equals(refreshToken)){
-      throw new RingoException("유효하지 않은 토큰입니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    if(token.equals(refreshToken)){
+      return generateTokenAndSaveRefreshTokenInRedis(claims.getSubject());
     }
+    else throw new RingoException("유효하지 않은 토큰입니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+
+  }
+
+  private RegenerateTokenResponseDto generateTokenAndSaveRefreshTokenInRedis(String loginId){
+    User user = userRepository.findByLoginId(loginId)
+        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST));
 
     // 토큰 재발급
     String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
 
     // 리프레시 토큰 업데이트
-    tokenInfo.setRefreshToken(refresh);
-    jwtRefreshTokenRepository.save(tokenInfo);
+    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refresh, 30, TimeUnit.DAYS);
 
     return new  RegenerateTokenResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refresh);
   }
@@ -162,8 +155,8 @@ public class LoginService {
     if (!(dto.gender().equalsIgnoreCase("MALE") || dto.gender().equalsIgnoreCase("FEMALE"))){
       throw new RingoException("성별 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
-    User user = userRepository.findById(dto.id()).orElseThrow(() -> new RingoException(
-        "해당 회원을 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+    User user = userRepository.findById(dto.id())
+        .orElseThrow(() -> new RingoException("해당 회원을 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
     Calendar calendar = Calendar.getInstance();
     //calendar.setTime(user.getBirthday());
@@ -222,7 +215,6 @@ public class LoginService {
       hashtagRepository.saveAll(hashtags);
       userPointRepository.save(UserPoint.builder().user(user).build());
       fcmTokenRepository.save(FcmToken.builder().user(user).build());
-      jwtRefreshTokenRepository.save(JwtRefreshToken.builder().user(user).build());
     } catch (DataIntegrityViolationException e) {
       log.error("step=회원가입_데이터_무결성_위반, userId={}", user.getId(), e);
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
@@ -238,20 +230,17 @@ public class LoginService {
 
 
   @Transactional
-  public void logout(User user, String accessToken){
-    /*
-     * 로그아웃 시 refresh 토큰에 관한 정보도 삭제하여 토큰 재발급을 막는다.
-     */
-    JwtRefreshToken refreshToken = jwtRefreshTokenRepository.findByUser(user)
-        .orElseThrow(() -> new RingoException("리프레시 토큰을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+  public void logout(HttpServletRequest request){
 
-    refreshToken.setRefreshToken(null);
+    String accessToken = request.getHeader("Authorization");
+    if (!accessToken.startsWith("Bearer ")) throw new RingoException("토큰이 잘못전달되었습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+    accessToken = accessToken.substring(7);
 
-    jwtRefreshTokenRepository.save(refreshToken);
+    Claims claims = jwtUtil.getClaims(accessToken);
 
+    redisTemplate.delete("redis::refresh::" + claims.getSubject());
     // redis의 blacklist에 저장해 놓는다.
-    redisTemplate.opsForValue().set("logoutUser::" + accessToken.substring(7), true, 1, TimeUnit.DAYS);;
-
+    redisTemplate.opsForValue().set("logoutUser::" + claims.getId(), accessToken, 1, TimeUnit.DAYS);
 
   }
 

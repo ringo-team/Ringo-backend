@@ -43,7 +43,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           .orElseThrow(() -> new RingoException("유효하지 않은 토큰입니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN));
 
       // 로그아웃한 유저가 기존 토큰으로 접근하려고 할때 접근을 차단함
-      if(redisTemplate.hasKey("logoutUser::" + accessToken)){
+      if(redisTemplate.hasKey("logoutUser::" + claims.getId())){
         throw new RingoException("유효하지 않은 토큰 입니다.", ErrorCode.LOGOUT, HttpStatus.FORBIDDEN);
       }
 

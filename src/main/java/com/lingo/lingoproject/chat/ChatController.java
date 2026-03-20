@@ -109,28 +109,21 @@ public class ChatController implements ChatApi{
     for (User member : roomMembers) {
       try {
         // 해당 방에 메세지 전송
-        simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/topic/" + roomId,
-            chatMessageDto);
+        simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/topic/" + roomId, chatMessageDto);
       } catch (Exception e) {
         // 에러, 메세지, 방id, 전송자, 목적지
-        chatService.savedSimpMessagingError(e, savedMessage, roomId, member.getLoginId(),
-            "/topic/");
+        chatService.savedSimpMessagingError(e, savedMessage, roomId, member.getLoginId(), "/topic/");
       }
       try {
         // 채팅 미리보기 기능
-        simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/room-list",
-            chatMessageDto);
+        simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/room-list", chatMessageDto);
       } catch (Exception e) {
-        log.error("chatroomId={}, userLoginId={}, step=메세지_전송_실패, status=FAILED", roomId,
-            member.getLoginId(),
-            e);
-        chatService.savedSimpMessagingError(e, savedMessage, roomId, member.getLoginId(),
-            "/room-list/");
+        log.error("chatroomId={}, userLoginId={}, step=메세지_전송_실패, status=FAILED", roomId, member.getLoginId(), e);
+        chatService.savedSimpMessagingError(e, savedMessage, roomId, member.getLoginId(), "/room-list/");
       }
 
       if (!existRoomMemberIdList.contains(member.getId()))
-        fcmService.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(),
-            NotificationType.MESSAGE);
+        fcmService.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
     }
   }
 

@@ -2,11 +2,9 @@ package com.lingo.lingoproject.security.jwt;
 
 
 
-import com.lingo.lingoproject.domain.JwtRefreshToken;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.security.TokenType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -14,10 +12,12 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import java.util.Date;
+import java.util.UUID;
 import javax.crypto.SecretKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -26,6 +26,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class JwtUtil {
 
+  private final RedisTemplate<String, Object> redisTemplate;
   @Value("${jwt.issuer}")
   private String issuer;
 
@@ -38,8 +39,6 @@ public class JwtUtil {
   @Value("${jwt.refresh.expiration}")
   private String refreshTokenExpiration;
 
-  private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
-
   public String generateToken(TokenType tokenType, User user){
     Long expiration = switch (tokenType) {
       case TokenType.ACCESS -> Long.parseLong(accessTokenExpiration);
@@ -48,6 +47,7 @@ public class JwtUtil {
           "토큰 타입은 access, refresh 둘 중 하나입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     };
     return Jwts.builder()
+        .id(UUID.randomUUID().toString())
         .issuer(issuer)
         .issuedAt(new Date())
         .subject(user.getLoginId())
@@ -76,14 +76,4 @@ public class JwtUtil {
     }
   }
 
-  public boolean hasJwtRefreshToken(User user){
-    return jwtRefreshTokenRepository.existsByUser(user);
-  }
-
-  public void saveJwtRefreshToken(User user, String refreshToken){
-    JwtRefreshToken jwtRefreshToken = jwtRefreshTokenRepository
-        .findByUser(user).orElseThrow(() -> new RingoException("리프레시 토큰 객체가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-    jwtRefreshToken.setRefreshToken(refreshToken);
-    jwtRefreshTokenRepository.save(jwtRefreshToken);
-  }
 }

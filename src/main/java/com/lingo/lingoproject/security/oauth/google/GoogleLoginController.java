@@ -8,8 +8,10 @@ import com.lingo.lingoproject.security.jwt.JwtUtil;
 import com.lingo.lingoproject.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.exception.RingoException;
 import io.swagger.v3.oas.annotations.Hidden;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,33 +26,22 @@ public class GoogleLoginController {
 
   private final GoogleLoginService googleLoginService;
   private final JwtUtil jwtUtil;
+  private final RedisTemplate<String, Object> redisTemplate;
 
   @GetMapping("/google/callback")
   public ResponseEntity<?> callback(@RequestParam String code){
     log.info("step=구글_로그인_콜백_시작, status=SUCCESS");
-    try {
-      User user = googleLoginService.saveUserLoginInfo(code);
 
-      if (!jwtUtil.hasJwtRefreshToken(user)){
-        return ResponseEntity.status(HttpStatus.OK).body(
-            new SignupResponseDto(user.getId(), ErrorCode.SUCCESS.getCode())
-            );
-      }
+    User user = googleLoginService.saveUserLoginInfo(code);
 
-      String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
-      String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);
 
-      jwtUtil.saveJwtRefreshToken(user, refreshToken);
+    String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
+    String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);
 
-      log.info("userId={}, step=구글_로그인_콜백_완료, status=SUCCESS", user.getId());
-      return ResponseEntity.ok(new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refreshToken));
-    } catch (Exception e) {
-      log.error("step=구글_로그인_콜백_실패, status=FAILED", e);
-      if (e instanceof RingoException re){
-        throw re;
-      }
-      throw new RingoException("구글 로그인 처리에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refreshToken, 30, TimeUnit.DAYS);
+
+    log.info("userId={}, step=구글_로그인_콜백_완료, status=SUCCESS", user.getId());
+    return ResponseEntity.ok(new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refreshToken));
   }
 
 }

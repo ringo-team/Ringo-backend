@@ -25,7 +25,6 @@ import com.lingo.lingoproject.repository.DormantAccountRepository;
 import com.lingo.lingoproject.repository.FcmTokenRepository;
 import com.lingo.lingoproject.repository.FriendInvitationLogRepository;
 import com.lingo.lingoproject.repository.HashtagRepository;
-import com.lingo.lingoproject.repository.JwtRefreshTokenRepository;
 import com.lingo.lingoproject.repository.MatchingRepository;
 import com.lingo.lingoproject.repository.MemberShipLogRepository;
 import com.lingo.lingoproject.repository.ProfileRepository;
@@ -43,6 +42,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +76,6 @@ public class UserService {
   private final DormantAccountRepository dormantAccountRepository;
   private final ImageService imageService;
   private final MatchingRepository matchingRepository;
-  private final JwtRefreshTokenRepository jwtRefreshTokenRepository;
   private final ChatroomParticipantRepository chatroomParticipantRepository;
   private final UserAccessLogRepository userAccessLogRepository;
   private final WithdrawerRepository withdrawerRepository;
@@ -110,7 +109,6 @@ public class UserService {
       fcmTokenRepository.deleteByUser(user);
       chatroomParticipantRepository.disconnectChatroomParticipantWithUser(user);
       userPointRepository.deleteAllByUser(user);
-      jwtRefreshTokenRepository.deleteByUser(user);
       userRepository.delete(user);
 
     } catch (Exception e) {
@@ -145,9 +143,11 @@ public class UserService {
 
   public GetUserInfoResponseDto getUserInfo(Long findUserId, User user) {
 
-    List<Long> recommendedUsersForCumulation = redisUtils.getRecommendedUserForCumulativeSurvey(user.getId().toString())
+    List<Long> recommendedUsersForCumulation = Optional.ofNullable(redisUtils.getRecommendedUserForCumulativeSurvey(user.getId().toString()))
+        .orElseGet(Collections::emptyList)
         .stream().map(GetUserProfileResponseDto::getUserId).toList();
-    List<Long> recommendedUsersForDaily = redisUtils.getRecommendUserForDailySurvey(user.getId().toString())
+    List<Long> recommendedUsersForDaily = Optional.ofNullable(redisUtils.getRecommendUserForDailySurvey(user.getId().toString()))
+        .orElseGet(Collections::emptyList)
         .stream().map(GetUserProfileResponseDto::getUserId).toList();
     List<Long> userIdList = new ArrayList<>();
 

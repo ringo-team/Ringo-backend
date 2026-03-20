@@ -76,7 +76,7 @@ public class User extends Timestamp implements UserDetails {
 
   @Column(length = 20, unique = true)
   private String loginId;
-  @Column(length = 20)
+
   private String password;
 
   @Column(length = 13, unique = true)
