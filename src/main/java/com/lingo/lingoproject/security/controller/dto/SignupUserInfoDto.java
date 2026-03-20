@@ -33,6 +33,9 @@ public record SignupUserInfoDto(
     @NotBlank
     String job,
 
+    @Schema(description = "학력", example = "대학교졸업")
+    String degree,
+
     @Schema(description = "키", example = "177")
     @NotBlank
     String height,

@@ -114,6 +114,9 @@ public class User extends Timestamp implements UserDetails {
   @Column(length = 5)
   private String height;
 
+  @Column(length = 10)
+  private String degree;
+
   private Integer age;
 
   @Column(length = 10)
@@ -168,10 +171,10 @@ public class User extends Timestamp implements UserDetails {
   public void setUserInfo(SignupUserInfoDto dto){
     this.nickname = dto.nickname();
     this.gender = Gender.valueOf(dto.gender().toUpperCase());
-    this.residenceProvince = dto.address().city();
-    this.residenceCity = dto.address().district();
-    this.activityLocProvince = dto.activeAddress().city();
-    this.activityLocCity = dto.activeAddress().district();
+    this.residenceProvince = dto.address().province();
+    this.residenceCity = dto.address().city();
+    this.activityLocProvince = dto.activeAddress().province();
+    this.activityLocCity = dto.activeAddress().city();
     this.job = dto.job();
     this.height = dto.height();
     this.isSmoking = Smoking.valueOf(dto.isSmoking());

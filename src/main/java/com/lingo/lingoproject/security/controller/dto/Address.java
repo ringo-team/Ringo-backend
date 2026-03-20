@@ -6,11 +6,11 @@ import jakarta.validation.constraints.NotBlank;
 public record Address(
     @Schema(description = "시/도", example = "경기도")
     @NotBlank
-    String city,
+    String province,
 
     @Schema(description = "시/군/구", example = "성남시")
     @NotBlank
-    String district
+    String city
 ) {
 
 }

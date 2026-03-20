@@ -32,6 +32,7 @@ import com.lingo.lingoproject.repository.UserAccessLogRepository;
 import com.lingo.lingoproject.repository.UserPointRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.repository.WithdrawerRepository;
+import com.lingo.lingoproject.security.controller.dto.Address;
 import com.lingo.lingoproject.user.dto.GetUserInfoResponseDto;
 import com.lingo.lingoproject.user.dto.UpdateUserInfoRequestDto;
 import com.lingo.lingoproject.utils.GenericUtils;
@@ -188,21 +189,45 @@ public class UserService {
 
   public void updateUserInfo(User user, UpdateUserInfoRequestDto dto) {
 
+    Address activeAddress = dto.activeAddress();
+    String job = dto.job();
+    String height = dto.height();
+    String degree = dto.degree();
     String drinking = dto.isDrinking();
-    String smoking  = dto.isSmoking();
+    String smoking = dto.isSmoking();
     String religion = dto.religion();
-    String height   = dto.height();
-    String job      = dto.job();
+    String mbti = dto.mbti();
+    List<String> hashtags = dto.hashtag();
     String biography = dto.biography();
-    String mbti     = dto.mbti();
+    String nickname = dto.nickname();
 
     GenericUtils.validateAndSetEnum(drinking, Drinking.values(), user::setIsDrinking);
     GenericUtils.validateAndSetEnum(smoking, Smoking.values(), user::setIsSmoking);
     GenericUtils.validateAndSetEnum(religion, Religion.values(), user::setReligion);
 
-    GenericUtils.validateAndSetStringValue(height, user::setHeight);
     GenericUtils.validateAndSetStringValue(job, user::setJob);
+    GenericUtils.validateAndSetStringValue(height, user::setHeight);
+    GenericUtils.validateAndSetStringValue(degree, user::setDegree);
     GenericUtils.validateAndSetStringValue(biography, user::setBiography);
+    GenericUtils.validateAndSetStringValue(nickname, user::setNickname);
+
+    if (validateAddress(activeAddress)){
+      user.setActivityLocProvince(activeAddress.province());
+      user.setActivityLocCity(activeAddress.city());
+    }
+
+    if (hashtags != null && !hashtags.isEmpty()){
+      hashtagRepository.deleteAllByUser(user);
+      List<Hashtag> hashtagEntities = hashtags.stream()
+          .map(h ->
+              Hashtag.builder()
+                  .user(user)
+                  .hashtag(h)
+                  .build()
+          )
+          .toList();
+      hashtagRepository.saveAll(hashtagEntities);
+    }
 
     if (!MBTI.contains(mbti.toUpperCase())){
       throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
@@ -212,6 +237,12 @@ public class UserService {
     }
 
     userRepository.save(user);
+  }
+
+  private boolean validateAddress(Address address){
+    if (address == null) return false;
+    return address.province() != null && address.province().isBlank() &&
+        address.city() != null && address.city().isBlank();
   }
 
 
