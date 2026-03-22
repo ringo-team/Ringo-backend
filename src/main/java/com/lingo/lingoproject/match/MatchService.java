@@ -415,12 +415,7 @@ public class MatchService {
         .map(s -> s.replace("suspension::", ""))
         .map(Long::parseLong)
         .toList();
-    // 로그아웃한 유저
-    List<Long> logoutUserIds = redisTemplate.keys("logoutUser::*")
-        .stream()
-        .map(s -> s.replace("logoutUser::", ""))
-        .map(Long::parseLong)
-        .toList();
+
 
     Set<Long> excludedUserId = new HashSet<>();
     excludedUserId.add(userId);
@@ -428,8 +423,7 @@ public class MatchService {
     excludedUserId.addAll(dormantUserIds);
     excludedUserId.addAll(blockedUserIds);
     excludedUserId.addAll(suspendedUserIds);
-    excludedUserId.addAll(logoutUserIds);
-    
+
     return new ArrayList<>(excludedUserId);
   }
 
