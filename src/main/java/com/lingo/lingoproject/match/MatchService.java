@@ -373,7 +373,7 @@ public class MatchService {
         .toList();
 
     UserAccessLog access = userAccessLogRepository.findFirstByUserIdOrderByCreateAtDesc(recommendedUser.getId());
-    long daysFromLastAccess = ChronoUnit.DAYS.between(access.getCreateAt(), LocalDate.now());
+    long daysFromLastAccess = ChronoUnit.DAYS.between(access.getCreateAt(), LocalDateTime.now());
 
     float matchingScore = calculateMatchScore(user.getId(), recommendedUser.getId());
 
