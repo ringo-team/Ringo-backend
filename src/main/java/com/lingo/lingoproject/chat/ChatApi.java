@@ -99,6 +99,7 @@ public interface ChatApi {
   @MessageMapping("/{roomId}")
   void sendMessage(@DestinationVariable Long roomId, GetChatMessageResponseDto chatMessageDto);
 
+  @Operation(summary = "약속잡기", description = "채팅방에서 유저들의 약속 잡기")
   @PostMapping("/appointments")
   @ApiResponses(
       value = {
