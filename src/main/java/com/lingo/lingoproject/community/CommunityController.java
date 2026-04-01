@@ -98,4 +98,22 @@ public class CommunityController implements CommunityApi {
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "댓글 성공적으로 삭제하였습니다."));
   }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> likePost(Long postId, User user) {
+    log.info("userId={}, step=게시물_좋아요_시작, status=SUCCESS", user.getId());
+    communityService.likePost(postId, user);
+    log.info("userId={}, step=게시물_좋아요_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "해당 게시물을 좋아요 혹은 좋아요 취소하였습니다."));
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> likeComment(Long commentId, User user) {
+    log.info("userId={}, step=댓글_좋아요_시작, status=SUCCESS", user.getId());
+    communityService.likeComment(commentId, user);
+    log.info("userId={}, step=댓글_좋아요_시작, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "해당 댓글을 좋아요 혹은 좋아요 취소하였습니다."));
+  }
 }

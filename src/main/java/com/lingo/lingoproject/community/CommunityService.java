@@ -13,16 +13,20 @@ import com.lingo.lingoproject.community.dto.UpdatePostImageResponseDto;
 import com.lingo.lingoproject.community.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.domain.Comment;
+import com.lingo.lingoproject.domain.CommentLikeUserMapping;
 import com.lingo.lingoproject.domain.Post;
 import com.lingo.lingoproject.domain.PostImageMapping;
+import com.lingo.lingoproject.domain.PostLikeUserMapping;
 import com.lingo.lingoproject.domain.Recommendation;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.PostTopic;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.ImageService;
+import com.lingo.lingoproject.repository.CommentLikeUserMappingRepository;
 import com.lingo.lingoproject.repository.CommentRepository;
 import com.lingo.lingoproject.repository.PostImageMappingRepository;
+import com.lingo.lingoproject.repository.PostLikeUserMappingRepository;
 import com.lingo.lingoproject.repository.PostRepository;
 import com.lingo.lingoproject.repository.RecommendationRepository;
 import com.lingo.lingoproject.repository.UserRepository;
@@ -47,6 +51,8 @@ public class CommunityService {
   private final CommentRepository commentRepository;
   private final ImageService imageService;
   private final PostImageMappingRepository postImageMappingRepository;
+  private final PostLikeUserMappingRepository postLikeUserMappingRepository;
+  private final CommentLikeUserMappingRepository commentLikeUserMappingRepository;
 
   public SavePostResponseDto post(SavePostRequestDto dto, List<MultipartFile> images){
     User author = userRepository.findById(dto.userId()).orElseThrow(
@@ -232,5 +238,46 @@ public class CommunityService {
         )
         .toList();
   }
+
+  public void likePost(Long postId, User user){
+    Post post = postRepository.findById(postId).orElseThrow(
+        () -> new RingoException("게시물 좋아요 처리 중 게시물을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST)
+    );
+    PostLikeUserMapping mapping = postLikeUserMappingRepository.findByPostAndUser(post, user);
+
+    if(mapping != null && post.getLikeCount() > 0){
+      postRepository.decreasePostLikeCount(postId);
+      postLikeUserMappingRepository.delete(mapping);
+      return;
+    }
+
+    postRepository.increasePostLikeCount(postId);
+    postLikeUserMappingRepository.save(PostLikeUserMapping.builder()
+        .post(post)
+        .user(user)
+        .build()
+    );
+  }
+
+  public void likeComment(Long commentId, User user){
+    Comment comment = commentRepository.findById(commentId).orElseThrow(
+        () -> new RingoException("댓글 좋아요 처리 중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST)
+    );
+
+    CommentLikeUserMapping mapping = commentLikeUserMappingRepository.findByCommentAndUser(comment, user);
+
+    if (mapping != null && comment.getLikeCount() > 0){
+      commentRepository.decreaseCommentLikeCount(commentId);
+      commentLikeUserMappingRepository.delete(mapping);
+    }
+
+    commentRepository.increaseCommentLikeCount(commentId);
+    commentLikeUserMappingRepository.save(
+        CommentLikeUserMapping.builder()
+            .comment(comment)
+            .user(user)
+            .build()
+    );
+}
 
 }

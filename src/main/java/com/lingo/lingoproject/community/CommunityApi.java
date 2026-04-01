@@ -108,4 +108,22 @@ public interface CommunityApi {
   })
   @DeleteMapping("/comments/{commentId}")
   ResponseEntity<ResultMessageResponseDto> deleteComment(@PathVariable(value = "commentId") Long commentId, @AuthenticationPrincipal User user);
+
+  @Operation(summary = "게시물 좋아요")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "0000", description = "성공"),
+      @ApiResponse(responseCode = "E0004", description = "게시물을 찾을 수 없습니다."),
+      @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
+  })
+  @PatchMapping("/like/posts/{post-id}")
+  ResponseEntity<ResultMessageResponseDto> likePost(@PathVariable("post-id") Long postId, @AuthenticationPrincipal User user);
+
+  @Operation(summary = "댓글 좋아요")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "0000", description = "성공"),
+      @ApiResponse(responseCode = "E0004", description = "댓글을 찾을 수 없습니다."),
+      @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
+  })
+  @PatchMapping("/like/comments/{comment-id}")
+  ResponseEntity<ResultMessageResponseDto> likeComment(@PathVariable("comment-id") Long commentId, @AuthenticationPrincipal User user);
 }

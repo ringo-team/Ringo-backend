@@ -14,6 +14,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.DynamicInsert;
 
 @Entity
 @Table(name = "COMMENTS")
@@ -21,6 +23,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter @Setter
+@DynamicInsert
 public class Comment extends Timestamp {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,6 +36,9 @@ public class Comment extends Timestamp {
   @ManyToOne
   @JoinColumn(name = "user_id")
   private User user;
+
+  @ColumnDefault(value = "0")
+  private int likeCount = 0;
 
   @Lob
   private String content;
