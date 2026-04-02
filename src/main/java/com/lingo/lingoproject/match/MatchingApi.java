@@ -52,9 +52,9 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
       }
   )
-  @PatchMapping("/matches/{matchingId}")
+  @PatchMapping("/matches/{matching-id}")
   ResponseEntity<ResultMessageResponseDto>  responseToMatching(
-      @NotNull @PathVariable(value = "matchingId") Long matchingId,
+      @NotNull @PathVariable(value = "matching-id") Long matchingId,
       @Parameter(description = "매칭 승낙 여부", example = "ACCEPTED", schema = @Schema(allowableValues = {"ACCEPTED", "REJECTED"})) @NotBlank @RequestParam(value = "decision") String decision,
       @AuthenticationPrincipal User user);
 
@@ -66,9 +66,9 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 운의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
       }
   )
-  @GetMapping("users/{userId}/match-requests") // 나를 지목한 사람
+  @GetMapping("users/{user-id}/match-requests") // 나를 지목한 사람
   ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> getMatchRequestsByDirection(
-      @Parameter(description = "유저id", example = "5") @PathVariable(value = "userId") Long userId,
+      @Parameter(description = "유저id", example = "5") @PathVariable(value = "user-id") Long userId,
       @Parameter(description = "SENT 경우 내가 매칭 요청한 사람, RECEIVED 경우 나에게 매칭 요청한 사람", example = "SENT", schema = @Schema(allowableValues = {"SENT", "RECEIVED"})) @RequestParam(value = "direction") String direction,
       @AuthenticationPrincipal User user);
 
@@ -79,9 +79,9 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E0003", description = "본인의 이성 추천만 확인할 수 있다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의")
   })
-  @GetMapping("/users/{userId}/recommendations")
+  @GetMapping("/users/{user-id}/recommendations")
   ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>>  recommendByCumulativeSurveys(
-      @Parameter(description = "유저id", example = "5") @PathVariable(value = "userId") Long userId,
+      @Parameter(description = "유저id", example = "5") @PathVariable(value = "user-id") Long userId,
       @AuthenticationPrincipal User user);
 
   @Operation(summary = "설문을 통해 제공하는 이성추천", description = "일일 설문에 일치한 응답을 한 유저를 무작위로 추천")
@@ -89,9 +89,9 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "0000", description = "추천 성공"),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("/users/{userId}/recommendations/daily-survey")
+  @GetMapping("/users/{user-id}/recommendations/daily-survey")
   ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> recommendByDailySurvey(
-      @PathVariable(value = "userId") Long userId, @AuthenticationPrincipal User user);
+      @PathVariable(value = "user-id") Long userId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "매칭 삭제")
   @ApiResponses(value = {
@@ -101,9 +101,9 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
       }
   )
-  @DeleteMapping("/matches/{matchingId}")
+  @DeleteMapping("/matches/{matching-id}")
   ResponseEntity<ResultMessageResponseDto> deleteMatching(
-      @Parameter(description = "매칭 id", example = "5") @PathVariable("matchingId") Long matchingId,
+      @Parameter(description = "매칭 id", example = "5") @PathVariable("matching-id") Long matchingId,
       @AuthenticationPrincipal User user);
 
   @Operation(summary = "매칭 요청 매세지 저장 및 수정")
@@ -113,10 +113,10 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E0004", description = "해당 Id로 매칭 객체를 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PostMapping("/matches/{matchingId}/message")
+  @PostMapping("/matches/{matching-id}/message")
   ResponseEntity<ResultMessageResponseDto> saveMatchingRequestMessage(
       @Valid @RequestBody SaveMatchingRequestMessageRequestDto dto,
-      @PathVariable(value = "matchingId") Long matchingId,
+      @PathVariable(value = "matching-id") Long matchingId,
       @AuthenticationPrincipal User user);
 
   @Operation(summary = "매칭 요청 메세지 조회")
@@ -126,18 +126,18 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E0004", description = "해당 Id로 매칭 객체를 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("/matches/{matchingId}/message")
+  @GetMapping("/matches/{matching-id}/message")
   ResponseEntity<GetMatchingRequestMessageResponseDto> getMatchingRequestMessage(
-      @PathVariable(value = "matchingId") Long matchingId, @AuthenticationPrincipal User user);
+      @PathVariable(value = "matching-id") Long matchingId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "추천이성 가리기")
   @ApiResponses(value = {
           @ApiResponse(responseCode = "0000", description = "성공", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PatchMapping("users/{userId}/recommendations/hide")
+  @PatchMapping("users/{user-id}/recommendations/hide")
   ResponseEntity<?> hideRecommendationUser(
-      @Parameter(description = "가리고 싶은 유저의 아이디", example = "5") @PathVariable(value = "userId") Long recommendedUserId,
+      @Parameter(description = "가리고 싶은 유저의 아이디", example = "5") @PathVariable(value = "user-id") Long recommendedUserId,
       @AuthenticationPrincipal User user
   );
 
@@ -147,19 +147,19 @@ public interface MatchingApi {
       @ApiResponse(responseCode = "E0005", description = "유저를 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PostMapping("user/{userId}/scrap")
+  @PostMapping("user/{user-id}/scrap")
   ResponseEntity<ResultMessageResponseDto> scrapUser(
-      @Parameter(description = "저장하고 싶은 추천이성 아이디", example = "5") @PathVariable(value = "userId") Long recommendedUserId,
+      @Parameter(description = "저장하고 싶은 추천이성 아이디", example = "5") @PathVariable(value = "user-id") Long recommendedUserId,
       @AuthenticationPrincipal User user);
 
   @Operation(summary = "스크랩된 유저 조회하기")
   @ApiResponses(value = {
-      @ApiResponse(responseCode = "0000", description = "성공", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
+      @ApiResponse(responseCode = "0000", description = "성공"),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("/user/{userId}/scrap")
+  @GetMapping("/user/{user-id}/scrap")
   ResponseEntity<ApiListResponseDto<GetScrappedUserResponseDto>> getScrappedUser(
-      @Parameter(description = "요청하는 유저 아이디", example = "5") @PathVariable(value = "userId") Long userId,
+      @Parameter(description = "요청하는 유저 아이디", example = "5") @PathVariable(value = "user-id") Long userId,
       @AuthenticationPrincipal User user
   );
 

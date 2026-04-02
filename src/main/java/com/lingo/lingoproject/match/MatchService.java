@@ -88,7 +88,7 @@ public class MatchService {
 
   private final int MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY = 4;
   private final int MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY = 4;
-  private final float LIMIT_OF_MATCHING_SCORE = 0.6f;
+  private final float LIMIT_OF_MATCHING_SCORE = 0;
   private final int ACTIVE_DAY_DURATION = 14;
   private final int HIDE_PROFILE_FLAG = 1;
   private final int EXPOSE_PROFILE_FLAG = 0;
@@ -719,6 +719,7 @@ public class MatchService {
         .map(scrappedUser -> {
           Profile profile = scrappedUser.getProfile();
           return new GetScrappedUserResponseDto(
+              user.getId(),
               user.getNickname(),
               user.getAge(),
               profile.getImageUrl(),

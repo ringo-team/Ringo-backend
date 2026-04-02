@@ -52,9 +52,9 @@ public interface ImageApi {
       @ApiResponse(responseCode = "E0005", description = "해당 id로 유저를 찾을 수 없음", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 에러, 기타문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("/users/{userId}/profile")
+  @GetMapping("/users/{user-id}/profile")
   ResponseEntity<GetImageUrlResponseDto> getProfileImageUrl(
-      @Parameter(description = "이미지 id", example = "5") @PathVariable(value = "userId") Long userId);
+      @Parameter(description = "이미지 id", example = "5") @PathVariable(value = "user-id") Long userId);
 
   @Operation(summary = "프로필 이미지 업데이트")
   @ApiResponses(value = {
@@ -63,10 +63,10 @@ public interface ImageApi {
       @ApiResponse(responseCode = "E0010", description = "프로필에 얼굴이 나오지 않음", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E0011", description = "프로필에 부적절한 부분이 검출됨", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
   })
-  @PatchMapping(value = "profiles/{profileId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PatchMapping(value = "profiles/{profile-id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   ResponseEntity<GetImageUrlResponseDto> updateProfileImage(
       @Parameter(description = "업데이트할 사진") @RequestParam(value = "image") MultipartFile image,
-      @Parameter(description = "업데이트 할 프로필 사진의 id") @PathVariable(value = "profileId") Long profileId,
+      @Parameter(description = "업데이트 할 프로필 사진의 id") @PathVariable(value = "profile-id") Long profileId,
       @AuthenticationPrincipal User user
   );
 
@@ -76,9 +76,9 @@ public interface ImageApi {
       @ApiResponse(responseCode = "E0003", description = "삭제 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부에러, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @DeleteMapping("/profiles/{profileId}")
+  @DeleteMapping("/profiles/{profile-id}")
   ResponseEntity<ResultMessageResponseDto> deleteProfileImage(
-      @Parameter(description = "프로필 id", example = "12") @PathVariable(value = "profileId") Long profileId,
+      @Parameter(description = "프로필 id", example = "12") @PathVariable(value = "profile-id") Long profileId,
       @AuthenticationPrincipal User user
   );
 
@@ -103,9 +103,9 @@ public interface ImageApi {
       @ApiResponse(responseCode = "E0005", description = "id로 유저를 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("users/{userId}/feeds")
+  @GetMapping("users/{user-id}/feeds")
   ResponseEntity<ApiListResponseDto<GetFeedImageInfoResponseDto>> getAllFeedImageUrls(
-      @Parameter(description = "유저 Id", example = "5") @PathVariable(value = "userId") Long userId
+      @Parameter(description = "유저 Id", example = "5") @PathVariable(value = "user-id") Long userId
   );
 
   @Operation(summary = "피드 사진 업데이트")
@@ -116,10 +116,10 @@ public interface ImageApi {
       @ApiResponse(responseCode = "E0003", description = "피드사진을 업데이트할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PatchMapping("/feeds/{feedImageId}")
+  @PatchMapping("/feeds/{feed-image-id}")
   ResponseEntity<?> updateFeedImage(
       @Parameter(description = "업데이트할 사진") @RequestParam(value = "image") MultipartFile image,
-      @Parameter(description = "업데이트할 피드 사진의 id") @PathVariable(value = "feedImageId") Long feedImageId,
+      @Parameter(description = "업데이트할 피드 사진의 id") @PathVariable(value = "feed-image-id") Long feedImageId,
       @Parameter(description = "업데이트한 피드 사진의 설명") @RequestParam(value = "description") String description,
       @AuthenticationPrincipal User user
   );
@@ -131,9 +131,9 @@ public interface ImageApi {
       @ApiResponse(responseCode = "E0003", description = "삭제 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부에러, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @DeleteMapping("/feeds/{feedImageId}")
+  @DeleteMapping("/feeds/{feed-image-id}")
   ResponseEntity<ResultMessageResponseDto> deleteFeedImage(
-      @Parameter(description = "피드 사진 id", example = "11") @PathVariable(value = "feedImageId") Long feedImageId,
+      @Parameter(description = "피드 사진 id", example = "11") @PathVariable(value = "feed-image-id") Long feedImageId,
       @AuthenticationPrincipal User user
   );
 
@@ -144,9 +144,9 @@ public interface ImageApi {
       @ApiResponse(responseCode = "E0003", description = "피드사진을 저장할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PatchMapping("/feeds/{feedImageId}/description")
+  @PatchMapping("/feeds/{feed-image-id}/description")
   ResponseEntity<ResultMessageResponseDto> updateFeedImageDescription(
-      @Parameter(description = "피드 사진 id", example = "11") @PathVariable(value = "feedImageId") Long feedImageId,
+      @Parameter(description = "피드 사진 id", example = "11") @PathVariable(value = "feed-image-id") Long feedImageId,
       @RequestBody UpdateFeedImageDescriptionRequestDto dto,
       @AuthenticationPrincipal User user
   );

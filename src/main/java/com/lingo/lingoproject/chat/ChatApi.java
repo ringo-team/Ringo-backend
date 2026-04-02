@@ -49,9 +49,9 @@ public interface ChatApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
       }
   )
-  @GetMapping("/chatrooms/{roomId}/messages")
+  @GetMapping("/chatrooms/{room-id}/messages")
   ResponseEntity<GetChatResponseDto> getChattingMessages(
-      @Parameter(description = "채팅방 id", example = "4") @PathVariable(value = "roomId") Long roomId,
+      @Parameter(description = "채팅방 id", example = "4") @PathVariable(value = "room-id") Long roomId,
       @Parameter(description = "페이지 수", example = "2") @RequestParam(value = "page", defaultValue = "0") int page,
       @Parameter(description = "페이지 크기", example = "50") @RequestParam(value = "size", defaultValue = "100") int size,
       @AuthenticationPrincipal User user
@@ -70,9 +70,9 @@ public interface ChatApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
       }
   )
-  @GetMapping("/users/{userId}/chatrooms")
+  @GetMapping("/users/{user-id}/chatrooms")
   ResponseEntity<ApiListResponseDto<GetChatroomResponseDto>> getChatrooms(
-      @Parameter(description = "유저id", example = "5") @PathVariable(value = "userId") Long userId,
+      @Parameter(description = "유저id", example = "5") @PathVariable(value = "user-id") Long userId,
       @AuthenticationPrincipal User user
     );
 
@@ -86,9 +86,9 @@ public interface ChatApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
       }
   )
-  @DeleteMapping("/chatrooms/{roomId}")
+  @DeleteMapping("/chatrooms/{room-id}")
   ResponseEntity<ResultMessageResponseDto> deleteChatroom(
-      @Parameter(description = "채팅방 id", example = "3") @PathVariable("roomId") Long roomId,
+      @Parameter(description = "채팅방 id", example = "3") @PathVariable("room-id") Long roomId,
       @AuthenticationPrincipal User user
   );
 

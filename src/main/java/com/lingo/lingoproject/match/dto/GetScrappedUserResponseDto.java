@@ -3,7 +3,11 @@ package com.lingo.lingoproject.match.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record GetScrappedUserResponseDto(
-    @Schema(description = "유저 닉네임", example = "3")
+
+    @Schema(description = "유저 Id", example = "1")
+    Long userId,
+
+    @Schema(description = "유저 닉네임", example = "망고")
     String nickname,
 
     @Schema(description = "유저 나이", example = "24")

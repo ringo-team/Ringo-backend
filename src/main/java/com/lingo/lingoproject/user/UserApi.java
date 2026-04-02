@@ -37,9 +37,10 @@ public interface UserApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
       }
   )
-  @DeleteMapping("/users/{userId}")
+  @DeleteMapping("/users/{user-id}")
   ResponseEntity<ResultMessageResponseDto> deleteUser(
-      @Parameter(description = "유저id", example = "4") @PathVariable Long userId,
+      @Parameter(description = "유저id", example = "4")
+      @PathVariable(value = "user-id") Long userId,
 
       @Parameter(description = "유저 탈퇴 사유", example = "좋은 인연을 만날 수 없어서")
       @NotBlank @Length(max = 100) @RequestParam(value = "reason") String reason,
@@ -75,8 +76,8 @@ public interface UserApi {
           @ApiResponse(responseCode = "E0005", description = "해당 userId는 가입된 유저의 아이디가 아닙니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("/users/{userId}")
-  ResponseEntity<GetUserInfoResponseDto> getUserInfo(@PathVariable(value = "userId") Long userId, @AuthenticationPrincipal User user);
+  @GetMapping("/users/{user-id}")
+  ResponseEntity<GetUserInfoResponseDto> getUserInfo(@PathVariable(value = "user-id") Long userId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "유저 정보 업데이트", description = "수정할 수 있는 유저 정보를 업데이트 하는 api")
   @ApiResponses(value = {

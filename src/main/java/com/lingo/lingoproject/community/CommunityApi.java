@@ -41,8 +41,8 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E0004", description = "해당 id의 추천 장소가 존재하지 않습니다.", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
-  @GetMapping("/recommendations/{recommendationId}")
-  ResponseEntity<List<GetPostResponseDto>> getPost(@PathVariable(value = "recommendationId") Long recommendationId, @RequestParam(value = "topic") String topic, @RequestParam(value = "page") int page, @RequestParam(value = "size") int size, @AuthenticationPrincipal User user);
+  @GetMapping("/recommendations/{recommendation-id}")
+  ResponseEntity<List<GetPostResponseDto>> getPost(@PathVariable(value = "recommendation-id") Long recommendationId, @RequestParam(value = "topic") String topic, @RequestParam(value = "page") int page, @RequestParam(value = "size") int size, @AuthenticationPrincipal User user);
 
   @Operation(summary = "게시물 업로드")
   @ApiResponses(value = {
@@ -61,8 +61,8 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E0003", description = "게시물을 업데이트할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
-  @DeleteMapping("/posts/{postId}")
-  ResponseEntity<ResultMessageResponseDto> deletePost(@PathVariable(value = "postId") Long postId, @AuthenticationPrincipal User user);
+  @DeleteMapping("/posts/{post-id}")
+  ResponseEntity<ResultMessageResponseDto> deletePost(@PathVariable(value = "post-id") Long postId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "게시물 업데이트")
   @ApiResponses(value = {
@@ -72,8 +72,8 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E0003", description = "게시물을 업데이트할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
-  @PatchMapping("/posts/{postId}")
-  ResponseEntity<UpdatePostResponseDto> updatePost(@PathVariable(value = "postId") Long postId, @RequestBody UpdatePostRequestDto dto, @AuthenticationPrincipal User user);
+  @PatchMapping("/posts/{post-id}")
+  ResponseEntity<UpdatePostResponseDto> updatePost(@PathVariable(value = "post-id") Long postId, @RequestBody UpdatePostRequestDto dto, @AuthenticationPrincipal User user);
 
   @Operation(summary = "댓글 조회")
   @ApiResponses(value = {
@@ -81,8 +81,8 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E0004", description = "해당 id의 게시물을 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
-  @GetMapping("/posts/{postId}/comments")
-  ResponseEntity<List<GetCommentResponseDto>> getComments(@PathVariable(value = "postId") Long postId, @AuthenticationPrincipal User user);
+  @GetMapping("/posts/{post-id}/comments")
+  ResponseEntity<List<GetCommentResponseDto>> getComments(@PathVariable(value = "post-id") Long postId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "댓글 업로드")
   @ApiResponses(value = {
@@ -111,8 +111,8 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E0003", description = "게시물을 삭제할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
-  @DeleteMapping("/comments/{commentId}")
-  ResponseEntity<ResultMessageResponseDto> deleteComment(@PathVariable(value = "commentId") Long commentId, @AuthenticationPrincipal User user);
+  @DeleteMapping("/comments/{comment-id}")
+  ResponseEntity<ResultMessageResponseDto> deleteComment(@PathVariable(value = "comment-id") Long commentId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "대댓글 생성")
   @ApiResponses(value = {

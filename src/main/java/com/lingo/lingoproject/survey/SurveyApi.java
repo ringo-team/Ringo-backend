@@ -41,10 +41,10 @@ public interface SurveyApi {
           @ApiResponse(responseCode = "E0004", description = "해당 id로 설문 객체를 찾을 수 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PatchMapping("/surveys/{surveyId}")
+  @PatchMapping("/surveys/{survey-id}")
   ResponseEntity<ResultMessageResponseDto> updateSurvey(
       @RequestBody UpdateSurveyRequestDto dto,
-      @PathVariable(value = "surveyId") Long surveyId,
+      @PathVariable(value = "survey-id") Long surveyId,
       @AuthenticationPrincipal User user);
 
   @Operation(summary = "설문지 조회")
@@ -57,10 +57,10 @@ public interface SurveyApi {
           @ApiResponse(responseCode = "E0003", description = "설문에 응답할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @PostMapping("/users/{userId}/surveys/responses")
+  @PostMapping("/users/{user-id}/surveys/responses")
   ResponseEntity<ResultMessageResponseDto> saveSurveyResponse(
       @RequestBody ApiListResponseDto<UploadSurveyRequestDto> responses,
-      @PathVariable(value = "userId") Long userId,
+      @PathVariable(value = "user-id") Long userId,
       @AuthenticationPrincipal User user);
 
   @Operation(summary = "일일 설문 조회", description = "날마다 진행하는 설문 문항들 조회, 만약 설문을 진행했으면 null 반환")
@@ -69,9 +69,9 @@ public interface SurveyApi {
           @ApiResponse(responseCode = "E0003", description = "일일 설문 조회할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("/users/{userId}/surveys/daily")
+  @GetMapping("/users/{user-id}/surveys/daily")
   ResponseEntity<ApiListResponseDto<GetSurveyResponseDto>> getDailySurveys(
-      @PathVariable(value = "userId") Long userId,
+      @PathVariable(value = "user-id") Long userId,
       @AuthenticationPrincipal User user
   );
 
@@ -81,8 +81,8 @@ public interface SurveyApi {
           @ApiResponse(responseCode = "E0003", description = "설문 응답 결과를 조회할 권한이 없습니다.", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class))),
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
-  @GetMapping("users/{userId}/surveys")
+  @GetMapping("users/{user-id}/surveys")
   ResponseEntity<ApiListResponseDto<GetUserSurveyResponseDto>> getUserSurveyResponses(
-      @PathVariable Long userId, @AuthenticationPrincipal User user
+      @PathVariable(value = "user-id") Long userId, @AuthenticationPrincipal User user
   );
 }
