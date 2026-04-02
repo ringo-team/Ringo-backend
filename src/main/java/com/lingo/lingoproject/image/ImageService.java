@@ -88,34 +88,23 @@ public class ImageService {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new RingoException("프로필을 업로드하던 중 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
-    if (!existsFaceInImage(file)){
-      throw new RingoException("프로필에 얼굴이 존재하지 않습니다.",
-          ErrorCode.FACE_NOT_FOUND, HttpStatus.NOT_ACCEPTABLE);
-    }
-
-    if (isUnmoderateImage(file)){
-      log.error("userId={}, step=부적절한_이미지_업로드, status=FAILED", user.getId());
-      throw new RingoException("적절하지 않은 사진을 업로드 하였습니다.",
-          ErrorCode.UNMODERATE, HttpStatus.NOT_ACCEPTABLE);
-    }
-
     // 이미 프로필 사진이 존재할 경우 업로드 할 수 없다.
     if (profileRepository.existsByUser(user)){
       return null;
     }
 
+    // s3에 이미지 업로드
     String imageUrl = uploadImageToS3(file, "profiles");
 
+    // url db에 저장
     Profile profile = Profile.builder()
         .user(user)
         .imageUrl(imageUrl)
         .build();
-
     Profile savedProfile = profileRepository.save(profile);
 
     // 회원가입을 성공적으로 마무리 했으므로 user status를 COMPLETE로 변경한다.
-    user.setStatus(SignupStatus.COMPLETED);
-    userRepository.save(user);
+    alterSignupStatusToComplete(user);
 
     return new GetImageUrlResponseDto(
         ErrorCode.SUCCESS.getCode(),
@@ -124,9 +113,15 @@ public class ImageService {
     );
   }
 
+  private void alterSignupStatusToComplete(User user){
+    user.setStatus(SignupStatus.COMPLETED);
+    userRepository.save(user);
+  }
+
   public GetImageUrlResponseDto getProfileImageUrl(Long userId){
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException(
-        "유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+    User user = userRepository.findById(userId).orElseThrow(
+        () -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)
+    );
     Profile profile = user.getProfile();
     return new GetImageUrlResponseDto(
         ErrorCode.SUCCESS.getCode(),
@@ -138,26 +133,17 @@ public class ImageService {
   @Transactional
   public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long profileId, Long userId){
 
-    // 프로필은 얼굴이 나와야함
-    if (!existsFaceInImage(file)){
-      throw new RingoException("프로필에 얼굴이 존재하지 않습니다.", ErrorCode.FACE_NOT_FOUND, HttpStatus.NOT_ACCEPTABLE);
-    }
+    User user = userRepository.findById(userId).orElseThrow(
+        () -> new RingoException("프로필을 업로드하던 중 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)
+    );
+    Profile profile = profileRepository.findById(profileId).orElseThrow(
+        () -> new RingoException("프로필을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST)
+    );
 
-    // 선정적인 사진은 업로드 하지 못함
-    if (isUnmoderateImage(file)){
-      log.error("userId={}, step=부적절한_이미지_업로드, status=FAILED", userId);
-      throw new RingoException("적절하지 않은 사진을 업로드 하였습니다.", ErrorCode.UNMODERATE, HttpStatus.NOT_ACCEPTABLE);
-    }
-
-    // 프로필 조회
-    Profile profile = profileRepository.findById(profileId).orElseThrow(() -> new RingoException(
-        "프로필을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+    validateProfileImage(file, user);
 
     // 업데이트 권한 확인
-    if(!hasPermissionOnImage(profile.getUser(), userId)){
-      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, profile.getUser().getId());
-      throw new RingoException("이미지를 업데이트할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
-    }
+    checkImagePermission(profile.getUser(), user.getId());
 
     // 업데이트 key 얻기
     String imageUrl = getFilenameFromS3ImageUrl(profile.getImageUrl());
@@ -177,6 +163,24 @@ public class ImageService {
         imageUrl,
         profileId
     );
+  }
+
+  private void validateProfileImage(MultipartFile file, User user){
+    if (!existsFaceInImage(file)){
+      throw new RingoException("프로필에 얼굴이 존재하지 않습니다.", ErrorCode.FACE_NOT_FOUND, HttpStatus.NOT_ACCEPTABLE);
+    }
+
+    if (isUnmoderateImage(file)){
+      log.error("userId={}, step=부적절한_이미지_업로드, status=FAILED", user.getId());
+      throw new RingoException("적절하지 않은 사진을 업로드 하였습니다.", ErrorCode.UNMODERATE, HttpStatus.NOT_ACCEPTABLE);
+    }
+  }
+
+  private void checkImagePermission(User host, Long userId){
+    if(!hasPermissionOnImage(host, userId)){
+      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, host.getId());
+      throw new RingoException("이미지를 업데이트할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+    }
   }
 
   @Transactional
@@ -199,6 +203,7 @@ public class ImageService {
       }
 
       String imageUrl = uploadImageToS3(file.getImage(), "feeds");
+
       FeedImage feedImage = FeedImage.builder()
           .imageUrl(imageUrl)
           .description(file.getContent())
@@ -227,10 +232,8 @@ public class ImageService {
         "프로필을 조회할 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     // 삭제 권한 확인
-    if(!hasPermissionOnImage(profile.getUser(), userId)){
-      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, profile.getUser().getId());
-      throw new RingoException("프로필을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
-    }
+    checkImagePermission(profile.getUser(), userId);
+
     // db 삭제
     profileRepository.delete(profile);
 
@@ -253,8 +256,9 @@ public class ImageService {
    * feed 이미지 crud
    */
   public List<GetFeedImageInfoResponseDto> getAllFeedImageUrls(Long userId){
-    User user = userRepository.findById(userId).orElseThrow(() -> new RingoException(
-        "유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+    User user = userRepository.findById(userId).orElseThrow(
+        () -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)
+    );
     List<FeedImage> images = feedImageRepository.findAllByUser(user);
     return images.stream()
         .map(image ->
@@ -277,10 +281,9 @@ public class ImageService {
 
     FeedImage feedImage = feedImageRepository.findById(snapImageId).orElseThrow(() -> new RingoException(
         "피드 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-    if(!hasPermissionOnImage(feedImage.getUser(), userId)){
-      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", userId, feedImage.getUser().getId());
-      throw new RingoException("업데이트 할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
+
+    checkImagePermission(feedImage.getUser(), userId);
+
     String imageUrl = getFilenameFromS3ImageUrl(feedImage.getImageUrl());
 
     //s3에 이미지 삭제
@@ -308,9 +311,7 @@ public class ImageService {
         "피드사진을 조회할 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
     // 삭제 권한 확인
-    if (!hasPermissionOnImage(feedImage.getUser(), userId)){
-      return;
-    }
+    checkImagePermission(feedImage.getUser(), userId);
 
     // db 값 삭제
     feedImageRepository.delete(feedImage);
@@ -321,7 +322,7 @@ public class ImageService {
   }
 
   @Transactional
-  public void deleteAllSnapImagesByUser(User user){
+  public void deleteAllFeedImagesByUser(User user){
     List<FeedImage> images = feedImageRepository.findAllByUser(user);
     feedImageRepository.deleteAllByUser(user);
 
@@ -333,7 +334,6 @@ public class ImageService {
   /**
    * photographer 이미지 crud
    */
-
   @Transactional
   public List<GetImageUrlResponseDto> uploadPhotographerExampleImages(List<MultipartFile> images, Long photographerId){
     User photographer = userRepository.findById(photographerId).orElseThrow(() -> new RingoException(

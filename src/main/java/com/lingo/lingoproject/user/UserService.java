@@ -104,7 +104,7 @@ public class UserService {
       blockedFriendRepository.deleteByUser(user);
       dormantAccountRepository.deleteByUser(user);
       imageService.deleteProfileImageByUser(user);
-      imageService.deleteAllSnapImagesByUser(user);
+      imageService.deleteAllFeedImagesByUser(user);
       matchingRepository.deleteAllByRequestedUser(user);
       matchingRepository.deleteAllByRequestUser(user);
       fcmTokenRepository.deleteByUser(user);
@@ -164,14 +164,12 @@ public class UserService {
         () -> new RingoException("해당하는 유저가 존재하지 않습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)
     );
 
-    Profile profile = findUser.getProfile();
-
     List<String> hashtags = hashtagRepository.findAllByUser(findUser)
         .stream().map(Hashtag::getHashtag).toList();
 
     return GetUserInfoResponseDto.builder()
         .userId(findUser.getId())
-        .profile(profile.getImageUrl())
+        .profile(findUser.getProfile().getImageUrl())
         .birthday(findUser.getBirthday().toString())
         .gender(findUser.getGender().toString())
         .mbti(findUser.getMbti())
@@ -217,26 +215,29 @@ public class UserService {
     }
 
     if (hashtags != null && !hashtags.isEmpty()){
+      // 기존에 저장된 해시태그 삭제
       hashtagRepository.deleteAllByUser(user);
-      List<Hashtag> hashtagEntities = hashtags.stream()
-          .map(h ->
-              Hashtag.builder()
-                  .user(user)
-                  .hashtag(h)
-                  .build()
+      // 수정된 새로운 해시태그 저장
+      List<Hashtag> hashtagEntities = hashtags.stream().map(h ->
+          Hashtag.builder()
+              .user(user)
+              .hashtag(h)
+              .build()
           )
           .toList();
       hashtagRepository.saveAll(hashtagEntities);
     }
+    setUserMbti(user, mbti);
+    userRepository.save(user);
+  }
 
+  private void setUserMbti(User user, String mbti){
     if (!MBTI.contains(mbti.toUpperCase())){
       throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
     else{
       user.setMbti(mbti.toUpperCase());
     }
-
-    userRepository.save(user);
   }
 
   private boolean validateAddress(Address address){

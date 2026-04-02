@@ -72,4 +72,8 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
   List<AnsweredSurvey> findAllByUserAndUpdatedAtAfter(User user, LocalDateTime updatedAtAfter);
 
   List<AnsweredSurvey> findAllByUserIdNotInAndAnswerAndSurveyNumIn(Collection<Long> users, Integer answer, Collection<Integer> surveyNums);
+
+  boolean existsByUserAndSurveyNum(User user, Integer surveyNum);
+
+  AnsweredSurvey findByUserAndSurveyNum(User user, Integer surveyNum);
 }

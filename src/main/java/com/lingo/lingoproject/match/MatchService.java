@@ -223,8 +223,6 @@ public class MatchService {
     List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(userId);
     activeUserIds.removeAll(excludedUserIds);
 
-
-    // 임계치 이상의 매칭도를 가진 유저를 랜덤으로 4명 추천해준다.
     List<Long> userIdsWithHighMatchScore = activeUserIds
         .stream()
         .map(id -> {
@@ -235,20 +233,22 @@ public class MatchService {
         .map(UserMatchingScoreMapping::getId)
         .collect(Collectors.toList());
 
+    // -------------------- 추천이성 섞기고 앞에 n 개 뽑기 ----------------------- //
 
     int n = Math.min(userIdsWithHighMatchScore.size(), MAX_RECOMMENDATION_SIZE_FOR_CUMULATIVE_SURVEY);
     ThreadLocalRandom random = ThreadLocalRandom.current();
-
     for (int i = 0; i < n; i++){
       int j = random.nextInt(i, userIdsWithHighMatchScore.size());
       Collections.swap(userIdsWithHighMatchScore, i, j);
     }
     userIdsWithHighMatchScore = userIdsWithHighMatchScore.subList(0, n);
 
-    // 추천된 이성의 프로필을 set에 저장한다.
+    //--------------------- 추천된 이성의 프로필을 set에 저장 --------------------- //
+    //  makeUserProfileAndAddInCollection 함수가 recommendedUserProfileSet 에 유저 정보를 저장 //
     Set<GetUserProfileResponseDto> recommendedUserProfileSet = new HashSet<>();
-    userRepository.findAllByIdIn(userIdsWithHighMatchScore)
-        .forEach(recommendedUser -> makeUserProfileAndAddInCollection(recommendedUserProfileSet, user, recommendedUser));
+    userRepository.findAllByIdIn(userIdsWithHighMatchScore).forEach(recommendedUser ->
+        makeUserProfileAndAddInCollection(recommendedUserProfileSet, user, recommendedUser)
+    );
     List<GetUserProfileResponseDto> recommendedUserList = new ArrayList<>(recommendedUserProfileSet);
 
     // 캐시 저장

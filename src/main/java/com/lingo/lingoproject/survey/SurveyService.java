@@ -107,30 +107,26 @@ public class SurveyService {
   }
 
   public void saveSurveyResponse(ApiListResponseDto<UploadSurveyRequestDto> responses, User user){
-    List<AnsweredSurvey> list = new ArrayList<>();
 
-    Map<Integer, AnsweredSurvey> alreadyAnsweredSurveys = answeredSurveyRepository.findAllByUser(user)
-        .stream()
-        .collect(Collectors.toMap(AnsweredSurvey::getSurveyNum, Function.identity(), (a, b) -> b));
+    List<AnsweredSurvey> list = new ArrayList<>();
 
     // 이미 응답한 설문이 존재하면 응답을 덮어씌운다.
     responses.getList().forEach(r -> {
 
-      // 응답 객체 생성
-      AnsweredSurvey answeredSurvey = AnsweredSurvey.builder()
-          .user(user)
-          .surveyNum(r.surveyNum())
-          .answer(r.answer())
-          .build();
-
-      // 이미 응답한 설문이 존재하면 id를 설정한다.
-      AnsweredSurvey alreadyAnsweredSurvey = alreadyAnsweredSurveys.get(r.surveyNum());
-      if (alreadyAnsweredSurvey != null) {
-        answeredSurvey.setId(alreadyAnsweredSurvey.getId());
+      // 이미 응답한 설문이 존재하면 수정하고 list에 추가
+      if (answeredSurveyRepository.existsByUserAndSurveyNum(user, r.surveyNum())){
+        AnsweredSurvey answeredSurvey = answeredSurveyRepository.findByUserAndSurveyNum(user, r.surveyNum());
+        answeredSurvey.setAnswer(r.answer());
+        list.add(answeredSurvey);
       }
-
-      // 리스트에 저장
-      list.add(answeredSurvey);
+      else {
+        AnsweredSurvey answeredSurvey = AnsweredSurvey.builder()
+            .user(user)
+            .surveyNum(r.surveyNum())
+            .answer(r.answer())
+            .build();
+        list.add(answeredSurvey);
+      }
     });
 
     answeredSurveyRepository.saveAll(list);
@@ -142,8 +138,7 @@ public class SurveyService {
 
     // 이미 설문을 진행했으면 null을 반환
     LocalDateTime now = LocalDate.now().atStartOfDay();
-    boolean isExists = answeredSurveyRepository.existsByUserAndUpdatedAtAfter(user, now);
-    if (isExists) {
+    if (answeredSurveyRepository.existsByUserAndUpdatedAtAfter(user, now)) {
       return null;
     }
 
@@ -164,24 +159,28 @@ public class SurveyService {
       return results;
     }
 
-    // 무작위로 설문을 제공한다.
-    int numberOfSurveys = (int) surveyRepository.count();
-    ThreadLocalRandom random = ThreadLocalRandom.current();
-    Set<Integer> randomSelectedSurveyNums = new HashSet<>();
-
-    while (randomSelectedSurveyNums.size() < NUMBER_OF_DAILY_SURVEYS){
-      randomSelectedSurveyNums.add(random.nextInt(numberOfSurveys) + 1);
-    }
-
-    List<Survey> randomSurveys = surveyRepository.findAllBySurveyNumIn(randomSelectedSurveyNums);
-    List<GetSurveyResponseDto> results = randomSurveys.stream()
-        .map(GetSurveyResponseDto::from)
-        .toList();
+    List<GetSurveyResponseDto> results = getRandomlySelectedDailySurvey();
 
     // 캐시 저장
     redisUtils.cacheUntilMidnight("dailySurvey::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), results));
 
     return results;
+  }
+
+  private List<GetSurveyResponseDto> getRandomlySelectedDailySurvey(){
+
+    int totalCountOfSurveys = (int) surveyRepository.count();
+    Set<Integer> randomlySelectedSurveyNums = new HashSet<>();
+
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    while (randomlySelectedSurveyNums.size() < NUMBER_OF_DAILY_SURVEYS){
+      randomlySelectedSurveyNums.add(random.nextInt(totalCountOfSurveys) + 1);
+    }
+
+    List<Survey> randomSurveys = surveyRepository.findAllBySurveyNumIn(randomlySelectedSurveyNums);
+    return randomSurveys.stream()
+        .map(GetSurveyResponseDto::from)
+        .toList();
   }
 
   public List<GetUserSurveyResponseDto> getUserSurveyResponses(User user){
