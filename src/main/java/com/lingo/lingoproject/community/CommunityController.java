@@ -2,6 +2,8 @@ package com.lingo.lingoproject.community;
 
 import com.lingo.lingoproject.community.dto.CommentRequestDto;
 import com.lingo.lingoproject.community.dto.CommentResponseDto;
+import com.lingo.lingoproject.community.dto.CreateSubCommentRequestDto;
+import com.lingo.lingoproject.community.dto.CreateSubCommentResponseDto;
 import com.lingo.lingoproject.community.dto.GetCommentResponseDto;
 import com.lingo.lingoproject.community.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.dto.SavePostRequestDto;
@@ -9,6 +11,7 @@ import com.lingo.lingoproject.community.dto.SavePostResponseDto;
 import com.lingo.lingoproject.community.dto.UpdateCommentRequestDto;
 import com.lingo.lingoproject.community.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.dto.UpdatePostResponseDto;
+import com.lingo.lingoproject.community.dto.UpdateSubCommentRequestDto;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
@@ -75,16 +78,16 @@ public class CommunityController implements CommunityApi {
   @Override
   public ResponseEntity<CommentResponseDto> comment(CommentRequestDto dto, User user) {
     log.info("userId={}, step=댓글_업로드_시작, status=SUCCESS", user.getId());
-    CommentResponseDto response = communityService.comment(dto);
+    CommentResponseDto response = communityService.comment(dto, user);
     log.info("userId={}, step=댓글_업로드_완료, status=SUCCESS", user.getId());
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
   @Override
-  public ResponseEntity<ResultMessageResponseDto> updateComment(UpdateCommentRequestDto dto, User user) {
+  public ResponseEntity<ResultMessageResponseDto> updateComment(Long commentId, UpdateCommentRequestDto dto, User user) {
     log.info("userId={}, step=댓글_업데이트_시작, status=SUCCESS", user.getId());
-    communityService.updateComment(dto, user);
+    communityService.updateComment(commentId, dto, user);
     log.info("userId={}, step=댓글_업데이트_완료, status=SUCCESS", user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "댓글 성공적으로 업데이트하였습니다."));
@@ -97,6 +100,34 @@ public class CommunityController implements CommunityApi {
     log.info("userId={}, step=댓글_삭제_완료, status=SUCCESS", user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "댓글 성공적으로 삭제하였습니다."));
+  }
+
+  @Override
+  public ResponseEntity<CreateSubCommentResponseDto> createSubComment(CreateSubCommentRequestDto dto, User user) {
+    log.info("userId={}, step=대댓글_생성_시작, status=SUCCESS", user.getId());
+    Long subCommentId = communityService.createSubComment(dto, user);
+    log.info("userId={}, step=대댓글_생성_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.CREATED).body(new CreateSubCommentResponseDto(subCommentId, ErrorCode.SUCCESS.getCode()));
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> updateSubComment(Long subCommentId,
+      UpdateSubCommentRequestDto dto, User user) {
+    log.info("userId={}, step=대댓글_업데이트_시작, status=SUCCESS", user.getId());
+    communityService.updateSubComment(subCommentId, dto, user);
+    log.info("userId={}, step=대댓글_업데이트_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "대댓글을 성공적으로 업데이트했습니다."));
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> deleteSubComment(Long subCommentId, User user) {
+    log.info("userId={}, step=대댓글_삭제_시작, status=SUCCESS", user.getId());
+    communityService.deleteSubComment(subCommentId, user);
+    log.info("userId={}, step=대댓글_삭제_완료, status=SUCCESS", user.getId());
+
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "대댓글을 성공적으로 삭제했습니다."));
   }
 
   @Override

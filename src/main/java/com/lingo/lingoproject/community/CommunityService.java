@@ -2,8 +2,11 @@ package com.lingo.lingoproject.community;
 
 import com.lingo.lingoproject.community.dto.CommentRequestDto;
 import com.lingo.lingoproject.community.dto.CommentResponseDto;
+import com.lingo.lingoproject.community.dto.CreateSubCommentRequestDto;
 import com.lingo.lingoproject.community.dto.GetCommentResponseDto;
+import com.lingo.lingoproject.community.dto.GetPostImageResponseDto;
 import com.lingo.lingoproject.community.dto.GetPostResponseDto;
+import com.lingo.lingoproject.community.dto.GetSubCommentResponseDto;
 import com.lingo.lingoproject.community.dto.SavePostImageResponseDto;
 import com.lingo.lingoproject.community.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.dto.SavePostResponseDto;
@@ -12,12 +15,14 @@ import com.lingo.lingoproject.community.dto.UpdatePostImageRequestDto;
 import com.lingo.lingoproject.community.dto.UpdatePostImageResponseDto;
 import com.lingo.lingoproject.community.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.dto.UpdatePostResponseDto;
+import com.lingo.lingoproject.community.dto.UpdateSubCommentRequestDto;
 import com.lingo.lingoproject.domain.Comment;
 import com.lingo.lingoproject.domain.CommentLikeUserMapping;
 import com.lingo.lingoproject.domain.Post;
-import com.lingo.lingoproject.domain.PostImageMapping;
+import com.lingo.lingoproject.domain.PostImage;
 import com.lingo.lingoproject.domain.PostLikeUserMapping;
 import com.lingo.lingoproject.domain.Recommendation;
+import com.lingo.lingoproject.domain.SubComment;
 import com.lingo.lingoproject.domain.User;
 import com.lingo.lingoproject.domain.enums.PostTopic;
 import com.lingo.lingoproject.exception.ErrorCode;
@@ -25,10 +30,11 @@ import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.image.ImageService;
 import com.lingo.lingoproject.repository.CommentLikeUserMappingRepository;
 import com.lingo.lingoproject.repository.CommentRepository;
-import com.lingo.lingoproject.repository.PostImageMappingRepository;
+import com.lingo.lingoproject.repository.PostImageRepository;
 import com.lingo.lingoproject.repository.PostLikeUserMappingRepository;
 import com.lingo.lingoproject.repository.PostRepository;
 import com.lingo.lingoproject.repository.RecommendationRepository;
+import com.lingo.lingoproject.repository.SubCommentRepository;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.utils.GenericUtils;
 import java.util.ArrayList;
@@ -50,9 +56,10 @@ public class CommunityService {
   private final RecommendationRepository recommendationRepository;
   private final CommentRepository commentRepository;
   private final ImageService imageService;
-  private final PostImageMappingRepository postImageMappingRepository;
+  private final PostImageRepository postImageRepository;
   private final PostLikeUserMappingRepository postLikeUserMappingRepository;
   private final CommentLikeUserMappingRepository commentLikeUserMappingRepository;
+  private final SubCommentRepository subCommentRepository;
 
   public SavePostResponseDto post(SavePostRequestDto dto, List<MultipartFile> images){
     User author = userRepository.findById(dto.userId()).orElseThrow(
@@ -78,11 +85,11 @@ public class CommunityService {
         // 사진 업로드
         String imageUrl = imageService.uploadImageToS3(image, "post");
         // db 사진 url 저장
-        PostImageMapping mapping = PostImageMapping.builder()
+        PostImage mapping = PostImage.builder()
             .post(savedPost)
             .imageUrl(imageUrl)
             .build();
-        PostImageMapping savedMapping = postImageMappingRepository.save(mapping);
+        PostImage savedMapping = postImageRepository.save(mapping);
         // 리턴값에 id와 사진url 전달
         imageList.add(new SavePostImageResponseDto(savedMapping.getId(), imageUrl));
       }
@@ -113,7 +120,7 @@ public class CommunityService {
     List<UpdatePostImageResponseDto> imageList = new ArrayList<>();
 
     images.forEach(image -> {
-      PostImageMapping mapping = postImageMappingRepository.findById(image.imageId())
+      PostImage mapping = postImageRepository.findById(image.imageId())
           .orElseThrow(() -> new RingoException("게시물 업데이트 중 해당이미지 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
       // s3에서 기존 사진 삭제
       String imageKey = imageService.getFilenameFromS3ImageUrl(mapping.getImageUrl());
@@ -122,7 +129,7 @@ public class CommunityService {
       String newImageUrl = imageService.uploadImageToS3(image.imageFile(), "post");
       // db에 사진 url 저장
       mapping.setImageUrl(newImageUrl);
-      postImageMappingRepository.save(mapping);
+      postImageRepository.save(mapping);
       imageList.add(new UpdatePostImageResponseDto(mapping.getId(), newImageUrl));
     });
 
@@ -143,12 +150,19 @@ public class CommunityService {
     }
 
     // s3 사진 삭제
-    PostImageMapping mapping = postImageMappingRepository.findByPost(post);
-    String imageKey = imageService.getFilenameFromS3ImageUrl(mapping.getImageUrl());
-    imageService.deleteImageInS3(imageKey);
+    postImageRepository.findAllByPost(post).forEach(mapping -> {
+          String imageKey = imageService.getFilenameFromS3ImageUrl(mapping.getImageUrl());
+          imageService.deleteImageInS3(imageKey);
 
-    commentRepository.deleteAllByPost(post);
-    postImageMappingRepository.delete(mapping);
+          postImageRepository.delete(mapping);
+        }
+    );
+    commentRepository.findAllByPost(post).forEach(comment ->{
+      // 대댓글 삭제
+      subCommentRepository.deleteAllByComment(comment);
+      // 댓글 삭제
+      commentRepository.delete(comment);
+    });
     postRepository.delete(post);
   }
 
@@ -157,18 +171,26 @@ public class CommunityService {
     Recommendation recommendation = recommendationRepository.findById(recommendationId)
         .orElseThrow(() -> new RingoException("해당 추천 장소가 존재하지 않습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
-    Pageable pageable = PageRequest.of(page, size);
-    Page<Post> posts = postRepository.findByRecommendation(recommendation, pageable);
+    // topic 검증
     PostTopic postTopic = GenericUtils.validateAndReturnEnumValue(PostTopic.values(), topic);
 
+    Pageable pageable = PageRequest.of(page, size);
+    Page<Post> posts;
+
+    if (postTopic == PostTopic.ENTIRE) posts = postRepository.findByRecommendation(recommendation, pageable);
+    else posts = postRepository.findByRecommendationAndTopic(recommendation, postTopic, pageable);
+
     return posts.stream()
-        .filter(post -> {
-          if (postTopic == PostTopic.ENTIRE) return true;
-          return postTopic == post.getTopic();
-        })
         .map(
         post -> {
-          PostImageMapping mapping = postImageMappingRepository.findByPost(post);
+          // 해당 게시글의 이미지 조회
+          List<GetPostImageResponseDto> images = postImageRepository.findAllByPost(post)
+              .stream()
+              .map(postImage ->
+                  new GetPostImageResponseDto(postImage.getId(), postImage.getImageUrl())
+              )
+              .toList();
+          // 응답 dto 생성
           return GetPostResponseDto.builder()
               .postId(post.getId())
               .title(post.getTitle())
@@ -177,7 +199,7 @@ public class CommunityService {
               .authorName(post.getAuthor().getNickname())
               .likeCount(post.getLikeCount())
               .commentCount(post.getCommentCount())
-              .profileUrl(mapping.getImageUrl())
+              .images(images)
               .updatedAt(post.getUpdatedAt())
               .result(ErrorCode.SUCCESS.getCode())
               .build();
@@ -185,12 +207,9 @@ public class CommunityService {
     ).toList();
   }
 
-  public CommentResponseDto comment(CommentRequestDto dto){
+  public CommentResponseDto comment(CommentRequestDto dto, User user){
     Post post = postRepository.findById(dto.postId()).orElseThrow(
         () -> new RingoException("댓글 작성 중 게시물을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST)
-    );
-    User user = userRepository.findById(dto.userId()).orElseThrow(
-        () -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)
     );
     Comment comment = Comment.builder()
         .post(post)
@@ -201,8 +220,8 @@ public class CommunityService {
     return new CommentResponseDto(savedComment.getId(), ErrorCode.SUCCESS.getCode());
   }
 
-  public void updateComment(UpdateCommentRequestDto dto, User user){
-    Comment comment = commentRepository.findById(dto.commentId()).orElseThrow(
+  public void updateComment(Long commentId, UpdateCommentRequestDto dto, User user){
+    Comment comment = commentRepository.findById(commentId).orElseThrow(
         () -> new RingoException("댓글 업데이트 도중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST)
     );
     if (!comment.getUser().getId().equals(user.getId())){
@@ -214,6 +233,10 @@ public class CommunityService {
 
   public void deleteComment(Long commentId, User user){
     if(commentRepository.existsByIdAndUser(commentId, user)){
+      Comment comment = commentRepository.findById(commentId).orElse(null);
+      // 대댓글 삭제
+      subCommentRepository.deleteAllByComment(comment);
+      // 댓글 삭제
       commentRepository.deleteById(commentId);
       return;
     }
@@ -226,17 +249,66 @@ public class CommunityService {
     );
     return commentRepository.findAllByPost(post)
         .stream()
-        .map(comment ->
-            GetCommentResponseDto.builder()
+        .map(comment -> {
+          List<GetSubCommentResponseDto> subComments = subCommentRepository.findAllByComment(
+                  comment)
+              .stream()
+              .map(subComment -> GetSubCommentResponseDto.builder()
+                  .subCommentId(subComment.getId())
+                  .content(subComment.getContent())
+                  .userId(subComment.getUser().getId())
+                  .userNickname(subComment.getUser().getNickname())
+                  .userProfileUrl(subComment.getUser().getProfile().getImageUrl())
+                  .updatedAt(subComment.getUpdatedAt().toString())
+                  .build()
+              )
+              .toList();
+
+          return GetCommentResponseDto.builder()
                 .commentId(comment.getId())
+                .userId(comment.getUser().getId())
                 .userProfileUrl(comment.getUser().getProfile().getImageUrl())
-                .userName(comment.getUser().getName())
+                .userNickname(comment.getUser().getNickname())
+                .subComments(subComments)
                 .content(comment.getContent())
                 .updatedAt(comment.getUpdatedAt())
                 .result(ErrorCode.SUCCESS.getCode())
-                .build()
+                .build();
+            }
         )
         .toList();
+  }
+
+  public Long createSubComment(CreateSubCommentRequestDto dto, User user) {
+    Comment comment = commentRepository.findById(dto.commentId()).orElseThrow(
+        () -> new RingoException("대댓글을 생성하던 도중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND,
+            HttpStatus.BAD_REQUEST)
+    );
+    return subCommentRepository.save(
+        SubComment.builder()
+            .user(user)
+            .comment(comment)
+            .content(dto.content())
+            .build()
+    ).getId();
+  }
+
+  public void updateSubComment(Long subCommentId, UpdateSubCommentRequestDto dto, User user){
+    SubComment subComment = subCommentRepository.findById(subCommentId).orElseThrow(
+        () -> new RingoException("대댓글을 업데이트하던 도중 대댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST)
+    );
+    if (subComment.getUser().getId().equals(user.getId())){
+      subComment.setContent(dto.content());
+      subCommentRepository.save(subComment);
+    }
+    else throw new RingoException("대댓글을 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+  }
+
+  public void deleteSubComment(Long subCommentId, User user){
+    if (subCommentRepository.existsByIdAndUser(subCommentId, user)){
+      subCommentRepository.deleteById(subCommentId);
+    }
+    else throw new RingoException("대댓글을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
   }
 
   public void likePost(Long postId, User user){

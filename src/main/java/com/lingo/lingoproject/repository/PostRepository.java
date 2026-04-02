@@ -2,6 +2,7 @@ package com.lingo.lingoproject.repository;
 
 import com.lingo.lingoproject.domain.Post;
 import com.lingo.lingoproject.domain.Recommendation;
+import com.lingo.lingoproject.domain.enums.PostTopic;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,4 +21,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
   @Modifying
   @Query("update Post p set p.likeCount = p.likeCount - 1 where p.id = :postId")
   void decreasePostLikeCount(@Param("postId") Long postId);
+
+  Page<Post> findByRecommendationAndTopic(Recommendation recommendation, PostTopic topic, Pageable pageable);
 }
