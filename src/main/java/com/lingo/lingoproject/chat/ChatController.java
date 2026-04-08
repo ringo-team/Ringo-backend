@@ -41,16 +41,37 @@ public class ChatController implements ChatApi{
 
     // 조회 권한 체크
     if(!chatService.isMemberInChatroom(roomId, user.getId())){
-      log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
+      log.error("""
+          
+          message=채팅방 메세지를 조회할 권한이 없습니다.
+          authUserId={},
+          step=잘못된_유저_요청,
+          status=FAILED
+          
+          """, user.getId());
       throw new RingoException("채팅방 메세지를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
-    log.info("userId={}, chatroomId={}, step=메세지_조회_시작, status=SUCCESS", user.getId(), roomId);
+    log.info("""
 
-    chatService.changeNotReadToReadMessages(roomId, user.getId());
+          userId={},
+          chatroomId={},
+          step=메세지_조회_시작,
+          status=SUCCESS
+
+          """, user.getId(), roomId);
+
+    chatService.readAllMessages(roomId, user.getId());
     GetChatResponseDto responses = chatService.getChatMessages(user, roomId, page, size);
 
-    log.info("userId={}, chatroomId={}, step=메세지_조회_완료, status=SUCCESS", user.getId(), roomId);
+    log.info("""
+
+          userId={},
+          chatroomId={},
+          step=메세지_조회_완료,
+          status=SUCCESS
+
+          """, user.getId(), roomId);
 
     return ResponseEntity.status(HttpStatus.OK).body(responses);
   }
@@ -69,14 +90,33 @@ public class ChatController implements ChatApi{
 
     // 조회 권한 체크
     if (!userId.equals(user.getId())){
-      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), userId);
+      log.error("""
+
+          authUserId={},
+          userId={},
+          step=잘못된_유저_요청,
+          status=FAILED
+
+          """, user.getId(), userId);
       throw new RingoException("채팅방 조회를 할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
     // 채팅방 조회
-    log.info("userId={}, step=채팅방_조회_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+          userId={},
+          step=채팅방_조회_시작,
+          status=SUCCESS
+
+          """, user.getId());
     List<GetChatroomResponseDto> dtos = chatService.getAllChatroomByUserId(user);
-    log.info("userId={}, step=채팅방_조회_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+          userId={},
+          step=채팅방_조회_완료,
+          status=SUCCESS
+
+          """, user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));
 
@@ -85,9 +125,23 @@ public class ChatController implements ChatApi{
 
   public ResponseEntity<ResultMessageResponseDto> deleteChatroom(Long roomId, User user) {
 
-    log.info("userId={}, chatroomId={}, step=채팅방_삭제_시작, status=SUCCESS", user.getId(), roomId);
+    log.info("""
+
+          userId={},
+          chatroomId={},
+          step=채팅방_삭제_시작,
+          status=SUCCESS
+
+          """, user.getId(), roomId);
     chatService.deleteChatroom(roomId, user);
-    log.info("userId={}, chatroomId={}, step=채팅방_삭제_완료, status=SUCCESS", user.getId(), roomId);
+    log.info("""
+
+          userId={},
+          chatroomId={},
+          step=채팅방_삭제_완료,
+          status=SUCCESS
+
+          """, user.getId(), roomId);
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "채팅방을 성공적으로 삭제했습니다."));
 
@@ -95,11 +149,11 @@ public class ChatController implements ChatApi{
 
 
   public void sendMessage(Long roomId, GetChatMessageResponseDto chatMessageDto) {
-    List<User> roomMembers = chatService.findUserInChatroom(roomId);
+    List<User> roomMembers = chatService.getParticipantsInChatroom(roomId);
 
 
-    List<Long> existRoomMemberIdList = chatService.getExistChatroomMemberIdList(roomMembers, roomId);
-    chatMessageDto.setReaderIds(existRoomMemberIdList);
+    List<Long> connectedUserIdList = chatService.getConnectedUserIdList(roomMembers, roomId);
+    chatMessageDto.setReaderIds(connectedUserIdList);
 
     // 메세지 저장
     Message savedMessage = chatService.saveMessage(chatMessageDto, roomId);
@@ -108,6 +162,8 @@ public class ChatController implements ChatApi{
 
     for (User member : roomMembers) {
       try {
+        if (connectedUserIdList.contains(member.getId())) chatMessageDto.setIsRead(1);
+        else chatMessageDto.setIsRead(0);
         // 해당 방에 메세지 전송
         simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/topic/" + roomId, chatMessageDto);
       } catch (Exception e) {
@@ -118,11 +174,18 @@ public class ChatController implements ChatApi{
         // 채팅 미리보기 기능
         simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/room-list", chatMessageDto);
       } catch (Exception e) {
-        log.error("chatroomId={}, userLoginId={}, step=메세지_전송_실패, status=FAILED", roomId, member.getLoginId(), e);
+        log.error("""
+
+          chatroomId={},
+          userLoginId={},
+          step=메세지_전송_실패,
+          status=FAILED
+
+          """, roomId, member.getLoginId(), e);
         chatService.savedSimpMessagingError(e, savedMessage, roomId, member.getLoginId(), "/room-list/");
       }
 
-      if (!existRoomMemberIdList.contains(member.getId()))
+      if (!connectedUserIdList.contains(member.getId()))
         fcmService.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
     }
   }
@@ -139,7 +202,7 @@ public class ChatController implements ChatApi{
 
   @Scheduled(fixedDelay = 60000)
   public void alertScheduling(){
-    List<Appointment> alertAppointments = chatService.getAlertChatrooms();
+    List<Appointment> alertAppointments = chatService.getScheduledAppointments();
     for (Appointment appointment : alertAppointments){
       Long roomId = appointment.getChatroom().getId();
       GetChatMessageResponseDto dto = GetChatMessageResponseDto.builder()
@@ -151,7 +214,7 @@ public class ChatController implements ChatApi{
       sendMessage(roomId, dto);
       appointment.setAlert(false);
     }
-    chatService.saveAlertOffAppointment(alertAppointments);
+    chatService.saveAppointment(alertAppointments);
   }
 
 }

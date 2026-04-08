@@ -107,6 +107,8 @@ dependencies {
     implementation "org.bytedeco:ffmpeg-platform:7.1.1-1.5.12"
     implementation "org.bytedeco:javacv-platform:1.5.12"
 
+    // jpa logging configuration
+    implementation 'p6spy:p6spy:3.9.1'
 
 }
 dependencyManagement {

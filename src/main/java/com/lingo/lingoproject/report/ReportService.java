@@ -15,12 +15,14 @@ import com.lingo.lingoproject.utils.RedisUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReportService {
 
   private final ReportRepository reportRepository;
@@ -37,6 +39,14 @@ public class ReportService {
     if (reportRepository.existsByReportUserIdAndReportedUserIdAndReportedUserStatus(
         dto.reportUserId(), dto.reportedUserId(), ReportStatus.PENDING
     )){
+      log.warn("""
+
+          step=신고_중복_접수,
+          reportUserId={},
+          reportedUserId={},
+          status=DUPLICATED
+
+          """, dto.reportUserId(), dto.reportedUserId());
       throw new RingoException("이미 접수된 신고입니다.", ErrorCode.DUPLICATED, HttpStatus.BAD_REQUEST);
     }
     Report report = Report.builder()
@@ -47,6 +57,13 @@ public class ReportService {
         .reportIntensity(ReportIntensity.PENDING)
         .build();
     reportRepository.save(report);
+    log.info("""
+
+        step=신고_접수_완료,
+        reportUserId={},
+        reportedUserId={}
+
+        """, dto.reportUserId(), dto.reportedUserId());
   }
 
   public List<GetReportInfoResponseDto> getReportInfos(GetReportInfoRequestDto dto){
@@ -54,6 +71,14 @@ public class ReportService {
   }
 
   public void suspendUser(Long reportId, String reportedUserStatus, Long adminId){
+    log.info("""
+
+        step=신고_처리_시작,
+        reportId={},
+        reportedUserStatus={},
+        adminId={}
+
+        """, reportId, reportedUserStatus, adminId);
     Report report = reportRepository.findById(reportId)
         .orElseThrow(() -> new RingoException("해당 신고가 존재하지 않습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
     report.setAdminId(adminId);
@@ -83,8 +108,25 @@ public class ReportService {
         report.setReportedUserStatus(ReportStatus.LEGAL_REVIEW);
         break;
       default:
+        log.warn("""
+
+            step=신고_처리_잘못된_조치,
+            reportId={},
+            reportedUserStatus={},
+            adminId={}
+
+            """, reportId, reportedUserStatus, adminId);
         throw new RingoException("적절하지 못한 조치가 입력되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
+    log.info("""
+
+        step=신고_처리_완료,
+        reportId={},
+        reportedUserId={},
+        reportedUserStatus={},
+        adminId={}
+
+        """, reportId, report.getReportedUserId(), reportedUserStatus, adminId);
     reportRepository.save(report);
   }
 }

@@ -46,9 +46,24 @@ public class AdminController {
 
       @Parameter(description = "페이지 크기", example = "5")
       @RequestParam int size){
-    log.info("page={}, size={}, step=관리자_유저정보_조회_시작, status=SUCCESS", page, size);
+    log.info("""
+
+        page={},
+        size={},
+        step=관리자_유저정보_조회_시작,
+        status=SUCCESS
+
+        """, page, size);
     List<GetUserInfoResponseDto> dtos = userService.getPageableUserInfo(page, size);
-    log.info("page={}, size={}, count={}, step=관리자_유저정보_조회_완료, status=SUCCESS", page, size, dtos.size());
+    log.info("""
+
+        page={},
+        size={},
+        count={},
+        step=관리자_유저정보_조회_완료,
+        status=SUCCESS
+
+        """, page, size, dtos.size());
     return ResponseEntity.status(HttpStatus.OK).body(dtos);
   }
 
@@ -96,9 +111,26 @@ public class AdminController {
       @RequestParam(required = false)
       String finishedAt
   ){
-    log.info("step=신고정보_조회_시작, status=SUCCESS, userId={}, reportedUserStatus={}, reportIntensity={}, ordering={}, startedAt={}, finishedAt={}", userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt);
+    log.info("""
+
+        step=신고정보_조회_시작,
+        status=SUCCESS,
+        userId={},
+        reportedUserStatus={},
+        reportIntensity={},
+        ordering={},
+        startedAt={},
+        finishedAt={}
+
+        """, userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt);
     List<GetReportInfoResponseDto> list = reportService.getReportInfos(new GetReportInfoRequestDto(userId, reportedUserStatus, reportIntensity, ordering, startedAt, finishedAt));
-    log.info("count={}, step=신고정보_조회_완료, status=SUCCESS", list.size());
+    log.info("""
+
+        count={},
+        step=신고정보_조회_완료,
+        status=SUCCESS
+
+        """, list.size());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), list));
   }
@@ -123,9 +155,23 @@ public class AdminController {
 
       @AuthenticationPrincipal User admin
   ){
-    log.info("adminId={}, reportId={}, step=신고조치_시작, status=SUCCESS", admin.getId(), reportId);
+    log.info("""
+
+        adminId={},
+        reportId={},
+        step=신고조치_시작,
+        status=SUCCESS
+
+        """, admin.getId(), reportId);
     reportService.suspendUser(reportId, reportedUserStatus, admin.getId());
-    log.info("adminId={}, reportId={}, step=신고조치_완료, status=SUCCESS", admin.getId(), reportId);
+    log.info("""
+
+        adminId={},
+        reportId={},
+        step=신고조치_완료,
+        status=SUCCESS
+
+        """, admin.getId(), reportId);
 
     return ResponseEntity.status(HttpStatus.OK).body("성공적으로 신고조치가 완료되었습니다.");
   }

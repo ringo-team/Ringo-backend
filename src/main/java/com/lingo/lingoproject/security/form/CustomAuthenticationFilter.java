@@ -52,7 +52,14 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
         info = objectMapper.readValue(requestBody, LoginInfoDto.class);
         request.setAttribute("requestBody", info);
       } catch (Exception e) {
-        log.error("uri={}, loc=AuthenticationFilter, step=로그인_요청_역직렬화, status=FAILED", request.getRequestURI(), e);
+        log.error("""
+
+            uri={},
+            loc=AuthenticationFilter,
+            step=로그인_요청_역직렬화,
+            status=FAILED
+
+            """, request.getRequestURI(), e);
         throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
       }
 

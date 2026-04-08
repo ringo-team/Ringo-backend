@@ -30,7 +30,12 @@ public class GoogleLoginController {
 
   @GetMapping("/google/callback")
   public ResponseEntity<?> callback(@RequestParam String code){
-    log.info("step=구글_로그인_콜백_시작, status=SUCCESS");
+    log.info("""
+
+        step=구글_로그인_콜백_시작,
+        status=SUCCESS
+
+        """);
 
     User user = googleLoginService.saveUserLoginInfo(code);
 
@@ -40,7 +45,13 @@ public class GoogleLoginController {
 
     redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refreshToken, 30, TimeUnit.DAYS);
 
-    log.info("userId={}, step=구글_로그인_콜백_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=구글_로그인_콜백_완료,
+        status=SUCCESS
+
+        """, user.getId());
     return ResponseEntity.ok(new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refreshToken));
   }
 

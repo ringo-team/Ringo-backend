@@ -17,6 +17,7 @@ import com.lingo.lingoproject.domain.UserMatchingLog;
 import com.lingo.lingoproject.domain.enums.ChatType;
 import com.lingo.lingoproject.domain.enums.MatchingStatus;
 import com.lingo.lingoproject.domain.enums.NotificationType;
+import com.lingo.lingoproject.domain.enums.SignupStatus;
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.match.dto.GetScrappedUserResponseDto;
@@ -59,6 +60,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -117,7 +119,18 @@ public class MatchService {
 
     // 매칭 점수 계산
     float matchingScore = calculateMatchScore(requestedUser.getId(), requestUser.getId());
-    log.info("requestUserId={}, requestedUserId={}, matchingScore={}, step=매칭요청, status=SUCCESS", requestUser.getId(), requestedUser.getId(), matchingScore);
+    log.info("""
+
+        requestUserId={},
+        requestedUserId={},
+        matchingScore={},
+        step=매칭요청,
+        status=SUCCESS
+
+        """,
+        requestUser.getId(),
+        requestedUser.getId(),
+        matchingScore);
 
     // 매칭 내용 저장
     Matching matching = Matching.builder()
@@ -127,7 +140,23 @@ public class MatchService {
         .matchingScore(matchingScore)
         .build();
 
-    fcmService.sendFcmNotification(requestedUser, "누군가 매칭 요청을 했어요!", null, NotificationType.MATCHING_REQUEST);
+    log.info("""
+        ######### 매칭 요청 ###########
+        request-user: {},
+        requested-user: {},
+        matching-status: {},
+        matching-score: {},
+        matching-date: {}
+        #############################
+        """,
+        requestUser.getId(),
+        requestedUser.getId(),
+        matching.getMatchingStatus(),
+        matching.getMatchingScore(),
+        LocalDateTime.now()
+        );
+
+    //fcmService.sendFcmNotification(requestedUser, "누군가 매칭 요청을 했어요!", null, NotificationType.MATCHING_REQUEST);
 
     return matchingRepository.save(matching);
   }
@@ -143,7 +172,15 @@ public class MatchService {
 
     Long requestedUserId = matching.getRequestedUser().getId();
     if (!requestedUserId.equals(user.getId())) {
-      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestedUserId);
+      log.error("""
+          
+          message=해당 메칭에 응답할 권한이 없습니다.
+          authUserId={},
+          userId={}, 
+          step=잘못된_유저_요청,
+          status=FAILED
+          
+          """, user.getId(), requestedUserId);
       throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
@@ -153,14 +190,30 @@ public class MatchService {
       default -> throw new RingoException("decision 값이 적절하지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
 
-    UserMatchingLog log = UserMatchingLog.builder()
+    UserMatchingLog logEntity = UserMatchingLog.builder()
         .userId(user.getId())
         .matchingId(matchingId)
         .status(matching.getMatchingStatus())
         .gender(user.getGender())
         .build();
 
-    userMatchingLogRepository.save(log);
+    log.info("""
+        ######### 매칭 요청 ###########
+        request-user: {},
+        requested-user: {},
+        matching-status: {},
+        matching-score: {},
+        matching-date: {}
+        #############################
+        """,
+        user.getId(),
+        requestedUserId,
+        matching.getMatchingStatus(),
+        matching.getMatchingScore(),
+        LocalDateTime.now()
+    );
+
+    userMatchingLogRepository.save(logEntity);
     matchingRepository.save(matching);
   }
 
@@ -219,12 +272,27 @@ public class MatchService {
       activeUserIds = getActiveUserIds();
     }
 
+    log.info("""
+        active-user-size: {}
+        """, activeUserIds.size());
+
     // 이성추천에서 배제해야할 유저를 가져온다.
     List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(userId);
+
+    log.info("""
+        exclueded-user-size: {}
+        """, excludedUserIds.size());
+
     activeUserIds.removeAll(excludedUserIds);
 
-    List<Long> userIdsWithHighMatchScore = activeUserIds
+    log.info("""
+        추천 이성 풀 사이즈: {}
+        """, activeUserIds.size());
+
+    List<Long> userIdsWithHighMatchScore = userRepository.findAllByIdIn(activeUserIds)
         .stream()
+        .filter(u -> u.getStatus() == SignupStatus.COMPLETED)
+        .map(User::getId)
         .map(id -> {
           float matchingScore = calculateMatchScore(userId, id);
           return new UserMatchingScoreMapping(id, matchingScore);
@@ -242,6 +310,9 @@ public class MatchService {
       Collections.swap(userIdsWithHighMatchScore, i, j);
     }
     userIdsWithHighMatchScore = userIdsWithHighMatchScore.subList(0, n);
+    log.info("""
+        추천이성ids: {}
+        """, userIdsWithHighMatchScore);
 
     //--------------------- 추천된 이성의 프로필을 set에 저장 --------------------- //
     //  makeUserProfileAndAddInCollection 함수가 recommendedUserProfileSet 에 유저 정보를 저장 //
@@ -286,6 +357,38 @@ public class MatchService {
     //캐시 조회
     if (redisTemplate.hasKey("recommend-for-daily-survey::" + userId)){
       List<GetUserProfileResponseDto> responses = redisUtils.getRecommendUserForDailySurvey(userId.toString());
+      responses.forEach(response -> {
+        log.info("""
+          
+          ######## 캐시조회된 이성 정보 #########
+          request-user-id: {}
+          user-id: {},
+          user-age: {},
+          user-gender: {},
+          user-nickname: {},
+          matching-socre: {},
+          matching-status: {},
+          hashtags: {},
+          face-verify: {},
+          days-from-last-access: {},
+          mbti: {}
+          ###############################
+          
+          """,
+            user.getId(),
+            response.getUserId(),
+            response.getAge(),
+            response.getGender(),
+            response.getNickname(),
+            response.getMatchingScore(),
+            response.getMatchingStatus(),
+            response.getHashtags(),
+            response.getVerify(),
+            response.getDaysFromLastAccess(),
+            response.getMbti()
+        );
+      });
+
       if (responses.size() == MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY) return responses;
     }
 
@@ -305,6 +408,10 @@ public class MatchService {
     // 추천되지 않아야할 유저를 조회
     List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(user.getId());
 
+    log.info("""
+        exclueded-user-size: {}
+        """, excludedUserIds.size());
+
     // 유저와 유사한 응답을 한 이성을 추천해줌
     List<GetUserProfileResponseDto> recommendUserProfileList = new ArrayList<>();
     for (AnsweredSurvey todayAnsweredSurvey : todayAnsweredSurveys) {
@@ -321,12 +428,32 @@ public class MatchService {
       );
 
       // 유사한 응답을 한 유저가 없으면 continue
-      if (matchingAnsweredSurveyList.isEmpty()){ continue; }
+      if (matchingAnsweredSurveyList.isEmpty()){
+        log.info("매칭되는 설문이 존재하지 않습니다. matched survey list size= {}" , 0);
+        continue;
+      }
 
       // 유사한 응답을 한 유저들 중 한 사람을 뽑음
       ThreadLocalRandom random = ThreadLocalRandom.current();
       int n = random.nextInt(matchingAnsweredSurveyList.size());
       User recommendedUser = matchingAnsweredSurveyList.get(n).getUser();
+
+      log.info("""
+          
+          유사한 설문을 한 설문의 개수: {},
+          선택된 설문 id: {} | 선택된 설문 번호: {}
+          유저 id: {} | 선택된 유저 id: {}
+          유저의 설문 응답: {} | 선택된 유저의 읍답: {}
+          
+          """,
+          matchingAnsweredSurveyList.size(),
+          matchingAnsweredSurveyList.get(n).getId(),
+          matchingAnsweredSurveyList.get(n).getSurveyNum(),
+          user.getId(),
+          recommendedUser.getId(),
+          answer,
+          matchingAnsweredSurveyList.get(n).getAnswer()
+          );
 
       // recommendUserProfileList에 유저 프로필 정보를 저장함
       makeUserProfileAndAddInCollection(recommendUserProfileList, user, recommendedUser);
@@ -350,15 +477,23 @@ public class MatchService {
     if(redisTemplate.hasKey(redisKeyPrefix + userId)){
       List<GetUserProfileResponseDto> responses = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
       if (responses == null) return;
-      setHideFlagOnUserProfile(responses, recommendedUserId);
+      setHideFlagOnUserProfile(responses, recommendedUserId, userId);
       redisUtils.cacheUntilMidnight(redisKeyPrefix + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), responses));
     }
   }
 
-  private void setHideFlagOnUserProfile(List<GetUserProfileResponseDto> responses, Long recommendedUserId){
+  private void setHideFlagOnUserProfile(List<GetUserProfileResponseDto> responses, Long recommendedUserId, Long userId){
     for (GetUserProfileResponseDto response : responses){
       if (response.getUserId().equals(recommendedUserId)){
         response.setHide(HIDE_PROFILE_FLAG);
+        log.info("""
+            hide-flag: 0 -----> {}
+            user-id: {} 가 추천_이성_id: {} 를 가렸습니다.
+            """,
+            response.getHide(),
+            userId,
+            recommendedUserId
+        );
         return;
       }
     }
@@ -377,21 +512,49 @@ public class MatchService {
 
     float matchingScore = calculateMatchScore(user.getId(), recommendedUser.getId());
 
-    collection.add(
-        GetUserProfileResponseDto.builder()
-            .userId(recommendedUser.getId())
-            .age(recommendedUser.getAge())
-            .gender(recommendedUser.getGender().toString())
-            .nickname(recommendedUser.getNickname())
-            .profileUrl(profile.getImageUrl())
-            .matchingScore(matchingScore)
-            .hashtags(hashtags)
-            .hide(EXPOSE_PROFILE_FLAG)
-            .verify(profile.isVerified() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG)
-            .daysFromLastAccess((int) daysFromLastAccess)
-            .mbti(user.getMbti())
-            .build()
+    GetUserProfileResponseDto response = GetUserProfileResponseDto.builder()
+        .userId(recommendedUser.getId())
+        .age(recommendedUser.getAge())
+        .gender(recommendedUser.getGender().toString())
+        .nickname(recommendedUser.getNickname())
+        .profileUrl(profile.getImageUrl())
+        .matchingScore(matchingScore)
+        .hashtags(hashtags)
+        .hide(EXPOSE_PROFILE_FLAG)
+        .verify(profile.isVerified() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG)
+        .daysFromLastAccess((int) daysFromLastAccess)
+        .mbti(user.getMbti())
+        .build();
+
+    log.info("""
+          
+          ######## 추천 이성 정보 #########
+          user-id: {},
+          user-age: {},
+          user-gender: {},
+          user-nickname: {},
+          matching-socre: {},
+          matching-status: {},
+          hashtags: {},
+          face-verify: {},
+          days-from-last-access: {},
+          mbti: {}
+          ###############################
+          
+          """,
+        response.getUserId(),
+        response.getAge(),
+        response.getGender(),
+        response.getNickname(),
+        response.getMatchingScore(),
+        response.getMatchingStatus(),
+        response.getHashtags(),
+        response.getVerify(),
+        response.getDaysFromLastAccess(),
+        response.getMbti()
     );
+
+    collection.add(response);
   }
   
   public List<Long> getExcludedUserIdsForRecommendation(Long userId){
@@ -423,6 +586,10 @@ public class MatchService {
     excludedUserId.addAll(dormantUserIds);
     excludedUserId.addAll(blockedUserIds);
     excludedUserId.addAll(suspendedUserIds);
+
+    log.info("""
+        제외된 유저들의 id: {}
+        """, excludedUserId);
 
     return new ArrayList<>(excludedUserId);
   }
@@ -466,7 +633,7 @@ public class MatchService {
     List<GetUserProfileResponseDto> requestedUserProfileDtoList =
         profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
 
-    setHashtagToProfileDtoList(requestedUserProfileDtoList);
+    addHashtagInEachProfileDto(requestedUserProfileDtoList);
 
     return requestedUserProfileDtoList;
   }
@@ -482,12 +649,12 @@ public class MatchService {
     List<GetUserProfileResponseDto> requestUserProfileDtoList =
         profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
 
-    setHashtagToProfileDtoList(requestUserProfileDtoList);
+    addHashtagInEachProfileDto(requestUserProfileDtoList);
 
     return requestUserProfileDtoList;
   }
 
-  private void setHashtagToProfileDtoList(List<GetUserProfileResponseDto> profiles){
+  private void addHashtagInEachProfileDto(List<GetUserProfileResponseDto> profiles){
     profiles.forEach(profile -> {
       User user = userRepository.findById(profile.getUserId()).orElse(null);
       if (user == null) return;
@@ -496,6 +663,33 @@ public class MatchService {
           .map(Hashtag::getHashtag)
           .toList();
       profile.setHashtags(hashtags);
+      log.info("""
+          
+          ######## 매칭 보낸/받은 이성 정보 #########
+          user-id: {},
+          user-age: {},
+          user-gender: {},
+          user-nickname: {},
+          matching-socre: {},
+          matching-status: {},
+          hashtags: {},
+          face-verify: {},
+          days-from-last-access: {},
+          mbti: {}
+          ###############################
+          
+          """,
+          profile.getUserId(),
+          profile.getAge(),
+          profile.getGender(),
+          profile.getNickname(),
+          profile.getMatchingScore(),
+          profile.getMatchingStatus(),
+          profile.getHashtags(),
+          profile.getVerify(),
+          profile.getDaysFromLastAccess(),
+          profile.getMbti()
+          );
     });
   }
 
@@ -507,8 +701,24 @@ public class MatchService {
 
     Long requestedUserId = match.getRequestedUser().getId();
     Long requestUserId = match.getRequestUser().getId();
+
+    log.info("""
+        
+        매칭 id: {},
+        요청자 id: {} 가 매칭 철회를 요청하였습니다.
+        
+        """, matchingId, user.getId());
+
     if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))){
-      log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
+      log.error("""
+          
+          message=해당 매칭을 철회할 권한이 없습니다.
+          user-id: {},
+          requested-user-id: {}
+          step=잘못된_유저_요청,
+          status=FAILED"
+          
+          """, user.getId(), requestedUserId);
       throw new RingoException("매칭을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
 
@@ -523,25 +733,46 @@ public class MatchService {
 
     User requestUser = matching.getRequestUser();
     if (!requestUser.getId().equals(user.getId())){
-      log.error("authUserId={}, userId={}, step=잘못된_유저_요청, status=FAILED", user.getId(), requestUser.getId());
+      log.error("""
+          
+          authUserId={}, 
+          userId={}, 
+          step=잘못된_유저_요청, 
+          status=FAILED
+          
+          """, user.getId(), requestUser.getId());
       throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
     matching.setMatchingStatus(MatchingStatus.PENDING);
     matching.setMatchingRequestMessage(dto.message());
 
     // 로그에 저장
-    UserMatchingLog log = UserMatchingLog.builder()
+    UserMatchingLog logEntity = UserMatchingLog.builder()
         .userId(requestUser.getId())
         .matchingId(matching.getId())
         .status(MatchingStatus.PENDING)
         .gender(requestUser.getGender())
         .build();
 
+    log.info("""
+        
+        matching-id: {}
+        request-user-id: {}, 가 보낸 메세지를 저장하였습니다.
+        matching-status: {}.
+        request-user-gender: {}
+        
+        """,
+        matching.getId(),
+        requestUser.getId(),
+        matching.getMatchingStatus(),
+        requestUser.getGender()
+        );
+
     matchingRepository.save(matching);
-    userMatchingLogRepository.save(log);
+    userMatchingLogRepository.save(logEntity);
 
     // 유저 알림
-    fcmService.sendFcmNotification(matching.getRequestedUser(), "누군가 매칭을 요청했어요", null, NotificationType.MATCHING_REQUEST);
+    //fcmService.sendFcmNotification(matching.getRequestedUser(), "누군가 매칭을 요청했어요", null, NotificationType.MATCHING_REQUEST);
   }
 
   public String getMatchingRequestMessage(Long matchingId, User user){
@@ -552,7 +783,13 @@ public class MatchService {
     Long requestedUserId = match.getRequestedUser().getId();
     Long requestUserId = match.getRequestUser().getId();
     if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))){
-      log.error("authUserId={}, step=잘못된_유저_요청, status=FAILED", user.getId());
+      log.error("""
+          
+          authUserId={}, 
+          step=잘못된_유저_요청, 
+          status=FAILED
+          
+          """, user.getId());
       throw new RingoException("해당 매칭의 요청 메세지를 확인할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
 
@@ -689,6 +926,8 @@ public class MatchService {
             .map(GetUserProfileResponseDto::getUserId)
             .toList();
 
+    log.info("누적 설문을 통한 이성 추천 리스트: {}", recommendUserIdListForCumulativeSurvey);
+
     List<Long> recommendUserIdListForDailySurvey =
         Optional.ofNullable(redisUtils.getRecommendUserForDailySurvey(userId.toString()))
             .orElseGet(Collections::emptyList)
@@ -696,11 +935,26 @@ public class MatchService {
             .map(GetUserProfileResponseDto::getUserId)
             .toList();
 
+    log.info("일일 설문을 통한 이성 추천 리스트: {}", recommendUserIdListForDailySurvey);
+
     List<Long> recommededUserIdList = new ArrayList<>();
     recommededUserIdList.addAll(recommendUserIdListForCumulativeSurvey);
     recommededUserIdList.addAll(recommendUserIdListForDailySurvey);
 
-    if (!recommededUserIdList.contains(recommendedUserId)) return;
+    if (!recommededUserIdList.contains(recommendedUserId)) {
+      log.info("""
+          
+          요청 유저 id: {},
+          스크랩 유저 id: {},
+          유저의 추천 이성 리스트: {}
+          
+          """,
+          user.getId(),
+          recommendedUserId,
+          recommededUserIdList
+          );
+      return;
+    }
 
     User recommendedUser = userRepository.findById(recommendedUserId).orElseThrow(() -> new RingoException("유저를 스크랩하던 도중 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 

@@ -1,8 +1,10 @@
 package com.lingo.lingoproject.community.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public record CreateSubCommentRequestDto(
-    Long commentId,
-    String content
+    @NotBlank Long commentId,
+    @NotBlank String content
 ) {
 
 }

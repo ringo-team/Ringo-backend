@@ -144,16 +144,27 @@ public class UserService {
 
   public GetUserInfoResponseDto getUserInfo(Long findUserId, User user) {
 
-    List<Long> recommendedUsersForCumulation = Optional.ofNullable(redisUtils.getRecommendedUserForCumulativeSurvey(user.getId().toString()))
+    List<Long> cumulativeSurveyBasedRecommendUserList = Optional.ofNullable(redisUtils.getRecommendedUserForCumulativeSurvey(user.getId().toString()))
         .orElseGet(Collections::emptyList)
         .stream().map(GetUserProfileResponseDto::getUserId).toList();
-    List<Long> recommendedUsersForDaily = Optional.ofNullable(redisUtils.getRecommendUserForDailySurvey(user.getId().toString()))
+    List<Long> dailySurveyBasedRecommendUserList = Optional.ofNullable(redisUtils.getRecommendUserForDailySurvey(user.getId().toString()))
         .orElseGet(Collections::emptyList)
         .stream().map(GetUserProfileResponseDto::getUserId).toList();
     List<Long> userIdList = new ArrayList<>();
 
-    if (!recommendedUsersForCumulation.isEmpty()) userIdList.addAll(recommendedUsersForCumulation);
-    if (!recommendedUsersForDaily.isEmpty()) userIdList.addAll(recommendedUsersForDaily);
+    if (!cumulativeSurveyBasedRecommendUserList.isEmpty()) userIdList.addAll(cumulativeSurveyBasedRecommendUserList);
+    if (!dailySurveyBasedRecommendUserList.isEmpty()) userIdList.addAll(dailySurveyBasedRecommendUserList);
+
+    log.info("""
+        cumulative-survey-recommended-user: {},
+        daily-seurvey-recommended-user: {},
+        find-user-id: {}
+        """,
+        cumulativeSurveyBasedRecommendUserList,
+        dailySurveyBasedRecommendUserList,
+        findUserId
+    );
+
     boolean hasCommunityPass = redisTemplate.hasKey("membership::" + user.getId());
 
     if (!(userIdList.contains(findUserId) || findUserId.equals(user.getId()) || hasCommunityPass)){
@@ -185,6 +196,7 @@ public class UserService {
         .build();
   }
 
+  @Transactional
   public void updateUserInfo(User user, UpdateUserInfoRequestDto dto) {
 
     Address activeAddress = dto.activeAddress();
@@ -277,6 +289,12 @@ public class UserService {
         .phoneNumber(user.getPhoneNumber())
         .admin(admin)
         .build();
+    log.info("""
+        admin이 특정 user를 block했습니다.
+        admin-id: {},
+        block-user-id: {},
+        block-user-phone-number: {}
+        """, admin.getId(), user.getId(), user.getPhoneNumber());
     blockedUserRepository.save(blockedUser);
   }
 
@@ -285,6 +303,18 @@ public class UserService {
     if (userAccessLogRepository.existsByUserIdAndCreateAtAfter(user.getId(), LocalDate.now().atStartOfDay())){
       return;
     }
+    log.info("""
+        user가 앱을 실행하였습니다.
+        user-id: {},
+        user-age: {},
+        user-nickname: {},
+        user-gender: {}
+        """,
+        user.getId(),
+        user.getAge(),
+        user.getNickname(),
+        user.getGender()
+        );
     userAccessLogRepository.save(UserAccessLog.builder()
         .age(user.getAge())
         .userId(user.getId())

@@ -27,13 +27,33 @@ public class SelfAuthController {
       @RequestParam(value = "integrity_value") String integrityValue
   ) throws Exception{
 
-    log.info("step=유저_정보_복호화_시작, status=SUCCESS");
-    String decryptedData = selfAuthService.validateIntegrityAndDecryptData(tokenVersionId, encryptedData, integrityValue);
-    log.info("step=유저_정보_복호화_완료, status=SUCCESS");
+    log.info("""
 
-    log.info("step=유저_정보_역직렬화_저장, status=SUCCESS");
+        step=유저_정보_복호화_시작,
+        status=SUCCESS
+
+        """);
+    String decryptedData = selfAuthService.validateIntegrityAndDecryptData(tokenVersionId, encryptedData, integrityValue);
+    log.info("""
+
+        step=유저_정보_복호화_완료,
+        status=SUCCESS
+
+        """);
+
+    log.info("""
+
+        step=유저_정보_역직렬화_저장,
+        status=SUCCESS
+
+        """);
     selfAuthService.deserializeAndSaveUserInfo(decryptedData);
-    log.info("step=유저_정보_역직렬화_완료, status=SUCCESS");
+    log.info("""
+
+        step=유저_정보_역직렬화_완료,
+        status=SUCCESS
+
+        """);
 
     return ResponseEntity.status(HttpStatus.OK).build();
   }

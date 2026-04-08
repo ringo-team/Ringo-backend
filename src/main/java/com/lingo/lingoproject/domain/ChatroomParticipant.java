@@ -47,6 +47,8 @@ public class ChatroomParticipant {
   @JoinColumn(name = "participant_user_id")
   private User participant;
 
+  private boolean isActive = true;
+
   @ColumnDefault(value = "false")
   private boolean isWithdrawn = false;
 }

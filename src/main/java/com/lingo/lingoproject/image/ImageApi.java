@@ -43,7 +43,7 @@ public interface ImageApi {
   @PostMapping(value = "profiles", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   ResponseEntity<?> uploadProfileImage(
       @Parameter(description = "이미지 파일") @RequestParam(value = "image") MultipartFile image,
-      @NotNull Long userId
+      @RequestParam(value = "userId") Long userId
   );
 
   @Operation(summary = "프로필 조회", description = "프로필 URL과 이미지 id를 반환합니다.")

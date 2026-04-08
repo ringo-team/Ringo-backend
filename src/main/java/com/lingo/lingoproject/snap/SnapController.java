@@ -42,13 +42,28 @@ public class SnapController {
   @PostMapping("/snaps")
   public ResponseEntity<ResultMessageResponseDto> applySnapShooting(@Valid @RequestBody ApplySnapShootingRequestDto dto){
     try {
-      log.info("step=스냅_촬영_신청_시작, status=SUCCESS");
+      log.info("""
+
+          step=스냅_촬영_신청_시작,
+          status=SUCCESS
+
+          """);
       snapService.applySnapShooting(dto);
-      log.info("step=스냅_촬영_신청_완료, status=SUCCESS");
+      log.info("""
+
+          step=스냅_촬영_신청_완료,
+          status=SUCCESS
+
+          """);
 
       return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 촬영 날짜가 저장되었습니다."));
     } catch (Exception e) {
-      log.error("step=스냅_촬영_신청_실패, status=FAILED", e);
+      log.error("""
+
+          step=스냅_촬영_신청_실패,
+          status=FAILED
+
+          """, e);
       if (e instanceof RingoException re) {
         throw re;
       }
@@ -63,14 +78,32 @@ public class SnapController {
       @PathVariable(value = "photographerId") Long photographerId
   ){
     try {
-      log.info("photographerId={}, step=작가_정보_저장_시작, status=SUCCESS", photographerId);
+      log.info("""
+
+          photographerId={},
+          step=작가_정보_저장_시작,
+          status=SUCCESS
+
+          """, photographerId);
       snapService.savePhotographerInfo(dto, photographerId);
-      log.info("photographerId={}, step=작가_정보_저장_완료, status=SUCCESS", photographerId);
+      log.info("""
+
+          photographerId={},
+          step=작가_정보_저장_완료,
+          status=SUCCESS
+
+          """, photographerId);
 
       return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 작가 정보가 저장되었습니다."));
 
     } catch (Exception e) {
-      log.error("photographerId={}, step=작가_정보_저장_실패, status=FAILED", photographerId, e);
+      log.error("""
+
+          photographerId={},
+          step=작가_정보_저장_실패,
+          status=FAILED
+
+          """, photographerId, e);
       if (e instanceof RingoException re) {
         throw re;
       }
@@ -89,15 +122,33 @@ public class SnapController {
   ){
     List<GetImageUrlResponseDto> dtos;
     try {
-      log.info("photographerId={}, step=작가_예시사진_업로드_시작, status=SUCCESS", photographerId);
+      log.info("""
+
+          photographerId={},
+          step=작가_예시사진_업로드_시작,
+          status=SUCCESS
+
+          """, photographerId);
       dtos = imageService.uploadPhotographerExampleImages(images, photographerId);
-      log.info("photographerId={}, step=작가_예시사진_업로드_완료, status=SUCCESS", photographerId);
+      log.info("""
+
+          photographerId={},
+          step=작가_예시사진_업로드_완료,
+          status=SUCCESS
+
+          """, photographerId);
 
       return ResponseEntity.status(HttpStatus.CREATED)
           .body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));
 
     } catch (Exception e) {
-      log.error("photographerId={}, step=작가_예시사진_업로드_실패, status=FAILED", photographerId, e);
+      log.error("""
+
+          photographerId={},
+          step=작가_예시사진_업로드_실패,
+          status=FAILED
+
+          """, photographerId, e);
       if (e instanceof RingoException re) {
         throw re;
       }
@@ -111,14 +162,29 @@ public class SnapController {
     @Valid @RequestBody UpdatePhotographerExampleImagesInfoRequestDto dto
   ){
     try {
-      log.info("step=작가_예시사진_정보_저장_시작, status=SUCCESS");
+      log.info("""
+
+          step=작가_예시사진_정보_저장_시작,
+          status=SUCCESS
+
+          """);
       snapService.updatePhotographerExampleImagesInfo(dto);
-      log.info("step=작가_예시사진_정보_저장_완료, status=SUCCESS");
+      log.info("""
+
+          step=작가_예시사진_정보_저장_완료,
+          status=SUCCESS
+
+          """);
 
       return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "정상적으로 사진 정보가 저장되었습니다."));
 
     } catch (Exception e) {
-      log.error("step=작가_예시사진_정보_저장_실패, status=FAILED", e);
+      log.error("""
+
+          step=작가_예시사진_정보_저장_실패,
+          status=FAILED
+
+          """, e);
       if (e instanceof RingoException re) {
         throw re;
       }
@@ -132,14 +198,29 @@ public class SnapController {
     List<GetPhotographerInfosResponseDto> list;
     try {
 
-      log.info("step=작가_정보_조회_시작, status=SUCCESS");
+      log.info("""
+
+          step=작가_정보_조회_시작,
+          status=SUCCESS
+
+          """);
       list = snapService.getPhotographerInfos();
-      log.info("step=작가_정보_조회_완료, status=SUCCESS");
+      log.info("""
+
+          step=작가_정보_조회_완료,
+          status=SUCCESS
+
+          """);
 
       return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), list));
 
     } catch (Exception e) {
-      log.error("step=작가_정보_조회_실패, status=FAILED", e);
+      log.error("""
+
+          step=작가_정보_조회_실패,
+          status=FAILED
+
+          """, e);
       if (e instanceof RingoException re) {
         throw re;
       }

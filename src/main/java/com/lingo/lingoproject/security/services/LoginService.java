@@ -92,6 +92,11 @@ public class LoginService {
 
     if (token == null) throw new RingoException("로그인하지 않은 유저입니다.", ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN);
 
+    log.info("""
+        redisRefreshToken :{},
+        requestRefreshToken: {}
+        토큰을 재발급하기 위해 refresh 토큰을 전달하였습니다.
+        """, token, refreshToken);
     if(token.equals(refreshToken)){
       return generateTokenAndSaveRefreshTokenInRedis(claims.getSubject());
     }
@@ -116,6 +121,7 @@ public class LoginService {
   public User signup(LoginInfoDto dto){
 
     if(!dto.loginId().matches("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]+$")){
+      log.warn("회원가입 로그인 요청값: {}", dto.loginId());
       throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.NOT_ACCEPTABLE);
     }
     if(!dto.password().matches("^(?=.*[A-Za-z])(?=.*\\d).+$")){
@@ -182,6 +188,7 @@ public class LoginService {
 
     // 유저 정보 및 해시태그 객체에 저장
     user.setUserInfo(dto);
+
     List<Hashtag> hashtags = new ArrayList<>();
     for (String tag : dto.hashtags()){
       hashtags.add(Hashtag.builder()
@@ -208,7 +215,6 @@ public class LoginService {
 
     // 유저 친구초대코드 저장
     user.setFriendInvitationCode(generateFriendInvitationCode());
-
 
     try {
       userRepository.save(user);

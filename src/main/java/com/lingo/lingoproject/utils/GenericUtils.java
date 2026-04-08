@@ -2,17 +2,28 @@ package com.lingo.lingoproject.utils;
 
 import com.lingo.lingoproject.exception.ErrorCode;
 import com.lingo.lingoproject.exception.RingoException;
+import java.util.Arrays;
 import java.util.function.Consumer;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 
+@Slf4j
 public class GenericUtils {
 
   public static <T> T validateAndReturnEnumValue(T[] array, String value) {
     for (T item : array) {
       if (item.toString().equals(value)) {
+        log.info("""
+            ENUM 값: {},
+            STRING 값: {}
+            """, item, value);
         return item;
       }
     }
+    log.error("""
+            ENUM 리스트: {}
+            STRING 값: {}
+            """, Arrays.toString(array), value);
     throw new RingoException("적절하지 않은 값이 요청되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
   }
 

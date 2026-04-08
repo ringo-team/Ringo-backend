@@ -29,13 +29,35 @@ public class ReportController {
       @AuthenticationPrincipal User user
   ){
     if (!dto.reportUserId().equals(user.getId())){
-      log.error("userId={}, reportUserId={}, step=신고_요청, status=FAILED, reason=권한없음", user.getId(), dto.reportUserId());
+      log.error("""
+
+          userId={},
+          reportUserId={},
+          step=신고_요청,
+          status=FAILED,
+          reason=권한없음
+
+          """, user.getId(), dto.reportUserId());
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto(
           ErrorCode.NO_AUTH.getCode(), "신고할 권한이 없습니다."));
     }
-    log.info("userId={}, reportedUserId={}, step=신고_요청_시작, status=SUCCESS", user.getId(), dto.reportedUserId());
+    log.info("""
+
+        userId={},
+        reportedUserId={},
+        step=신고_요청_시작,
+        status=SUCCESS
+
+        """, user.getId(), dto.reportedUserId());
     reportService.report(dto);
-    log.info("userId={}, reportedUserId={}, step=신고_요청_완료, status=SUCCESS", user.getId(), dto.reportedUserId());
+    log.info("""
+
+        userId={},
+        reportedUserId={},
+        step=신고_요청_완료,
+        status=SUCCESS
+
+        """, user.getId(), dto.reportedUserId());
 
     return ResponseEntity.status(HttpStatus.OK)
         .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "신고가 성공적으로 접수되었습니다."));

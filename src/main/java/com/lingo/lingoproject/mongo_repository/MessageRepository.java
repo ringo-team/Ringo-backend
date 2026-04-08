@@ -17,12 +17,19 @@ public interface MessageRepository extends MongoRepository<Message, String> {
   @Query(value = "{ 'chatroomId': ?0, 'readerIds':  { $ne:  ?1 }, 'senderId':  { $ne:  ?1 }}", count = true)
   int findNumberOfNotReadMessages(Long chatroomId, Long userId);
 
-  @Query(value = "{ 'chatroomId': ?0, 'readerIds':  { $ne:  ?1 }, 'senderId':  { $ne:  ?1 } }")
-  List<Message> findNotReadMessages(Long chatroomId, Long userId);
-
-  @Query(value = "{ '_id':  { $in:  ?0 } } ")
-  @Update(value = "{ '$addToSet': { 'readerIds': ?1 } } ")
-  void insertMemberIdInMessage(List<String> messageIds, Long userId);
+  @Query(value = """
+        {
+        'chatroomId': ?0,
+        'readerIds': { $ne: ?1 },
+        'senderId': { $ne: ?1 }
+        }"""
+  )
+  @Update(value = """
+        { 
+        '$addToSet': { 'readerIds': ?1 } 
+        }"""
+  )
+  void readAllMessages(Long chatroomId, Long userId);
 
   Page<Message> findAllByChatroomIdOrderByCreatedAtDesc(Long chatroomId, Pageable pageable);
 

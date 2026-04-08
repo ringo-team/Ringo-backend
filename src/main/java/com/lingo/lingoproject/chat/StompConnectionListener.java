@@ -41,7 +41,14 @@ public class StompConnectionListener {
       if (roomId == null) return;
 
       // 유저 채팅방 레디스에 저장
-      log.info("userId={}, chatroomId={}, step=채팅방_입장, status=SUCCESS", user.getId(), roomId);
+      log.info("""
+
+          userId={},
+          chatroomId={},
+          step=채팅방_입장,
+          status=SUCCESS
+
+          """, user.getId(), roomId);
       ValueOperations<String, Object> ops = redisTemplate.opsForValue();
       ops.set("connect::" + user.getId() + "::" + roomId, true);
 

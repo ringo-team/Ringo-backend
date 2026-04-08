@@ -71,7 +71,14 @@ public class FcmService {
     try {
       FirebaseMessaging.getInstance().send(message);
     }catch (Exception e){
-      log.error("step=FCM_알림_전송_실패, requestUserId={}, title={}, status=FAILED", receiver.getId(), title, e);
+      log.error("""
+
+          step=FCM_알림_전송_실패,
+          requestUserId={},
+          title={},
+          status=FAILED
+
+          """, receiver.getId(), title, e);
       FailedFcmMessageLog log = FailedFcmMessageLog.builder()
           .token(token.getToken())
           .errorMessage(e.getMessage())

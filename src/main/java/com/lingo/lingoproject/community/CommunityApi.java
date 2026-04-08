@@ -103,7 +103,7 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
   @PatchMapping("/comments/{comment-id}")
-  ResponseEntity<ResultMessageResponseDto> updateComment(@PathVariable(value = "comment-id") Long commentId, @RequestBody UpdateCommentRequestDto dto, @AuthenticationPrincipal User user);
+  ResponseEntity<ResultMessageResponseDto> updateComment(@PathVariable(value = "comment-id") Long commentId, @Valid @RequestBody UpdateCommentRequestDto dto, @AuthenticationPrincipal User user);
 
   @Operation(summary = "댓글 삭제")
   @ApiResponses(value = {
@@ -121,7 +121,7 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
   @PostMapping("/sub-comments")
-  ResponseEntity<CreateSubCommentResponseDto> createSubComment(@RequestBody CreateSubCommentRequestDto dto, @AuthenticationPrincipal User user);
+  ResponseEntity<CreateSubCommentResponseDto> createSubComment(@Valid @RequestBody CreateSubCommentRequestDto dto, @AuthenticationPrincipal User user);
 
   @Operation(summary = "대댓글 업데이트")
   @ApiResponses(value = {

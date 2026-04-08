@@ -39,9 +39,21 @@ public class UserController implements UserApi{
     }
 
     // 유저 삭제
-    log.info("userId={}, step=회원탈퇴_시작, status=SUCCESS", userId);
+    log.info("""
+
+        userId={},
+        step=회원탈퇴_시작,
+        status=SUCCESS
+
+        """, userId);
     userService.deleteUser(user, reason, feedback);
-    log.info("userId={}, step=회원탈퇴_완료, status=SUCCESS", userId);
+    log.info("""
+
+        userId={},
+        step=회원탈퇴_완료,
+        status=SUCCESS
+
+        """, userId);
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
         ErrorCode.SUCCESS.getCode(), "유저를 성공적으로 삭제하였습니다."));
@@ -49,18 +61,42 @@ public class UserController implements UserApi{
 
   @Override
   public ResponseEntity<GetUserLoginIdResponseDto> findUserLoginId(User user){
-    log.info("userId={}, step=유저_ID찾기_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저_ID찾기_시작,
+        status=SUCCESS
+
+        """, user.getId());
     String loginId = userService.findUserLoginId(user);
-    log.info("userId={}, step=유저_ID찾기_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저_ID찾기_완료,
+        status=SUCCESS
+
+        """, user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new GetUserLoginIdResponseDto(loginId));
   }
 
   @Override
   public ResponseEntity<ResultMessageResponseDto> resetPassword(ResetPasswordRequestDto dto, User user){
-    log.info("userId={}, step=비밀번호_재설정_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=비밀번호_재설정_시작,
+        status=SUCCESS
+
+        """, user.getId());
     userService.resetPassword(dto.password(), user);
-    log.info("userId={}, step=비밀번호_재설정_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=비밀번호_재설정_완료,
+        status=SUCCESS
+
+        """, user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
         ErrorCode.SUCCESS.getCode(), "password를 성공적으로 변경하였습니다."));
@@ -68,18 +104,42 @@ public class UserController implements UserApi{
 
   @Override
   public ResponseEntity<GetUserInfoResponseDto> getUserInfo(Long userId, User user){
-    log.info("userId={}, step=유저정보_조회_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저정보_조회_시작,
+        status=SUCCESS
+
+        """, user.getId());
     GetUserInfoResponseDto dto = userService.getUserInfo(userId, user);
-    log.info("userId={}, step=유저정보_조회_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저정보_조회_완료,
+        status=SUCCESS
+
+        """, user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(dto);
   }
 
   @Override
   public ResponseEntity<ResultMessageResponseDto> updateUserInfo(UpdateUserInfoRequestDto dto, User user){
-    log.info("userId={}, step=유저정보_수정_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저정보_수정_시작,
+        status=SUCCESS
+
+        """, user.getId());
     userService.updateUserInfo(user, dto);
-    log.info("userId={}, step=유저정보_수정_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저정보_수정_완료,
+        status=SUCCESS
+
+        """, user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
         ErrorCode.SUCCESS.getCode(), "정상적으로 수정되었습니다."));
@@ -87,15 +147,33 @@ public class UserController implements UserApi{
 
   @Override
   public ResponseEntity<GetFriendInvitationCodeResponseDto> getInvitationCode(User user){
-    log.info("userId={}, step=친구초대코드_조회_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=친구초대코드_조회_시작,
+        status=SUCCESS
+
+        """, user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(new GetFriendInvitationCodeResponseDto(user.getFriendInvitationCode()));
   }
 
   @Override
   public ResponseEntity<ResultMessageResponseDto> inputInvitationCodeAndGetReward(User user, String code){
-    log.info("userId={}, step=친구초대코드_입력_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=친구초대코드_입력_시작,
+        status=SUCCESS
+
+        """, user.getId());
     userService.checkFriendInvitationCodeAndProvideReward(user, code);
-    log.info("userId={}, step=친구초대코드_입력_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=친구초대코드_입력_완료,
+        status=SUCCESS
+
+        """, user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
         ErrorCode.SUCCESS.getCode(), "친구와 본인 모두 보상을 획득하였습니다."));
@@ -104,9 +182,21 @@ public class UserController implements UserApi{
   @Override
   public ResponseEntity<ResultMessageResponseDto> updateDormantAccount(User user){
 
-    log.info("userId={}, step=휴면계정_상태변경_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=휴면계정_상태변경_시작,
+        status=SUCCESS
+
+        """, user.getId());
     userService.updateDormantAccount(user);
-    log.info("userId={}, step=휴면계정_상태변경_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=휴면계정_상태변경_완료,
+        status=SUCCESS
+
+        """, user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
         ErrorCode.SUCCESS.getCode(), "휴면 계정 정보를 업데이트 하였습니다."));
@@ -115,9 +205,21 @@ public class UserController implements UserApi{
   @Override
   public ResponseEntity<ResultMessageResponseDto> saveUserAccessLog(User user){
 
-    log.info("userId={}, step=유저_접근로그_저장_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저_접근로그_저장_시작,
+        status=SUCCESS
+
+        """, user.getId());
     userService.saveUserAccessLog(user);
-    log.info("userId={}, step=유저_접근로그_저장_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저_접근로그_저장_완료,
+        status=SUCCESS
+
+        """, user.getId());
 
     return ResponseEntity.status(HttpStatus.OK)
         .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "유저 접속 정보가 저장되었습니다."));
@@ -125,9 +227,21 @@ public class UserController implements UserApi{
 
   @Override
   public ResponseEntity<ResultMessageResponseDto> saveMembership(SaveMembershipRequestDto dto, User user) {
-    log.info("userId={}, step=유저_구독_시작, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저_구독_시작,
+        status=SUCCESS
+
+        """, user.getId());
     userService.saveMembership(dto.duration(), user);
-    log.info("userId={}, step=유저_구독_완료, status=SUCCESS", user.getId());
+    log.info("""
+
+        userId={},
+        step=유저_구독_완료,
+        status=SUCCESS
+
+        """, user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "멤버십이 구독되었습니다."));
   }

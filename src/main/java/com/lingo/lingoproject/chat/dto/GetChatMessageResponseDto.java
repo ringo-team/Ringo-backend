@@ -28,6 +28,8 @@ public class GetChatMessageResponseDto {
   String content;
   @Schema(description = "채팅 생성일자", example = "2025-07-05 14:46:37")
   String createdAt;
+  @Schema(description = "채팅 읽음 여부", example = "1 이면 읽음, 0이면 읽지 않음")
+  Integer isRead;
   @Schema(description = "채팅 읽은 사람 리스트", example = "[\"12\", \"25\"]")
   List<Long> readerIds;
 

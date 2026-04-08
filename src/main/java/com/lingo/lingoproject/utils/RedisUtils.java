@@ -76,13 +76,15 @@ public class RedisUtils {
 
   public void cacheUntilMidnight(String key, Object value) {
 
-    Instant expireAtUtc = LocalDate.now()
+    Instant expireAt = LocalDate.now()
         .plusDays(1)
         .atStartOfDay(ZoneId.systemDefault())
         .toInstant();
 
+    log.info("{} 값 caching 유지 기간: {} 까지", value, expireAt);
+
     //  캐시 저장 + 만료 시각 지정
     redisTemplate.opsForValue().set(key, value);
-    redisTemplate.expireAt(key, expireAtUtc);
+    redisTemplate.expireAt(key, expireAt);
   }
 }

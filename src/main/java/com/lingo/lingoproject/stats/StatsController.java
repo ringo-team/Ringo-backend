@@ -27,11 +27,24 @@ public class StatsController {
   @Operation(summary = "일일 방문객 수 조회")
   @GetMapping
   public ResponseEntity<GetTodayVisitorStatsRequestDto> getTodayNumberOfVisitor(){
-    log.info("step=일일_방문자수_조회_시작, status=SUCCESS");
+    log.info("""
+
+        step=일일_방문자수_조회_시작,
+        status=SUCCESS
+
+        """);
     long countOfTodayVisitors = statService.getTodayNumberOfVisitor();
     float ratioOfTodayMaleVisitor = statService.getTodayMaleRatioOfVisitor();
     float ratioOfTodayFemaleVisitor = 100 - ratioOfTodayMaleVisitor;
-    log.info("step=일일_방문자수_조회_완료, status=SUCCESS, count={}, maleRatio={}, femaleRatio={}", countOfTodayVisitors, ratioOfTodayMaleVisitor, ratioOfTodayFemaleVisitor);
+    log.info("""
+
+        step=일일_방문자수_조회_완료,
+        status=SUCCESS,
+        count={},
+        maleRatio={},
+        femaleRatio={}
+
+        """, countOfTodayVisitors, ratioOfTodayMaleVisitor, ratioOfTodayFemaleVisitor);
 
     return ResponseEntity.status(HttpStatus.OK).body(new GetTodayVisitorStatsRequestDto(countOfTodayVisitors, ratioOfTodayMaleVisitor, ratioOfTodayFemaleVisitor));
   }
@@ -39,9 +52,20 @@ public class StatsController {
   @Operation(summary = "일주일 간 일일 방문객 수 조회")
   @GetMapping("/daily")
   public ResponseEntity<ApiListResponseDto<GetDailyNumberOfVisitorRequestDto>> getDailyNumberOfVisitor(){
-    log.info("step=주간_방문자수_조회_시작, status=SUCCESS");
+    log.info("""
+
+        step=주간_방문자수_조회_시작,
+        status=SUCCESS
+
+        """);
     List<GetDailyNumberOfVisitorRequestDto> visitors = statService.getDailyNumberOfVisitorForWeek();
-    log.info("count={}, step=주간_방문자수_조회_완료, status=SUCCESS", visitors.size());
+    log.info("""
+
+        count={},
+        step=주간_방문자수_조회_완료,
+        status=SUCCESS
+
+        """, visitors.size());
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), visitors));
   }
 

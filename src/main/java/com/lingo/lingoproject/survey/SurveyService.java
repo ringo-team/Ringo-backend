@@ -116,6 +116,16 @@ public class SurveyService {
       // 이미 응답한 설문이 존재하면 수정하고 list에 추가
       if (answeredSurveyRepository.existsByUserAndSurveyNum(user, r.surveyNum())){
         AnsweredSurvey answeredSurvey = answeredSurveyRepository.findByUserAndSurveyNum(user, r.surveyNum());
+        log.info("""
+            user-id: {},
+            survey-num: {},
+            answer-survey-변화: {} ------> {}
+            """,
+            user.getId(),
+            r.surveyNum(),
+            answeredSurvey.getAnswer(),
+            r.answer()
+        );
         answeredSurvey.setAnswer(r.answer());
         list.add(answeredSurvey);
       }
@@ -125,6 +135,16 @@ public class SurveyService {
             .surveyNum(r.surveyNum())
             .answer(r.answer())
             .build();
+        log.info("""
+            user-id: {},
+            survey-num: {},
+            answer-survey-변화: {} ------> {}
+            """,
+            user.getId(),
+            r.surveyNum(),
+            answeredSurvey.getAnswer(),
+            r.answer()
+            );
         list.add(answeredSurvey);
       }
     });
@@ -155,11 +175,52 @@ public class SurveyService {
           .stream()
           .map(GetSurveyResponseDto::from)
           .toList();
+      log.info("""
+          number-of-answer-surveys: {},
+          limit: {},
+          조회된_설문_번호: {} ~ {}
+          총_조회된_설문_개수: {} 개
+          """,
+          numberOfAnswerSurveys,
+          SIGNUP_NUMBER_OF_SURVEYS + NUMBER_OF_DAILY_SURVEYS * MAX_SURVEY_STARTER_DAYS,
+          numberOfAnswerSurveys + 1, numberOfAnswerSurveys + NUMBER_OF_DAILY_SURVEYS,
+          results.size()
+          );
       redisUtils.cacheUntilMidnight("recommend-for-daily-survey::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), results));
+
+      results.forEach(result -> {
+          log.info("""
+              user-id: {},
+              survey-num: {},
+              confront-survey-num: {},
+              survey-purpose: {}]
+              """,
+              user.getId(),
+              result.surveyNum(),
+              result.confrontSurveyNum(),
+              result.purpose()
+              );
+      });
+
       return results;
     }
 
     List<GetSurveyResponseDto> results = getRandomlySelectedDailySurvey();
+
+    results.forEach(result -> {
+          log.info("""
+                  user-id: {},
+                  survey-num: {},
+                  confront-survey-num: {},
+                  survey-purpose: {}]
+                  """,
+              user.getId(),
+              result.surveyNum(),
+              result.confrontSurveyNum(),
+              result.purpose()
+          );
+        });
+
 
     // 캐시 저장
     redisUtils.cacheUntilMidnight("dailySurvey::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), results));
@@ -176,6 +237,11 @@ public class SurveyService {
     while (randomlySelectedSurveyNums.size() < NUMBER_OF_DAILY_SURVEYS){
       randomlySelectedSurveyNums.add(random.nextInt(totalCountOfSurveys) + 1);
     }
+
+    log.info("""
+        total-survey-count: {},
+        randomly-selected-survey-nums: {}
+        """, totalCountOfSurveys, randomlySelectedSurveyNums);
 
     List<Survey> randomSurveys = surveyRepository.findAllBySurveyNumIn(randomlySelectedSurveyNums);
     return randomSurveys.stream()

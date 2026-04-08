@@ -33,38 +33,83 @@ public class LoginController implements LoginApi{
     try {
       info = (LoginInfoDto) request.getAttribute("requestBody");
     } catch (Exception e) {
-      log.error("step=로그인_요청값_역직렬화_실패, status=FAILED", e);
+      log.error("""
+
+          step=로그인_요청값_역직렬화_실패,
+          status=FAILED
+
+          """, e);
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    log.info("step=로그인_시작, status=SUCCESS");
+    log.info("""
+
+        step=로그인_시작,
+        status=SUCCESS
+
+        """);
     LoginResponseDto response = loginService.login(info);
-    log.info("step=로그인_완료, status=SUCCESS");
+    log.info("""
+
+        step=로그인_완료,
+        status=SUCCESS
+
+        """);
 
     return ResponseEntity.status(HttpStatus.OK).body(response);
   }
 
 
   public ResponseEntity<RegenerateTokenResponseDto> refresh(String refreshToken) {
-    log.info("step=토큰_재발급_시작, status=SUCCESS");
+    log.info("""
+
+        step=토큰_재발급_시작,
+        status=SUCCESS
+
+        """);
     RegenerateTokenResponseDto response = loginService.regenerateToken(refreshToken);
-    log.info("step=토큰_재발급_완료, status=SUCCESS");
+    log.info("""
+
+        step=토큰_재발급_완료,
+        status=SUCCESS
+
+        """);
 
     return ResponseEntity.status(HttpStatus.OK).body(response);
   }
 
   public ResponseEntity<SignupResponseDto> signup(LoginInfoDto dto) {
-    log.info("step=회원가입_시작, status=SUCCESS");
+    log.info("""
+
+        step=회원가입_시작,
+        status=SUCCESS
+
+        """);
     User user = loginService.signup(dto);
-    log.info("step=회원가입_완료, status=SUCCESS");
+    log.info("""
+
+        step=회원가입_완료,
+        status=SUCCESS
+
+        """);
 
     return ResponseEntity.status(HttpStatus.OK).body(new SignupResponseDto(user.getId(), "회원가입이 완료되었습니다."));
   }
 
 
   public ResponseEntity<ResultMessageResponseDto> signupUserInfo(@Valid @RequestBody SignupUserInfoDto dto){
-    log.info("step=회원_정보_저장_시작, status=SUCCESS");
+    log.info("""
+
+        step=회원_정보_저장_시작,
+        status=SUCCESS
+
+        """);
     loginService.saveUserInfo(dto);
-    log.info("step=회원_정보_저장_완료, status=SUCCESS");
+    log.info("""
+
+        step=회원_정보_저장_완료,
+        status=SUCCESS
+
+        """);
 
     return ResponseEntity.status(HttpStatus.OK)
         .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "유저 정보 저장이 완료되었습니다."));
@@ -73,9 +118,19 @@ public class LoginController implements LoginApi{
 
   public ResponseEntity<ResultMessageResponseDto> verifyDuplicatedLoginId(String loginId)
   {
-    log.info("step=회원_아이디_중복확인_시작, status=SUCCESS");
+    log.info("""
+
+        step=회원_아이디_중복확인_시작,
+        status=SUCCESS
+
+        """);
     boolean isDuplicated = loginService.verifyDuplicatedLoginId(loginId);
-    log.info("step=회원_아이디_중복확인_완료, status=SUCCESS");
+    log.info("""
+
+        step=회원_아이디_중복확인_완료,
+        status=SUCCESS
+
+        """);
     if (isDuplicated) {
       return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
           .body(new ResultMessageResponseDto(ErrorCode.DUPLICATED.getCode(), "중복된 아이디입니다."));
@@ -86,9 +141,19 @@ public class LoginController implements LoginApi{
 
 
   public ResponseEntity<ResultMessageResponseDto> verifyDuplicatedNickname(String nickname){
-    log.info("step=회원_닉네임_중복확인_시작, status=SUCCESS");
+    log.info("""
+
+        step=회원_닉네임_중복확인_시작,
+        status=SUCCESS
+
+        """);
     boolean isDuplicated = loginService.verifyDuplicatedNickname(nickname);
-    log.info("step=회원_닉네임_중복확인_완료, status=SUCCESS");
+    log.info("""
+
+        step=회원_닉네임_중복확인_완료,
+        status=SUCCESS
+
+        """);
     if (isDuplicated) {
       return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
           .body(new ResultMessageResponseDto(ErrorCode.DUPLICATED.getCode(), "중복된 닉네임입니다."));

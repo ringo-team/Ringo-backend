@@ -40,6 +40,7 @@ import com.lingo.lingoproject.utils.GenericUtils;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -49,6 +50,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CommunityService {
 
   private final PostRepository postRepository;
@@ -62,6 +64,14 @@ public class CommunityService {
   private final SubCommentRepository subCommentRepository;
 
   public SavePostResponseDto post(SavePostRequestDto dto, List<MultipartFile> images){
+    log.info("""
+
+        step=게시물_작성_시작,
+        userId={},
+        recommendationId={},
+        topic={}
+
+        """, dto.userId(), dto.recommendationId(), dto.topic());
     User author = userRepository.findById(dto.userId()).orElseThrow(
         () -> new RingoException("게시물을 포스팅하던 도중 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)
     );
@@ -77,6 +87,14 @@ public class CommunityService {
         .topic(postTopic)
         .build();
     Post savedPost = postRepository.save(post);
+    log.info("""
+
+        step=게시물_저장_완료,
+        postId={},
+        userId={},
+        imageCount={}
+
+        """, savedPost.getId(), dto.userId(), images.size());
 
     List<SavePostImageResponseDto> imageList = new ArrayList<>();
 
@@ -110,6 +128,14 @@ public class CommunityService {
     List<UpdatePostImageRequestDto> images = dto.imagelist();
 
     if (!authorId.equals(user.getId())){
+      log.warn("""
+
+          step=게시물_수정_권한없음,
+          postId={},
+          requestUserId={},
+          authorId={}
+
+          """, postId, user.getId(), authorId);
       throw new RingoException("게시자만 게시물을 업데이트할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
@@ -134,6 +160,13 @@ public class CommunityService {
     });
 
     postRepository.save(post);
+    log.info("""
+
+        step=게시물_수정_완료,
+        postId={},
+        userId={}
+
+        """, postId, user.getId());
 
     return new UpdatePostResponseDto(imageList, ErrorCode.SUCCESS.getCode());
   }
@@ -146,6 +179,14 @@ public class CommunityService {
     Long authorId = post.getAuthor().getId();
 
     if (!authorId.equals(user.getId())){
+      log.warn("""
+
+          step=게시물_삭제_권한없음,
+          postId={},
+          requestUserId={},
+          authorId={}
+
+          """, postId, user.getId(), authorId);
       throw new RingoException("게시자만 게시물을 삭제할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
     }
 
@@ -164,6 +205,13 @@ public class CommunityService {
       commentRepository.delete(comment);
     });
     postRepository.delete(post);
+    log.info("""
+
+        step=게시물_삭제_완료,
+        postId={},
+        userId={}
+
+        """, postId, user.getId());
   }
 
   public List<GetPostResponseDto> getPost(Long recommendationId, String topic, int page, int size){
@@ -225,6 +273,14 @@ public class CommunityService {
         () -> new RingoException("댓글 업데이트 도중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST)
     );
     if (!comment.getUser().getId().equals(user.getId())){
+      log.warn("""
+
+          step=댓글_수정_권한없음,
+          commentId={},
+          requestUserId={},
+          commentOwnerId={}
+
+          """, commentId, user.getId(), comment.getUser().getId());
       throw new RingoException("댓글을 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
     comment.setContent(dto.content());
@@ -240,6 +296,13 @@ public class CommunityService {
       commentRepository.deleteById(commentId);
       return;
     }
+    log.warn("""
+
+        step=댓글_삭제_권한없음,
+        commentId={},
+        requestUserId={}
+
+        """, commentId, user.getId());
     throw new RingoException("댓글을 지울 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
   }
 
@@ -301,14 +364,33 @@ public class CommunityService {
       subComment.setContent(dto.content());
       subCommentRepository.save(subComment);
     }
-    else throw new RingoException("대댓글을 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    else {
+      log.warn("""
+
+          step=대댓글_수정_권한없음,
+          subCommentId={},
+          requestUserId={},
+          subCommentOwnerId={}
+
+          """, subCommentId, user.getId(), subComment.getUser().getId());
+      throw new RingoException("대댓글을 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    }
   }
 
   public void deleteSubComment(Long subCommentId, User user){
     if (subCommentRepository.existsByIdAndUser(subCommentId, user)){
       subCommentRepository.deleteById(subCommentId);
     }
-    else throw new RingoException("대댓글을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    else {
+      log.warn("""
+
+          step=대댓글_삭제_권한없음,
+          subCommentId={},
+          requestUserId={}
+
+          """, subCommentId, user.getId());
+      throw new RingoException("대댓글을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    }
   }
 
   public void likePost(Long postId, User user){
