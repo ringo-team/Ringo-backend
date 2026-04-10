@@ -222,6 +222,8 @@ public class MatchService {
     // 매칭 수락으로 변경
     matching.setMatchingStatus(MatchingStatus.ACCEPTED);
 
+    matchingRepository.save(matching);
+
     // 채팅방 생성
     chatService.createChatroom(
         new CreateChatroomRequestDto(
@@ -232,7 +234,7 @@ public class MatchService {
     );
 
     // fcm 요청 전송
-    fcmService.sendFcmNotification(matching.getRequestUser(), "누군가 요청을 수락했어요", null, NotificationType.MATCHING_ACCEPTED);
+    // fcmService.sendFcmNotification(matching.getRequestUser(), "누군가 요청을 수락했어요", null, NotificationType.MATCHING_ACCEPTED);
   }
 
   @Transactional

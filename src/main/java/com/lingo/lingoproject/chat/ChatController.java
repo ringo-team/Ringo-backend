@@ -17,6 +17,8 @@ import com.lingo.lingoproject.notification.FcmService;
 import com.lingo.lingoproject.utils.ApiListResponseDto;
 import com.lingo.lingoproject.utils.ResultMessageResponseDto;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -153,18 +155,29 @@ public class ChatController implements ChatApi{
 
 
     List<Long> connectedUserIdList = chatService.getConnectedUserIdList(roomMembers, roomId);
+    if (!connectedUserIdList.contains(chatMessageDto.getSenderId()
+    )){
+      throw new RingoException("레디스에 채팅방에 존재하는 유저 id가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    String createdAt = DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm:ss").format(LocalDateTime.now());
     chatMessageDto.setReaderIds(connectedUserIdList);
+    chatMessageDto.setCreatedAt(createdAt);
 
     // 메세지 저장
-    Message savedMessage = chatService.saveMessage(chatMessageDto, roomId);
-
-    if (savedMessage == null) return;
+    Message savedMessage = null;
+    if(!chatMessageDto.getType().equalsIgnoreCase("CONNECT")) {
+      savedMessage = chatService.saveMessage(chatMessageDto, roomId);
+      if (savedMessage == null) return;
+    }
 
     for (User member : roomMembers) {
       try {
         if (connectedUserIdList.contains(member.getId())) chatMessageDto.setIsRead(1);
         else chatMessageDto.setIsRead(0);
         // 해당 방에 메세지 전송
+
+        log.info("senderID: " + chatMessageDto.getSenderId() + ", receiverID: " + member.getId());
         simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/topic/" + roomId, chatMessageDto);
       } catch (Exception e) {
         // 에러, 메세지, 방id, 전송자, 목적지
@@ -185,8 +198,9 @@ public class ChatController implements ChatApi{
         chatService.savedSimpMessagingError(e, savedMessage, roomId, member.getLoginId(), "/room-list/");
       }
 
-      if (!connectedUserIdList.contains(member.getId()))
-        fcmService.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
+      if (!connectedUserIdList.contains(member.getId())) {
+        //fcmService.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
+      }
     }
   }
 

@@ -170,8 +170,13 @@ public class ChatService {
   private void markIsReadFlag(GetChatMessageResponseDto dto, User chatUser){
     List<Long> readerIds = dto.getReaderIds();
 
-    if (readerIds.contains(dto.getSenderId())){
-      log.info("""
+    if (readerIds.isEmpty()) {
+      log.error("채팅을 읽은 사람이 없습니다.");
+      dto.setIsRead(0); // 읽은 사람이 없는 경우
+    }
+
+    if (!readerIds.contains(dto.getSenderId())){
+      log.error("""
           
           readerIds: {},
           보낸_사람_id: {},
@@ -179,11 +184,6 @@ public class ChatService {
           
           """, readerIds, dto.getSenderId());
       throw new RingoException("readerIds에 보낸 사람의 id가 존재하지 않습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-    }
-
-    if (readerIds.isEmpty()) {
-      log.error("채팅을 읽은 사람이 없습니다.");
-      dto.setIsRead(0); // 읽은 사람이 없는 경우
     }
     /*
      * 보낸 사람만 읽은 경우 -> 안 읽음 처리
@@ -255,7 +255,7 @@ public class ChatService {
         .roomId(roomId)
         .errorMessage(e.getMessage())
         .errorCause(e.getCause() != null ? e.getCause().getMessage() : null)
-        .messageId(savedMessage.getId())
+        .messageId(savedMessage != null ? savedMessage.getId() : null)
         .destination(destination + roomId)
         .userLoginId(userLoginId)
         .build();
@@ -431,7 +431,7 @@ public class ChatService {
               
               userId: {},
               채팅방_id: {}
-              채팅방이 조회되지 않습니다
+              나간 채팅방은 조회되지 않습니다
               
               """, user.getId(), chatroom.getId());
           continue;
@@ -544,10 +544,8 @@ public class ChatService {
       log.info("""
           
           요청자_id: {} | 채팅_참여자_id: {}, {} | 채팅방_크기: {}
-          한명이 회원탈퇴한 채팅방에 조회를 요청하였습니다.
-          * 확인: 채팅방 참여자와 요청자가 동일한 사용자인지 확인해야합니다.
           
-          """, userId, userIds.get(0), userIds.get(1), 1);
+          """, userId, userIds.get(0), userIds.get(1), userIds.size());
     }
 
     return userIds.contains(userId);
@@ -565,13 +563,19 @@ public class ChatService {
 
   /**
    * 안읽은 메세지를 읽은 메세지로 전부 변환하는 함수
+   *
+   * @param roomId 채팅방 id
+   * @param userId 요청 유저 id
    */
   @Transactional
   public void readAllMessages(Long roomId, Long userId){
     messageRepository.readAllMessages(roomId, userId);
   }
 
-  // 약속 잡기
+  /**
+   * 약속 db 저장 함수
+   * @param dto 약속 잡기 요청 dto
+   */
   public GetChatMessageResponseDto saveAppointment(SaveAppointmentRequestDto dto){
     User register = userRepository.findById(dto.registerId()).orElseThrow(
         () -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST)

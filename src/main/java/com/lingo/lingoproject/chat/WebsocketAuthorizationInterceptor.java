@@ -6,7 +6,9 @@ import com.lingo.lingoproject.exception.RingoException;
 import com.lingo.lingoproject.repository.UserRepository;
 import com.lingo.lingoproject.security.jwt.JwtUtil;
 import io.jsonwebtoken.Claims;
+import java.security.Principal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -17,8 +19,10 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
@@ -38,16 +42,28 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     }
 
     String token = accessor.getFirstNativeHeader("Authorization");
-
+    User user;
     /*------------------------------------토큰 검증-----------------------------------------*/
     if (token == null || !token.startsWith("Bearer ")) {
-      throw new RingoException("토큰이 없습니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN);
+      if (accessor.getUser() != null) user = userRepository.findByLoginId(accessor.getUser().getName()).orElseThrow(
+          () -> new RingoException("유저 정보가 올바르지 않습니다.", ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN)
+      );
+      else throw new RingoException("토큰이 없습니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN);
     }
-    token = token.substring(7);
+    else {
+      token = token.substring(7);
 
     Claims claims = jwtUtil.getClaims(token);
-    User user = userRepository.findByLoginId(claims.getSubject())
+    user = userRepository.findByLoginId(claims.getSubject())
             .orElseThrow(() -> new RingoException("유효한 토큰이 아닙니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN));
+    accessor.setUser(new Principal() {
+      @Override
+      public String getName() {
+        return user.getLoginId();
+      }
+    });
+    }
+
     /*-------------------------------------------------------------------------------------*/
 
     /*------------------------------------토큰으로 인증----------------------------------------*/
@@ -65,8 +81,10 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     Long roomId = extractRoomId(destination);
 
     if (roomId == null) {
+      log.info("roomId is null");
       return message;
     }
+
     if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())){
       if(!chatService.isMemberInChatroom(roomId, user.getId())){
         throw new RingoException("구독 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
@@ -77,6 +95,7 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
         throw new RingoException("메세지 전달 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
       }
     }
+    log.info("no error");
     return message;
   }
 

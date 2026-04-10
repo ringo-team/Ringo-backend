@@ -77,16 +77,26 @@ public class StompConnectionListener {
   public void onDisconnected(SessionDisconnectEvent event){
     try {
 
+      log.info("disconnect working");
+
       // 유저 조회
       StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
-      if (accessor.getUser() == null) return;
+      if (accessor.getUser() == null) {
+        log.info("access user not exist");
+        return;
+      }
+
       String username = accessor.getUser().getName();
       User user = userRepository.findByLoginId(username).orElseThrow(() ->
           new RingoException("세션에 해당하는 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
 
       // 유저 id 로 저장된 키 모두 삭제
-      Set<String> keyset = redisTemplate.keys("connect::" + user.getId());
+      Set<String> keyset = redisTemplate.keys("connect::" + user.getId() + "*");
+      if (keyset.isEmpty() || keyset == null){
+        log.info("error");
+      }
       for (String key : keyset) {
+        log.info("deleted key: " + key);
         redisTemplate.delete(key);
       }
 
