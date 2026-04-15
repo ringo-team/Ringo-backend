@@ -1,0 +1,39 @@
+package com.lingo.lingoproject.shared.domain.model;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Getter
+@Table(name = "DORMANT_ACCOUNTS")
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class DormantAccount {
+
+  public static DormantAccount of(User user) {
+    return DormantAccount.builder()
+        .user(user)
+        .build();
+  }
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  /*
+  휴면 계정은 친구 추천에 들어가면 안됨;
+   */
+  @ManyToOne
+  @JoinColumn(name = "user_id")
+  private User user;
+}

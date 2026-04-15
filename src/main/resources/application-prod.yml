@@ -61,3 +61,6 @@ ringo:
       self_representation_weight: 0.3
       content_weight: 0.25
       sharing_weight: 0.25
+
+springdoc:
+  server-url: https://api.ringolinkgo.com

@@ -1,0 +1,149 @@
+package com.lingo.lingoproject.snap.presentation;
+import com.lingo.lingoproject.snap.application.SnapService;
+import com.lingo.lingoproject.shared.exception.ErrorCode;
+import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageService;
+import com.lingo.lingoproject.shared.presentation.dto.image.GetImageUrlResponseDto;
+import com.lingo.lingoproject.snap.presentation.dto.ApplySnapShootingRequestDto;
+import com.lingo.lingoproject.snap.presentation.dto.GetPhotographerInfosResponseDto;
+import com.lingo.lingoproject.snap.presentation.dto.UpdatePhotographerExampleImagesInfoRequestDto;
+import com.lingo.lingoproject.snap.presentation.dto.SavePhotographerInfoRequestDto;
+import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
+import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import com.lingo.lingoproject.shared.exception.RingoException;
+
+@RestController
+@Slf4j
+@RequiredArgsConstructor
+@Tag(name = "snap-controller", description = "스냅 신청, 작가 정보 조회 관련 api")
+public class SnapController {
+
+  private final SnapService snapService;
+  private final S3ImageStorageService imageService;
+
+  @Operation(summary = "스냅 사진 신청")
+  @PostMapping("/snaps")
+  public ResponseEntity<ResultMessageResponseDto> applySnapShooting(@Valid @RequestBody ApplySnapShootingRequestDto dto){
+    try {
+      log.info("step=스냅_촬영_신청_시작");
+      snapService.applySnapShooting(dto);
+      log.info("step=스냅_촬영_신청_완료");
+
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 촬영 날짜가 저장되었습니다."));
+    } catch (Exception e) {
+      log.error("step=스냅_촬영_신청_실패", e);
+      if (e instanceof RingoException re) {
+        throw re;
+      }
+      throw new RingoException("스냅 촬영 신청에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Operation(summary = "사진 작가 정보 저장")
+  @PostMapping("/photographers/{photographerId}")
+  public ResponseEntity<ResultMessageResponseDto> savePhotographerInfo(
+      @Valid @RequestBody SavePhotographerInfoRequestDto dto,
+      @PathVariable(value = "photographerId") Long photographerId
+  ){
+    try {
+      log.info("step=작가_정보_저장_시작, photographerId={}", photographerId);
+      snapService.savePhotographerInfo(dto, photographerId);
+      log.info("step=작가_정보_저장_완료, photographerId={}", photographerId);
+
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 작가 정보가 저장되었습니다."));
+
+    } catch (Exception e) {
+      log.error("step=작가_정보_저장_실패, photographerId={}", photographerId, e);
+      if (e instanceof RingoException re) {
+        throw re;
+      }
+      throw new RingoException("작가 정보를 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Operation(summary = "촬영 예시 사진 업로드")
+  @PostMapping(value = "photographers/{photographerId}/example-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> uploadPhotographerExampleImages(
+      @Parameter(description = "이미지 파일들 업로드")
+      @RequestParam(value = "images") List<MultipartFile> images,
+
+      @Parameter(description = "사진 작가 id", example = "103")
+      @PathVariable("photographerId") Long photographerId
+  ){
+    List<GetImageUrlResponseDto> dtos;
+    try {
+      log.info("step=작가_예시사진_업로드_시작, photographerId={}", photographerId);
+      dtos = imageService.uploadPhotographerImages(images, photographerId);
+      log.info("step=작가_예시사진_업로드_완료, photographerId={}", photographerId);
+
+      return ResponseEntity.status(HttpStatus.CREATED)
+          .body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));
+
+    } catch (Exception e) {
+      log.error("step=작가_예시사진_업로드_실패, photographerId={}", photographerId, e);
+      if (e instanceof RingoException re) {
+        throw re;
+      }
+      throw new RingoException("작가 예시 사진 업로드에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Operation(summary = "촬영 예시 사진 정보 저장 또는 수정")
+  @PatchMapping(value = "/photographers/example-images")
+  public ResponseEntity<ResultMessageResponseDto> updatePhotographerExampleImagesInfo(
+    @Valid @RequestBody UpdatePhotographerExampleImagesInfoRequestDto dto
+  ){
+    try {
+      log.info("step=작가_예시사진_정보_저장_시작");
+      snapService.updatePhotographerExampleImagesInfo(dto);
+      log.info("step=작가_예시사진_정보_저장_완료");
+
+      return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "정상적으로 사진 정보가 저장되었습니다."));
+
+    } catch (Exception e) {
+      log.error("step=작가_예시사진_정보_저장_실패", e);
+      if (e instanceof RingoException re) {
+        throw re;
+      }
+      throw new RingoException("작가 예시사진 정보를 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Operation(summary = "작가 정보 가져오기")
+  @GetMapping("/photographer-infos")
+  public ResponseEntity<ApiListResponseDto<GetPhotographerInfosResponseDto>> getPhotographerInfos(){
+    List<GetPhotographerInfosResponseDto> list;
+    try {
+
+      log.info("step=작가_정보_조회_시작");
+      list = snapService.getPhotographerInfos();
+      log.info("step=작가_정보_조회_완료");
+
+      return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), list));
+
+    } catch (Exception e) {
+      log.error("step=작가_정보_조회_실패", e);
+      if (e instanceof RingoException re) {
+        throw re;
+      }
+      throw new RingoException("작가 정보를 조회하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+}
