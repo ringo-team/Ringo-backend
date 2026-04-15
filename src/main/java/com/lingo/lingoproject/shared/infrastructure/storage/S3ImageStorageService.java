@@ -91,6 +91,8 @@ public class S3ImageStorageService {
       return null;
     }
 
+    validateProfileImage(file, user);
+
     String imageUrl = uploadImageToS3(file, "profiles");
     Profile savedProfile = saveProfile(user, imageUrl);
     completeSignupStatus(user);

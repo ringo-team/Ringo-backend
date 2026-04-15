@@ -32,10 +32,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -103,22 +101,22 @@ public class ChatService {
    * @param size      페이지당 메시지 수
    * @return 상대방 정보 + 메시지 목록 + 각 메시지의 읽음 상태
    */
+  @Transactional
   public GetChatResponseDto fetchChatMessages(User user, Long chatroomId, int page, int size) {
     validateParticipant(chatroomId, user.getId());
 
     Chatroom chatroom = findChatroomOrThrow(chatroomId);
+    List<ChatroomParticipant> participants = fetchChatroomParticipantsByChatroomOrThrow(chatroom);
+
+    readAllMessages(chatroomId, user.getId());
     List<GetChatMessageResponseDto> messages = fetchPagedMessages(chatroomId, page, size);
-    List<ChatroomParticipant> participants = chatroomParticipantRepository.findAllByChatroom(chatroom);
 
     if (hasWithdrawnParticipant(participants)) {
       return buildWithdrawnUserChatroomResponse(messages, user);
     }
 
     User opponent = resolveOpponent(participants, user);
-    messages.forEach(dto -> applyReadStatus(dto, user));
-
-    List<String> hashtags = hashtagRepository.findAllByUser(opponent).stream()
-        .map(Hashtag::getHashtag).toList();
+    List<String> hashtags = getUserHashtags(opponent);
 
     log.info("step=메세지_조회, chatroomId={}, requestUserId={}, opponentId={}, opponentNickname={}, hashtags={}",
         chatroomId, user.getId(), opponent.getId(), opponent.getNickname(), hashtags);
@@ -317,7 +315,7 @@ public class ChatService {
    * 사용자가 해당 채팅방의 참여자인지 확인한다.
    */
   public boolean isParticipant(Long chatroomId, Long userId) {
-    List<Long> participantIds = findActiveParticipants(chatroomId).stream()
+    List<Long> participantIds = findParticipants(chatroomId).stream()
         .map(User::getId).toList();
     logParticipantCheckResult(chatroomId, userId, participantIds);
     return participantIds.contains(userId);
@@ -326,7 +324,7 @@ public class ChatService {
   /**
    * 채팅방의 탈퇴하지 않은 참여자 목록을 조회한다.
    */
-  public List<User> findActiveParticipants(Long chatroomId) {
+  public List<User> findParticipants(Long chatroomId) {
     Chatroom chatroom = chatroomRepository.findById(chatroomId)
         .orElseThrow(() -> new RingoException(
             "채팅방이 존재하지 않습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
@@ -340,16 +338,22 @@ public class ChatService {
   // Private helpers — chatroom summary
   // ============================================================
 
+  private List<ChatroomParticipant> fetchChatroomParticipantsByChatroomOrThrow(Chatroom chatroom){
+    List<ChatroomParticipant> participants = chatroomParticipantRepository.findAllByChatroom(chatroom);
+    if (participants.size() < 2){
+      throw new RingoException("chat_participants가_2미만_입니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    return participants;
+  }
+
   /** 단일 채팅방 요약 DTO를 생성한다. 나간 채팅방이면 null을 반환한다. */
   private GetChatroomResponseDto buildChatroomSummary(Chatroom chatroom, User user) {
     List<ChatroomParticipant> participants = chatroomParticipantRepository.findAllByChatroom(chatroom);
 
-    if (participants == null || participants.isEmpty()) {
-      log.error("chatroomId={}, step=참여자_없는_채팅방", chatroom.getId());
+    if (participants.size() < 2) {
+      log.error("chatroomId={}, step=chat_participant_오류", chatroom.getId());
       return null;
     }
-
-    validateParticipant(chatroom.getId(), user.getId());
 
     String opponentNickname;
     String opponentProfileUrl = null;
@@ -369,27 +373,29 @@ public class ChatService {
 
   /** 참여자 목록에서 상대방의 닉네임/프로필 정보를 추출한다. 사용자가 나간 채팅방이면 null을 반환한다. */
   private OpponentProfile resolveOpponentProfile(List<ChatroomParticipant> participants, User user) {
-    ChatroomParticipant participant1 = participants.get(0);
-    ChatroomParticipant participant2 = participants.get(1);
-    User firstUser = participant1.getParticipant();
-    User secondUser = participant2.getParticipant();
+    boolean hasLeft = hasUserLeftChatroom(participants, user);
 
-    boolean isCurrentUserFirst = user.getId().equals(firstUser.getId());
-    boolean isActive = isCurrentUserFirst ? participant1.isActive() : participant2.isActive();
-
-    if (!isActive) {
+    if (hasLeft) {
       log.info("userId={}, step=나간_채팅방_제외", user.getId());
       return null;
     }
 
-    User opponent = isCurrentUserFirst ? secondUser : firstUser;
-
-    log.info("step=채팅방_상대방_조회, user1Id={}, user1Nickname={}, user2Id={}, user2Nickname={}, requestUserId={}, opponentId={}",
-        firstUser.getId(), firstUser.getNickname(),
-        secondUser.getId(), secondUser.getNickname(),
-        user.getId(), opponent.getId());
+    User opponent = resolveOpponent(participants, user);
 
     return new OpponentProfile(opponent.getNickname(), opponent.getProfile().getImageUrl());
+  }
+
+  private boolean hasUserLeftChatroom(List<ChatroomParticipant> participants, User user){
+    ChatroomParticipant currentUser = resolveCurrentUser(participants, user);
+    return !currentUser.isActive();
+  }
+
+  private ChatroomParticipant resolveCurrentUser(List<ChatroomParticipant> participants, User user){
+    ChatroomParticipant participant1 = participants.get(0);
+    ChatroomParticipant participant2 = participants.get(1);
+    User user1 = participant1.getParticipant();
+
+    return user1.getId().equals(user.getId()) ? participant1 : participant2;
   }
 
   /** 채팅방 목록 응답 DTO를 빌드한다. */
@@ -400,12 +406,12 @@ public class ChatService {
       User user
   ) {
     int unreadCount = messageRepository.findNumberOfNotReadMessages(chatroom.getId(), user.getId());
-    Optional<Message> lastMessage =
-        messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(chatroom.getId());
-    String lastSentAt = lastMessage.map(m -> CHAT_TIME_FORMATTER.format(m.getCreatedAt())).orElse(null);
+    Message lastMessage = messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(chatroom.getId()).orElse(null);
+    String lastSentAt = lastMessage != null ? CHAT_TIME_FORMATTER.format(lastMessage.getCreatedAt()) : null;
+    String lastMessageContent = lastMessage != null ? lastMessage.getContent() : null;
 
-    GetChatroomResponseDto response = GetChatroomResponseDto.of(chatroom, opponentNickname,
-        opponentProfileUrl, lastMessage.map(Message::getContent).orElse(null), unreadCount, lastSentAt);
+    GetChatroomResponseDto response = GetChatroomResponseDto.of(
+        chatroom, opponentNickname, opponentProfileUrl, lastMessageContent, unreadCount, lastSentAt);
 
     log.info("step=채팅방_요약_빌드, chatroomId={}, opponentNickname={}, unreadCount={}, lastSentAt={}",
         response.chatroomId(), response.chatOpponent(),
@@ -477,15 +483,16 @@ public class ChatService {
 
   private List<GetChatMessageResponseDto> fetchPagedMessages(Long chatroomId, int page, int size) {
     Pageable pageable = PageRequest.of(page, size);
-    Page<Message> messages =
-        messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable);
-    return messages.stream()
-        .map(m -> GetChatMessageResponseDto.from(chatroomId, m))
-        .toList();
+    List<GetChatMessageResponseDto> messages =
+        messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable)
+            .stream().map(m -> GetChatMessageResponseDto.from(chatroomId, m))
+            .toList();
+    //messages.forEach(this::applyReadStatus);
+    return messages;
   }
 
-  /** 메시지 DTO에 읽음/미읽음 상태를 적용한다. */
-  private void applyReadStatus(GetChatMessageResponseDto dto, User viewer) {
+  /* 메시지 DTO에 읽음/미읽음 상태를 적용한다.
+  private void applyReadStatus(GetChatMessageResponseDto dto) {
     List<Long> readerIds = dto.getReaderIds();
 
     if (!readerIds.contains(dto.getSenderId())) {
@@ -493,15 +500,16 @@ public class ChatService {
       throw new RingoException(
           "readerIds에 보낸 사람의 id가 존재하지 않습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
     }
-    boolean onlySenderRead = readerIds.size() == 1 && dto.getSenderId().equals(viewer.getId());
+    boolean onlySenderRead = readerIds.size() == 1;
     dto.setIsRead(onlySenderRead ? 0 : 1);
   }
+  */
 
   // ============================================================
   // Private helpers — misc
   // ============================================================
 
-  private void validateParticipant(Long chatroomId, Long userId) {
+  public void validateParticipant(Long chatroomId, Long userId) {
     if (!isParticipant(chatroomId, userId)) {
       log.error("chatroomId={}, userId={}, step=채팅방_접근_권한_없음", chatroomId, userId);
       throw new RingoException("채팅방에 소속되지 않은 유저입니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
@@ -520,6 +528,11 @@ public class ChatService {
             "유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
   }
 
+  private List<String> getUserHashtags(User opponent){
+    return hashtagRepository.findAllByUser(opponent).stream()
+        .map(Hashtag::getHashtag).toList();
+  }
+
   private boolean hasWithdrawnParticipant(List<ChatroomParticipant> participants) {
     return participants.size() == 2
         && (participants.get(0).isWithdrawn() || participants.get(1).isWithdrawn());
@@ -535,7 +548,6 @@ public class ChatService {
       List<GetChatMessageResponseDto> messages,
       User user
   ) {
-    messages.forEach(dto -> applyReadStatus(dto, user));
     return GetChatResponseDto.of(GetChatroomMemberInfoResponseDto.withdrawn(), messages);
   }
 

@@ -35,7 +35,6 @@ public class ChatController implements ChatApi {
 
   private final ChatService chatService;
   private final SimpMessagingTemplate simpMessagingTemplate;
-  private final FcmNotificationUseCase fcmService;
 
 
   public ResponseEntity<GetChatResponseDto> getChattingMessages(Long roomId, int page, int size, User user) {
@@ -45,7 +44,6 @@ public class ChatController implements ChatApi {
     }
 
     log.info("step=메세지_조회_시작, userId={}, chatroomId={}", user.getId(), roomId);
-    chatService.readAllMessages(roomId, user.getId());
     GetChatResponseDto responses = chatService.fetchChatMessages(user, roomId, page, size);
     log.info("step=메세지_조회_완료, userId={}, chatroomId={}", user.getId(), roomId);
 
@@ -82,8 +80,10 @@ public class ChatController implements ChatApi {
 
 
   public void sendMessage(Long roomId, GetChatMessageResponseDto chatMessageDto) {
-    List<User> roomMembers = chatService.findActiveParticipants(roomId);
 
+    chatService.validateParticipant(roomId, chatMessageDto.getSenderId());
+
+    List<User> roomMembers = chatService.findParticipants(roomId);
     List<Long> connectedUserIdList = chatService.findConnectedUserIds(roomMembers, roomId);
     if (!connectedUserIdList.contains(chatMessageDto.getSenderId())) {
       throw new RingoException("레디스에 채팅방에 존재하는 유저 id가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
@@ -101,9 +101,6 @@ public class ChatController implements ChatApi {
 
     for (User member : roomMembers) {
       try {
-        if (connectedUserIdList.contains(member.getId())) chatMessageDto.setIsRead(1);
-        else chatMessageDto.setIsRead(0);
-
         log.info("step=메세지_전송, senderId={}, receiverId={}", chatMessageDto.getSenderId(), member.getId());
         simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/topic/" + roomId, chatMessageDto);
       } catch (Exception e) {
