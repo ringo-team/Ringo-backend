@@ -1,0 +1,44 @@
+package com.lingo.lingoproject.db.domain;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@Table(
+    name = "BLOCKED_USERS",
+    indexes = {
+        @Index(
+            name = "idx_blocked_users_blocked_user_id",
+            columnList = "blockedUserId"
+        )
+    }
+)
+public class BlockedUser {
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Column(length = 13)
+  private String phoneNumber;
+
+  private Long blockedUserId;
+
+  @ManyToOne
+  @JoinColumn(name = "admin_id")
+  private User admin;
+}

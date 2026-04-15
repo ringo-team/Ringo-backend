@@ -13,8 +13,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableJpaAuditing
 @ServletComponentScan
 @EnableCaching
-@EnableJpaRepositories("com.lingo.lingoproject.repository")
-@EnableMongoRepositories("com.lingo.lingoproject.mongo_repository")
+@EnableJpaRepositories("com.lingo.lingoproject.db.repository")
+@EnableMongoRepositories("com.lingo.lingoproject.db.mongo_repository")
 @EnableScheduling
 public class LingoProjectApplication {
 

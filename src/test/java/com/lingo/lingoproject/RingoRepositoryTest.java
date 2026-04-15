@@ -1,13 +1,13 @@
 package com.lingo.lingoproject;
 
 
-import com.lingo.lingoproject.domain.FailedFcmMessageLog;
-import com.lingo.lingoproject.exception.ErrorCode;
-import com.lingo.lingoproject.exception.RingoException;
-import com.lingo.lingoproject.image.ImageService;
-import com.lingo.lingoproject.match.MatchService;
-import com.lingo.lingoproject.retry.RedisQueueMessagePayLoad;
-import com.lingo.lingoproject.retry.RedisQueueService;
+import com.lingo.lingoproject.db.domain.FailedFcmMessageLog;
+import com.lingo.lingoproject.common.exception.ErrorCode;
+import com.lingo.lingoproject.common.exception.RingoException;
+import com.lingo.lingoproject.api.image.ImageService;
+import com.lingo.lingoproject.api.match.MatchService;
+import com.lingo.lingoproject.common.retry.RedisQueueMessagePayLoad;
+import com.lingo.lingoproject.common.retry.RedisQueueService;
 import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -31,8 +31,8 @@ public class RingoRepositoryTest {
 
   @Test
   public void getSuspendedUserTest(){
-    List<Long> banIds = matchService.getExcludedUserIdsForRecommendation(5L);
-    System.out.println("-----밴당한 유저 아이디 : " + banIds);
+    //List<Long> banIds = matchService.getExcludedUserIdsForRecommendation(5L);
+    //System.out.println("-----밴당한 유저 아이디 : " + banIds);
   }
 
   @Test

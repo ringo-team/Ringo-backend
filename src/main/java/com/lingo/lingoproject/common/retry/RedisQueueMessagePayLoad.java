@@ -1,0 +1,17 @@
+package com.lingo.lingoproject.common.retry;
+
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.SuperBuilder;
+
+@SuperBuilder
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter@Setter
+public class RedisQueueMessagePayLoad {
+  String content;
+  Integer retryCount;
+}
