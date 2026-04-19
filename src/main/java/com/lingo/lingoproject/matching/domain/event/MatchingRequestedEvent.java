@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.matching.domain.event;
 
 import com.lingo.lingoproject.shared.domain.event.DomainEvent;
+import com.lingo.lingoproject.shared.domain.event.DomainEventType;
 
 public class MatchingRequestedEvent extends DomainEvent {
   private final Long matchingId;
@@ -8,6 +9,7 @@ public class MatchingRequestedEvent extends DomainEvent {
   private final Long requestedUserId;
 
   public MatchingRequestedEvent(Long matchingId, Long requestUserId, Long requestedUserId) {
+    super(DomainEventType.MATCHING_REQUESTED);
     this.matchingId      = matchingId;
     this.requestUserId   = requestUserId;
     this.requestedUserId = requestedUserId;

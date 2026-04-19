@@ -81,4 +81,30 @@ public class Matching {
   @Column(nullable = false)
   @Enumerated(EnumType.STRING)
   private MatchingStatus matchingStatus;
+
+  public void accept() {
+    this.matchingStatus = MatchingStatus.ACCEPTED;
+  }
+
+  public void reject() {
+    this.matchingStatus = MatchingStatus.REJECTED;
+  }
+
+  public void submitRequestMessage(String message) {
+    this.matchingStatus = MatchingStatus.PENDING;
+    this.matchingRequestMessage = message;
+  }
+
+  public UserMatchingLog createMatchingLog(){
+    return UserMatchingLog.of(
+        requestUser.getId(),
+        id,
+        matchingStatus,
+        requestedUser.getGender()
+    );
+  }
+
+  public UserMatchingLog createRespondLog(User respondingUser) {
+    return UserMatchingLog.of(respondingUser.getId(), id, matchingStatus, respondingUser.getGender());
+  }
 }

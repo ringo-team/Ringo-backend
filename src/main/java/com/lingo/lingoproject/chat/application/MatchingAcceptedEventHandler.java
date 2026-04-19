@@ -2,6 +2,9 @@ package com.lingo.lingoproject.chat.application;
 
 import com.lingo.lingoproject.chat.presentation.dto.CreateChatroomRequestDto;
 import com.lingo.lingoproject.matching.domain.event.MatchingAcceptedEvent;
+import com.lingo.lingoproject.notification.application.FcmNotificationUseCase;
+import com.lingo.lingoproject.shared.domain.model.NotificationType;
+import com.lingo.lingoproject.shared.domain.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,6 +22,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class MatchingAcceptedEventHandler {
 
   private final ChatService chatService;
+  private final FcmNotificationUseCase fcmNotificationUseCase;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handle(MatchingAcceptedEvent event) {
@@ -30,5 +34,14 @@ public class MatchingAcceptedEventHandler {
         "USER"
     );
     chatService.createChatroom(dto);
+    User requestedUser = chatService.findUserOrThrow(event.getRequestedUserId());
+    /*
+    fcmNotificationUseCase.sendFcmNotification(
+        requestedUser,
+        "매칭이 승낙되었습니다.",
+        null,
+        NotificationType.MATCHING_ACCEPTED
+        );
+     */
   }
 }

@@ -31,6 +31,6 @@ public class MatchingRequestedEventHandler {
         event.getMatchingId(), event.getRequestUserId(), event.getRequestedUserId());
     User requestedUser = userRepository.findById(event.getRequestedUserId())
         .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.NOT_FOUND));
-    fcmNotificationUseCase.sendFcmNotification(requestedUser, "누군가 매칭 요청을 했어요!", null, NotificationType.MATCHING_REQUEST);
+    //fcmNotificationUseCase.sendFcmNotification(requestedUser, "누군가 매칭 요청을 했어요!", null, NotificationType.MATCHING_REQUEST);
   }
 }

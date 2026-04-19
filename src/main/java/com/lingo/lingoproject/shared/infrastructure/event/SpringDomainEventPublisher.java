@@ -24,9 +24,12 @@ import org.springframework.stereotype.Component;
  *
  * <h2>현재 발행되는 이벤트 목록</h2>
  * <ul>
- *   <li>{@link com.lingo.lingoproject.matching.domain.event.MatchingRequestedEvent}: 매칭 요청 발생 시</li>
+ *   <li>{@link com.lingo.lingoproject.matching.domain.event.MatchingRequestedEvent}: 매칭 요청 시</li>
  *   <li>{@link com.lingo.lingoproject.matching.domain.event.MatchingAcceptedEvent}: 매칭 수락 시</li>
+ *   <li>{@link com.lingo.lingoproject.matching.domain.event.MatchingRejectedEvent}: 매칭 거절 시</li>
  *   <li>{@link com.lingo.lingoproject.report.domain.event.UserSuspendedEvent}: 유저 영구 정지 시</li>
+ *   <li>{@link com.lingo.lingoproject.community.domain.event.PostCreatedEvent}: 게시물 생성 시</li>
+ *   <li>{@link com.lingo.lingoproject.community.domain.event.CommentCreatedEvent}: 댓글 생성 시</li>
  * </ul>
  */
 @Component

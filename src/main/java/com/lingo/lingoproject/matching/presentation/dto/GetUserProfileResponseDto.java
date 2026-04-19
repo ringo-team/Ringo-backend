@@ -1,11 +1,10 @@
 package com.lingo.lingoproject.matching.presentation.dto;
 
+import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Gender;
-import com.lingo.lingoproject.shared.domain.model.InspectStatus;
 import com.lingo.lingoproject.shared.domain.model.MatchingStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDate;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -96,7 +95,7 @@ public class GetUserProfileResponseDto {
       Long matchingId,
       MatchingStatus matchingStatus,
       String matchingMessage,
-      InspectStatus inspectStatus
+      FaceVerify faceVerify
   ) {
     this.userId = userId;
     this.gender = gender.toString();
@@ -106,6 +105,6 @@ public class GetUserProfileResponseDto {
     this.matchingId = matchingId;
     this.matchingStatus = matchingStatus.toString();
     this.matchingMessage = matchingMessage;
-    this.verify = InspectStatus.PASS == inspectStatus ? 1 : 0;
+    this.verify = com.lingo.lingoproject.shared.domain.model.FaceVerify.PASS == faceVerify ? 1 : 0;
   }
 }

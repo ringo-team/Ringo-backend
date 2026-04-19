@@ -1,5 +1,8 @@
 package com.lingo.lingoproject.community.application;
 
+import com.lingo.lingoproject.community.domain.event.CommentCreatedEvent;
+import com.lingo.lingoproject.community.domain.event.PostCreatedEvent;
+import com.lingo.lingoproject.community.domain.service.CommunityDomainService;
 import com.lingo.lingoproject.community.presentation.dto.CommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.CommentResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.CreateSubCommentRequestDto;
@@ -22,8 +25,8 @@ import com.lingo.lingoproject.shared.domain.model.Post;
 import com.lingo.lingoproject.shared.domain.model.PostImage;
 import com.lingo.lingoproject.shared.domain.model.PostLikeUserMapping;
 import com.lingo.lingoproject.shared.domain.model.PostTopic;
-import com.lingo.lingoproject.shared.domain.model.Recommendation;
 import com.lingo.lingoproject.shared.domain.model.SubComment;
+import com.lingo.lingoproject.shared.domain.event.DomainEventPublisher;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -32,7 +35,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.CommentRepositor
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostLikeUserMappingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.RecommendationRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.SubCommentRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageService;
@@ -79,13 +82,15 @@ public class CommunityService {
 
   private final PostRepository postRepository;
   private final UserRepository userRepository;
-  private final RecommendationRepository recommendationRepository;
+  private final PlaceRepository placeRepository;
   private final CommentRepository commentRepository;
   private final S3ImageStorageService imageService;
   private final PostImageRepository postImageRepository;
   private final PostLikeUserMappingRepository postLikeUserMappingRepository;
   private final CommentLikeUserMappingRepository commentLikeUserMappingRepository;
   private final SubCommentRepository subCommentRepository;
+  private final CommunityDomainService communityDomainService;
+  private final DomainEventPublisher eventPublisher;
 
   /**
    * 게시물을 생성한다.
@@ -99,17 +104,16 @@ public class CommunityService {
    * @throws RingoException 작성자 또는 추천 장소가 존재하지 않는 경우
    */
   public SavePostResponseDto createPost(SavePostRequestDto dto, List<MultipartFile> images) {
-    log.info("step=게시물_작성_시작, userId={}, recommendationId={}, topic={}",
-        dto.userId(), dto.recommendationId(), dto.topic());
+    log.info("step=게시물_작성_시작, userId={}, topic={}", dto.userId(), dto.topic());
 
     User author = findUserOrThrow(dto.userId());
-    Recommendation recommendation = findRecommendationOrThrow(dto.recommendationId());
     PostTopic postTopic = GenericUtils.validateAndReturnEnumValue(PostTopic.values(), dto.topic());
 
-    Post savedPost = postRepository.save(Post.of(author, recommendation, dto.title(), dto.content(), postTopic));
+    Post savedPost = postRepository.save(Post.of(author, dto.title(), dto.content(), postTopic));
 
-    log.info("step=게시물_저장_완료, postId={}, userId={}, imageCount={}",
-        savedPost.getId(), dto.userId(), images.size());
+    log.info("step=게시물_저장_완료, postId={}, userId={}, imageCount={}", savedPost.getId(), dto.userId(), images.size());
+
+    eventPublisher.publish(new PostCreatedEvent(savedPost.getId(), author.getId(), dto.topic()));
 
     List<SavePostImageResponseDto> savedPostImages = uploadAndSavePostImages(images, savedPost);
     return new SavePostResponseDto(savedPost.getId(), savedPostImages, ErrorCode.SUCCESS.getCode());
@@ -129,7 +133,7 @@ public class CommunityService {
    */
   public UpdatePostResponseDto updatePost(Long postId, UpdatePostRequestDto dto, User user) {
     Post post = findPostOrThrow(postId);
-    validatePostOwnership(post, user);
+    communityDomainService.validatePostOwnership(post, user);
     applyPostUpdates(post, dto);
 
     List<UpdatePostImageResponseDto> updatedImages = dto.imagelist().stream()
@@ -154,7 +158,7 @@ public class CommunityService {
    */
   public void deletePost(Long postId, User user) {
     Post post = findPostOrThrow(postId);
-    validatePostOwnership(post, user);
+    communityDomainService.validatePostOwnership(post, user);
 
     deleteAllPostImages(post);
     deleteAllPostComments(post);
@@ -168,20 +172,18 @@ public class CommunityService {
    *
    * <p>토픽이 {@code ENTIRE}이면 전체 게시물을, 그 외에는 해당 토픽의 게시물만 조회합니다.</p>
    *
-   * @param recommendationId 필터링 기준 추천 장소 ID
    * @param topic            게시물 토픽 문자열 (예: "ENTIRE", "FOOD", "ACTIVITY" 등)
    * @param page             페이지 번호 (0부터 시작)
    * @param size             페이지당 게시물 수
    * @return 게시물 요약 목록 (이미지 포함)
    */
-  public List<GetPostResponseDto> findPostsByRecommendation(Long recommendationId, String topic, int page, int size) {
-    Recommendation recommendation = findRecommendationOrThrow(recommendationId);
+  public List<GetPostResponseDto> findPosts(String topic, int page, int size) {
     PostTopic postTopic = GenericUtils.validateAndReturnEnumValue(PostTopic.values(), topic);
     Pageable pageable = PageRequest.of(page, size);
 
     Page<Post> posts = (postTopic == PostTopic.ENTIRE)
-        ? postRepository.findByRecommendation(recommendation, pageable)
-        : postRepository.findByRecommendationAndTopic(recommendation, postTopic, pageable);
+        ? postRepository.findAll(pageable)
+        : postRepository.findByTopic(postTopic, pageable);
 
     return posts.stream()
         .map(this::buildPostResponse)
@@ -199,6 +201,7 @@ public class CommunityService {
   public CommentResponseDto createComment(CommentRequestDto dto, User user) {
     Post post = findPostOrThrow(dto.postId());
     Comment savedComment = commentRepository.save(Comment.of(post, user, dto.content()));
+    eventPublisher.publish(new CommentCreatedEvent(savedComment.getId(), post.getId(), user.getId()));
     return new CommentResponseDto(savedComment.getId(), ErrorCode.SUCCESS.getCode());
   }
 
@@ -213,13 +216,8 @@ public class CommunityService {
    * @throws RingoException 댓글이 존재하지 않거나 작성자가 아닌 경우
    */
   public void updateComment(Long commentId, UpdateCommentRequestDto dto, User user) {
-    Comment comment = commentRepository.findById(commentId)
-        .orElseThrow(() -> new RingoException("댓글 업데이트 도중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-    if (!comment.getUser().getId().equals(user.getId())) {
-      log.warn("step=댓글_수정_권한없음, commentId={}, requestUserId={}, commentOwnerId={}",
-          commentId, user.getId(), comment.getUser().getId());
-      throw new RingoException("댓글을 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
+    Comment comment = findCommentOrThrow(commentId);
+    communityDomainService.validateCommentOwnership(comment, user);
     comment.setContent(dto.content());
     commentRepository.save(comment);
   }
@@ -235,14 +233,10 @@ public class CommunityService {
    * @throws RingoException 작성자가 아닌 경우
    */
   public void deleteComment(Long commentId, User user) {
-    if (commentRepository.existsByIdAndUser(commentId, user)) {
-      Comment comment = commentRepository.findById(commentId).orElse(null);
-      subCommentRepository.deleteAllByComment(comment);
-      commentRepository.deleteById(commentId);
-      return;
-    }
-    log.warn("step=댓글_삭제_권한없음, commentId={}, requestUserId={}", commentId, user.getId());
-    throw new RingoException("댓글을 지울 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    Comment comment = findCommentOrThrow(commentId);
+    communityDomainService.validateCommentOwnership(comment, user);
+    subCommentRepository.deleteAllByComment(comment);
+    commentRepository.delete(comment);
   }
 
   /**
@@ -271,8 +265,7 @@ public class CommunityService {
    * @throws RingoException 부모 댓글이 존재하지 않는 경우
    */
   public Long createSubComment(CreateSubCommentRequestDto dto, User user) {
-    Comment comment = commentRepository.findById(dto.commentId())
-        .orElseThrow(() -> new RingoException("대댓글을 생성하던 도중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+    Comment comment = findCommentOrThrow(dto.commentId());
     return subCommentRepository.save(SubComment.of(user, comment, dto.content())).getId();
   }
 
@@ -289,14 +282,9 @@ public class CommunityService {
   public void updateSubComment(Long subCommentId, UpdateSubCommentRequestDto dto, User user) {
     SubComment subComment = subCommentRepository.findById(subCommentId)
         .orElseThrow(() -> new RingoException("대댓글을 업데이트하던 도중 대댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-    if (subComment.getUser().getId().equals(user.getId())) {
-      subComment.setContent(dto.content());
-      subCommentRepository.save(subComment);
-    } else {
-      log.warn("step=대댓글_수정_권한없음, subCommentId={}, requestUserId={}, ownerId={}",
-          subCommentId, user.getId(), subComment.getUser().getId());
-      throw new RingoException("대댓글을 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
+    communityDomainService.validateSubCommentOwnership(subComment, user);
+    subComment.setContent(dto.content());
+    subCommentRepository.save(subComment);
   }
 
   /**
@@ -309,12 +297,10 @@ public class CommunityService {
    * @throws RingoException 작성자가 아닌 경우
    */
   public void deleteSubComment(Long subCommentId, User user) {
-    if (subCommentRepository.existsByIdAndUser(subCommentId, user)) {
-      subCommentRepository.deleteById(subCommentId);
-    } else {
-      log.warn("step=대댓글_삭제_권한없음, subCommentId={}, requestUserId={}", subCommentId, user.getId());
-      throw new RingoException("대댓글을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
+    SubComment subComment = subCommentRepository.findById(subCommentId)
+        .orElseThrow(() -> new RingoException("대댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+    communityDomainService.validateSubCommentOwnership(subComment, user);
+    subCommentRepository.deleteById(subCommentId);
   }
 
   /**
@@ -372,22 +358,14 @@ public class CommunityService {
         .orElseThrow(() -> new RingoException("게시물을 포스팅하던 도중 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
   }
 
-  private Recommendation findRecommendationOrThrow(Long recommendationId) {
-    return recommendationRepository.findById(recommendationId)
-        .orElseThrow(() -> new RingoException("해당 추천 장소가 존재하지 않습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+  private Comment findCommentOrThrow(Long commentId){
+    return commentRepository.findById(commentId)
+        .orElseThrow(() -> new RingoException("대댓글을 생성하던 도중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
   }
 
   private Post findPostOrThrow(Long postId) {
     return postRepository.findById(postId)
         .orElseThrow(() -> new RingoException("게시물을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-  }
-
-  private void validatePostOwnership(Post post, User user) {
-    if (!post.getAuthor().getId().equals(user.getId())) {
-      log.warn("step=게시물_권한없음, postId={}, requestUserId={}, authorId={}",
-          post.getId(), user.getId(), post.getAuthor().getId());
-      throw new RingoException("게시자만 게시물을 처리할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
   }
 
   /** 이미지 목록을 S3에 업로드하고 {@link PostImage} 엔티티로 저장한다. 부적절한 콘텐츠는 건너뜀. */

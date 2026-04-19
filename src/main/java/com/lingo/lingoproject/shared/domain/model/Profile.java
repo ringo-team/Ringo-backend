@@ -56,5 +56,5 @@ public class Profile extends Timestamp {
   @Enumerated(EnumType.STRING)
   @ColumnDefault("'PENDING'")
   @Builder.Default
-  private InspectStatus inspectStatus = InspectStatus.PENDING;
+  private FaceVerify faceVerify = com.lingo.lingoproject.shared.domain.model.FaceVerify.PENDING;
 }

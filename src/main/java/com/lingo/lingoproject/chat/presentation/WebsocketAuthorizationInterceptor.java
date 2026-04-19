@@ -6,7 +6,6 @@ import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.security.jwt.JwtUtil;
 import io.jsonwebtoken.Claims;
-import java.security.Principal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -80,9 +79,7 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     /*------------------------------------토큰 검증-----------------------------------------*/
     if (token == null || !token.startsWith("Bearer ")) {
       // 토큰이 없는 경우: 이미 CONNECT 단계에서 Principal이 설정된 경우 재사용
-      if (accessor.getUser() != null) user = userRepository.findByLoginId(accessor.getUser().getName()).orElseThrow(
-          () -> new RingoException("유저 정보가 올바르지 않습니다.", ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN)
-      );
+      if (accessor.getUser() != null) user = chatService.findUserByLoginIdOrThrow(accessor.getUser().getName());
       else throw new RingoException("토큰이 없습니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN);
     }
     else {
@@ -90,15 +87,9 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
       token = token.substring(7);
 
     Claims claims = jwtUtil.getClaims(token);
-    user = userRepository.findByLoginId(claims.getSubject())
-            .orElseThrow(() -> new RingoException("유효한 토큰이 아닙니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN));
+    user = chatService.findUserByLoginIdOrThrow(claims.getSubject());
     // STOMP 세션의 Principal을 loginId로 설정 (StompConnectionListener에서 유저 조회에 사용)
-    accessor.setUser(new Principal() {
-      @Override
-      public String getName() {
-        return user.getLoginId();
-      }
-    });
+    accessor.setUser(user::getLoginId);
     }
 
     /*-------------------------------------------------------------------------------------*/
@@ -118,7 +109,7 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     }
 
     String destination = accessor.getDestination();
-    Long roomId = extractRoomId(destination);
+    Long roomId = chatService.extractRoomIdFromDestination(destination);
 
     // destination에서 roomId를 파싱할 수 없는 경우 (예: /user/queue 구독 등) 통과
     if (roomId == null) {
@@ -128,36 +119,14 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
 
     if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())){
       // 구독 시 해당 채팅방 참여자인지 확인
-      if(!chatService.isParticipant(roomId, user.getId())){
-        throw new RingoException("구독 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-      }
+      chatService.validateParticipant(roomId, user.getId());
     }
     else if (StompCommand.SEND.equals(accessor.getCommand())){
       // 메시지 전송 시 해당 채팅방 참여자인지 확인
-      if(!chatService.isParticipant(roomId, user.getId())){
-        throw new RingoException("메세지 전달 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-      }
+      chatService.validateParticipant(roomId, user.getId());
     }
     log.info("no error");
     return message;
   }
 
-  /**
-   * destination 경로의 마지막 세그먼트에서 채팅방 ID를 추출합니다.
-   * 예: "/app/42" → 42L, "/user/queue/topic/42" → 42L
-   *
-   * @param destination STOMP 메시지의 목적지 경로
-   * @return 파싱된 채팅방 ID, 파싱 실패 시 null
-   */
-  // 목적지 패턴이 /topic/{id}일 때 id만 가져옴
-  private Long extractRoomId(String destination) {
-    if (destination == null) return null;
-    String[] parts = destination.split("/");
-    if (parts.length == 0) return null;
-    try {
-      return Long.valueOf(parts[parts.length - 1]);
-    } catch (Exception e) {
-      return null;
-    }
-  }
 }

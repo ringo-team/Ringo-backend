@@ -1,13 +1,13 @@
 package com.lingo.lingoproject;
 
 
-import com.lingo.lingoproject.db.domain.FailedFcmMessageLog;
-import com.lingo.lingoproject.common.exception.ErrorCode;
-import com.lingo.lingoproject.common.exception.RingoException;
-import com.lingo.lingoproject.api.image.ImageService;
-import com.lingo.lingoproject.api.match.MatchService;
-import com.lingo.lingoproject.common.retry.RedisQueueMessagePayLoad;
-import com.lingo.lingoproject.common.retry.RedisQueueService;
+import com.lingo.lingoproject.shared.domain.model.FailedFcmMessageLog;
+import com.lingo.lingoproject.shared.exception.ErrorCode;
+import com.lingo.lingoproject.shared.exception.RingoException;
+import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageService;
+import com.lingo.lingoproject.matching.application.MatchService;
+import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueMessagePayLoad;
+import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueService;
 import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ public class RingoRepositoryTest {
   MatchService matchService;
 
   @Autowired
-  ImageService imageService;
+  S3ImageStorageService imageService;
 
   @Autowired
   RedisQueueService redisQueueService;
@@ -38,7 +38,7 @@ public class RingoRepositoryTest {
   @Test
   public void getSubstringS3ImageUrl(){
     String url = "http://localhost:8080/amazonaws.com/2025/2025-12/2025-12-25/profile";
-    Assertions.assertEquals("2025/2025-12/2025-12-25/profile", imageService.getFilenameFromS3ImageUrl(url));
+    Assertions.assertEquals("2025/2025-12/2025-12-25/profile", imageService.extractS3ObjectKey(url));
   }
 
   @Test

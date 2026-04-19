@@ -74,7 +74,7 @@ public class RedisUtils {
    * @param key 유저 ID (문자열)
    * @return 캐시된 추천 유저 목록 (없으면 null)
    */
-  public List<GetUserProfileResponseDto> getRecommendedUserForCumulativeSurvey(String key){
+  public List<GetUserProfileResponseDto> getCumulativeSurveyBasedCachedProfile(String key){
     try {
 
       ApiListResponseDto<GetUserProfileResponseDto> savedRecommendUserList = (ApiListResponseDto<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);
@@ -93,7 +93,7 @@ public class RedisUtils {
    * @param key 유저 ID (문자열)
    * @return 캐시된 추천 유저 목록 (없으면 null)
    */
-  public List<GetUserProfileResponseDto> getRecommendUserForDailySurvey(String key){
+  public List<GetUserProfileResponseDto> getDailySurveyBasedCachedProfile(String key){
     try {
 
       ApiListResponseDto<GetUserProfileResponseDto> savedRecommendUserList = (ApiListResponseDto<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend-for-daily-survey::" + key);

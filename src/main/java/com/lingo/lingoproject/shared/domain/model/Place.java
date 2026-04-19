@@ -9,8 +9,8 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "RECOMMENDATIONS")
-public class Recommendation {
+@Table(name = "PLACES")
+public class Place {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

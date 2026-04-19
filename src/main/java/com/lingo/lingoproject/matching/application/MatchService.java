@@ -1,35 +1,37 @@
 package com.lingo.lingoproject.matching.application;
 
 import com.lingo.lingoproject.matching.domain.event.MatchingAcceptedEvent;
+import com.lingo.lingoproject.matching.domain.event.MatchingRejectedEvent;
 import com.lingo.lingoproject.matching.domain.event.MatchingRequestedEvent;
 import com.lingo.lingoproject.matching.domain.service.MatchScoreCalculator;
+import com.lingo.lingoproject.matching.domain.service.MatchingDomainService;
+import com.lingo.lingoproject.matching.domain.service.RecommendationDomainService;
+import com.lingo.lingoproject.shared.domain.event.DomainEventPublisher;
 import com.lingo.lingoproject.shared.domain.model.AnsweredSurvey;
 import com.lingo.lingoproject.shared.domain.model.BlockedUser;
 import com.lingo.lingoproject.shared.domain.model.DormantAccount;
+import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Hashtag;
-import com.lingo.lingoproject.shared.domain.model.InspectStatus;
 import com.lingo.lingoproject.shared.domain.model.Matching;
 import com.lingo.lingoproject.shared.domain.model.MatchingStatus;
+import com.lingo.lingoproject.shared.domain.model.Place;
 import com.lingo.lingoproject.shared.domain.model.Profile;
-import com.lingo.lingoproject.shared.domain.model.Recommendation;
 import com.lingo.lingoproject.shared.domain.model.ScrappedUser;
 import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.domain.model.Survey;
 import com.lingo.lingoproject.shared.domain.model.User;
-import com.lingo.lingoproject.shared.domain.model.UserAccessLog;
 import com.lingo.lingoproject.shared.domain.model.UserActivityLog;
 import com.lingo.lingoproject.shared.domain.model.UserMatchingLog;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
+import com.lingo.lingoproject.shared.infrastructure.persistence.KeywordRepository;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import com.lingo.lingoproject.matching.presentation.dto.GetScrappedUserResponseDto;
 import com.lingo.lingoproject.matching.presentation.dto.GetUserProfileResponseDto;
-import com.lingo.lingoproject.matching.presentation.dto.MatchScoreResultInterface;
 import com.lingo.lingoproject.matching.presentation.dto.MatchingRequestDto;
-import com.lingo.lingoproject.matching.presentation.dto.RelatedSurveyAnswerPairInterface;
 import com.lingo.lingoproject.matching.presentation.dto.SaveMatchingRequestMessageRequestDto;
-import com.lingo.lingoproject.shared.infrastructure.persistence.RecommendationRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ScrappedUserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserActivityLogRepository;
@@ -54,14 +56,16 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -76,18 +80,18 @@ import org.springframework.stereotype.Service;
  *
  * <h2>추천 이성 알고리즘</h2>
  * <ul>
- *   <li><b>누적 설문 기반</b>({@link #getRecommendationsByCumulativeSurvey}):
+ *   <li><b>누적 설문 기반</b>({@link #getCumulativeSurveyBasedRecommendationProfiles}):
  *       활성 유저 중 매칭 점수 임계값({@code MATCHING_SCORE_THRESHOLD}) 이상인 후보를
  *       Fisher-Yates 셔플로 최대 {@code MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE}명 추출.
  *       결과는 자정까지 Redis에 캐싱.</li>
- *   <li><b>일일 설문 기반</b>({@link #getRecommendationsByDailySurvey}):
+ *   <li><b>일일 설문 기반</b>({@link #getDailySurveyBasedRecommendationProfiles}):
  *       오늘 답변한 설문과 ±1 범위의 설문번호에서 동일한 답을 고른 유저를 랜덤 추출.
  *       오늘 답변 이력이 없으면 null 반환.</li>
  * </ul>
  *
  * <h2>추천 제외 대상</h2>
  * <p>블락 친구, 휴면 계정, 이용정지 계정(Redis {@code suspension::userId}), 이미 매칭 이력이 있는 유저는
- * {@link #getExcludedUserIdsForRecommendation}에서 일괄 수집하여 후보 풀에서 제거합니다.</p>
+ * {@link #getRecommendationExcludedUserIds}에서 일괄 수집하여 후보 풀에서 제거합니다.</p>
  *
  * <h2>이벤트 발행</h2>
  * <p>매칭 요청 시 {@link MatchingRequestedEvent}, 수락 시 {@link MatchingAcceptedEvent}를 발행합니다.
@@ -104,8 +108,10 @@ public class MatchService {
   private final DormantAccountRepository dormantAccountRepository;
   private final ProfileRepository profileRepository;
   private final AnsweredSurveyRepository answeredSurveyRepository;
-  private final ApplicationEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
   private final MatchScoreCalculator matchScoreCalculator;
+  private final MatchingDomainService matchingDomainService;
+  private final RecommendationDomainService recommendationDomainService;
   private final HashtagRepository hashtagRepository;
   private final BlockedUserRepository blockedUserRepository;
   private final RedisUtils redisUtils;
@@ -114,12 +120,12 @@ public class MatchService {
   private final UserAccessLogRepository userAccessLogRepository;
   private final RedisTemplate<String, Object> redisTemplate;
   private final SurveyRepository surveyRepository;
-  private final RecommendationRepository recommendationRepository;
+  private final PlaceRepository placeRepository;
   private final ScrappedUserRepository scrappedUserRepository;
   private final UserActivityLogRepository userActivityLogRepository;
 
   private static final int MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE = 4;
-  private static final int MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY = 4;
+  private static final int MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE = 4;
   private static final float MATCHING_SCORE_THRESHOLD = 0;
   private static final int ACTIVE_DAY_DURATION = 14;
   private static final int HIDE_PROFILE_FLAG = 1;
@@ -129,6 +135,7 @@ public class MatchService {
   private static final String REDIS_ACTIVE_USER_IDS = "redis:active:ids";
   private static final String DAILY_RECOMMENDATION_REDIS_KEY_PREFIX = "recommend-for-daily-survey::";
   private static final String CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX = "recommend::";
+  private final KeywordRepository keywordRepository;
 
   // ============================================================
   // 매칭 요청 / 응답
@@ -148,12 +155,8 @@ public class MatchService {
    */
   @Transactional
   public Matching matchRequest(MatchingRequestDto dto) {
-    User requestUser = userRepository.findById(dto.requestId())
-        .orElseThrow(() -> new RingoException(
-            "매칭을 요청한 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
-    User requestedUser = userRepository.findById(dto.requestedId())
-        .orElseThrow(() -> new RingoException(
-            "매칭을 요청 받은 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+    User requestUser = findUserOrThrow(dto.requestId());
+    User requestedUser = findUserOrThrow(dto.requestedId());
 
     float matchingScore = matchScoreCalculator.calculate(requestedUser.getId(), requestUser.getId());
 
@@ -163,7 +166,7 @@ public class MatchService {
         requestUser.getId(), requestedUser.getId(), matchingScore);
 
     Matching saved = matchingRepository.save(matching);
-    eventPublisher.publishEvent(new MatchingRequestedEvent(
+    eventPublisher.publish(new MatchingRequestedEvent(
         saved.getId(),
         requestUser.getId(),
         requestedUser.getId()
@@ -176,37 +179,45 @@ public class MatchService {
    * 거절 시 REJECTED 상태 변경
    */
   public void respondToMatchingRequest(String decision, Long matchingId, User user) {
-    Matching matching = matchingRepository.findById(matchingId)
-        .orElseThrow(() -> new RingoException("적절하지 않은 매칭 id 입니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+    Matching matching = findMatchingOrThrow(matchingId);
 
-    Long requestedUserId = matching.getRequestedUser().getId();
-    if (!requestedUserId.equals(user.getId())) {
-      log.error("step=잘못된_유저_요청, authUserId={}, matchRequestedUserId={}, status=FAILED",
-          user.getId(), requestedUserId);
-      throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
+    matchingDomainService.validateMatchingRespondPermission(matching, user);
 
     switch (decision) {
       case "ACCEPTED" -> acceptMatching(matching);
-      case "REJECTED" -> matching.setMatchingStatus(MatchingStatus.REJECTED);
+      case "REJECTED" -> rejectMatching(matching);
       default -> throw new RingoException("decision 값이 적절하지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
     }
 
-    UserMatchingLog matchingLog = UserMatchingLog.of(user.getId(), matchingId,
-        matching.getMatchingStatus(), user.getGender());
+    UserMatchingLog matchingLog = matching.createRespondLog(user);
 
     log.info("step=매칭_응답, requestedUserId={}, requestUserId={}, matchingStatus={}, matchingScore={}",
-        user.getId(), requestedUserId,
+        user.getId(), matching.getRequestUser().getId(),
         matching.getMatchingStatus(), matching.getMatchingScore());
 
     userMatchingLogRepository.save(matchingLog);
     matchingRepository.save(matching);
   }
 
+  private Matching findMatchingOrThrow(Long matchingId){
+    return matchingRepository.findById(matchingId)
+        .orElseThrow(() -> new RingoException("적절하지 않은 매칭 id 입니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+  }
+
   private void acceptMatching(Matching matching) {
-    matching.setMatchingStatus(MatchingStatus.ACCEPTED);
+    matching.accept();
     matchingRepository.save(matching);
-    eventPublisher.publishEvent(new MatchingAcceptedEvent(
+    eventPublisher.publish(new MatchingAcceptedEvent(
+        matching.getId(),
+        matching.getRequestUser().getId(),
+        matching.getRequestedUser().getId()
+    ));
+  }
+
+  private void rejectMatching(Matching matching) {
+    matching.reject();
+    matchingRepository.save(matching);
+    eventPublisher.publish(new MatchingRejectedEvent(
         matching.getId(),
         matching.getRequestUser().getId(),
         matching.getRequestedUser().getId()
@@ -255,13 +266,11 @@ public class MatchService {
    * @return 추천 이성 프로필 목록
    */
   @Transactional
-  public List<GetUserProfileResponseDto> getRecommendationsByCumulativeSurvey(User user) {
+  public List<GetUserProfileResponseDto> getCumulativeSurveyBasedRecommendationProfiles(User user) {
     Long userId = user.getId();
 
-    if (redisTemplate.hasKey(CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX + userId)) {
-      List<GetUserProfileResponseDto> cached = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
-      if (cached != null && cached.size() == MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE) return cached;
-    }
+    List<GetUserProfileResponseDto> cached = getCumulativeCachedProfile(user);
+    if (cached != null) return cached;
 
     List<Long> activeUserIds = getCachedActiveUserIds();
     if (activeUserIds.isEmpty()) {
@@ -270,13 +279,43 @@ public class MatchService {
     }
     log.info("step=누적설문_추천_활성유저_조회, activeUserCount={}", activeUserIds.size());
 
-    List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(user);
+    List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
     log.info("step=누적설문_추천_제외유저_조회, excludedUserCount={}", excludedUserIds.size());
 
     activeUserIds.removeAll(excludedUserIds);
     log.info("step=누적설문_추천_풀_확정, candidateCount={}", activeUserIds.size());
 
-    List<Long> candidates = userRepository.findAllByIdIn(activeUserIds)
+    List<Long> candidates = getUserAboveMatchScore(userId, activeUserIds);
+
+    List<Long> selectedIds = getRandomlySelectedCandidate(candidates);
+    log.info("step=누적설문_추천_대상_선정, selectedIds={}", selectedIds);
+
+
+    List<GetUserProfileResponseDto> result = getUserProfilesByIds(user, selectedIds);
+
+    redisUtils.cacheUntilMidnight(
+        CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
+        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
+    );
+    return result;
+  }
+
+  private List<GetUserProfileResponseDto> getUserProfilesByIds(User user, List<Long> selectedIds){
+    Set<GetUserProfileResponseDto> profileSet = new HashSet<>();
+    userRepository.findAllByIdIn(selectedIds)
+        .forEach(recommended ->
+            profileSet.add(buildUserProfileDto(user, recommended))
+        );
+    return new ArrayList<>(profileSet);
+  }
+
+  private List<Long> getRandomlySelectedCandidate(List<Long> candidates){
+    return recommendationDomainService.selectRandomCandidates(
+        candidates, MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE);
+  }
+
+  private List<Long> getUserAboveMatchScore(Long userId, List<Long> activeUserIds){
+    return userRepository.findAllByIdIn(activeUserIds)
         .stream()
         .filter(u -> u.getStatus() == SignupStatus.COMPLETED)
         .map(User::getId)
@@ -284,29 +323,6 @@ public class MatchService {
         .filter(entry -> entry.score() >= MATCHING_SCORE_THRESHOLD)
         .map(UserScoreEntry::userId)
         .collect(Collectors.toList());
-
-    // Fisher-Yates shuffle 로 앞 n 명 추출
-    int n = Math.min(candidates.size(), MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE);
-    ThreadLocalRandom random = ThreadLocalRandom.current();
-    for (int i = 0; i < n; i++) {
-      int j = random.nextInt(i, candidates.size());
-      Collections.swap(candidates, i, j);
-    }
-    List<Long> selectedIds = candidates.subList(0, n);
-    log.info("step=누적설문_추천_대상_선정, selectedIds={}", selectedIds);
-
-    Set<GetUserProfileResponseDto> profileSet = new HashSet<>();
-    userRepository.findAllByIdIn(selectedIds)
-        .forEach(recommended ->
-            profileSet.add(buildUserProfileDto(user, recommended))
-        );
-    List<GetUserProfileResponseDto> result = new ArrayList<>(profileSet);
-
-    redisUtils.cacheUntilMidnight(
-        CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
-        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
-    );
-    return result;
   }
 
   /**
@@ -320,65 +336,75 @@ public class MatchService {
    * @param user 추천을 요청하는 사용자
    * @return 추천 이성 프로필 목록, 오늘 답변 이력이 없으면 {@code null}
    */
-  public List<GetUserProfileResponseDto> getRecommendationsByDailySurvey(User user) {
+  public List<GetUserProfileResponseDto> getDailySurveyBasedRecommendationProfiles(User user) {
     Long userId = user.getId();
 
-    if (redisTemplate.hasKey(DAILY_RECOMMENDATION_REDIS_KEY_PREFIX + userId)) {
-      List<GetUserProfileResponseDto> cached = redisUtils.getRecommendUserForDailySurvey(userId.toString());
-      cached.forEach(profile -> log.info(
-          "step=일일설문_추천_캐시_조회, requestUserId={}, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, matchingStatus={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
-          user.getId(), profile.getUserId(), profile.getAge(), profile.getGender(),
-          profile.getNickname(), profile.getMatchingScore(), profile.getMatchingStatus(),
-          profile.getHashtags(), profile.getVerify(), profile.getDaysFromLastAccess(), profile.getMbti()
-      ));
-      if (cached.size() == MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY) return cached;
-    }
-
-    List<AnsweredSurvey> todayAnswers = answeredSurveyRepository.findAllByUserAndUpdatedAtAfter(
-        user, LocalDate.now().atStartOfDay()
-    );
+    List<AnsweredSurvey> todayAnswers = getUserTodayDailyAnswer(user);
     if (todayAnswers.isEmpty()) {
+      log.info("step=금일_설문_응답_부재, todayAnswersSize=0");
       return null;
     }
 
+    List<GetUserProfileResponseDto> cached = getDailyCacheProfile(user);
+    if(cached != null) return cached;
+
     Collections.shuffle(todayAnswers);
 
-    List<Long> excludedUserIds = getExcludedUserIdsForRecommendation(user);
+    List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
     log.info("step=일일설문_추천_제외유저_조회, excludedUserCount={}", excludedUserIds.size());
 
     List<GetUserProfileResponseDto> result = new ArrayList<>();
     for (AnsweredSurvey todayAnswer : todayAnswers) {
-      if (result.size() == MAX_RECOMMENDATION_SIZE_FOR_DAILY_SURVEY) break;
+      if (result.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) break;
 
-      int surveyNum = todayAnswer.getSurveyNum();
-      List<AnsweredSurvey> similarAnswers = answeredSurveyRepository.findAllByUserIdNotInAndAnswerAndSurveyNumIn(
-          excludedUserIds,
-          todayAnswer.getAnswer(),
-          List.of(surveyNum, surveyNum + 1, surveyNum - 1)
-      );
+      List<AnsweredSurvey> similarAnswers = getSimilarAnswers(excludedUserIds, todayAnswer);
 
-      if (similarAnswers.isEmpty()) {
-        log.info("step=일일설문_추천_매칭없음, surveyNum={}", surveyNum);
-        continue;
-      }
+      if (similarAnswers.isEmpty()) continue;
 
       int idx = ThreadLocalRandom.current().nextInt(similarAnswers.size());
       User recommended = similarAnswers.get(idx).getUser();
 
-      log.info("step=일일설문_추천_매칭, similarAnswerCount={}, selectedSurveyId={}, surveyNum={}, requestUserId={}, recommendedUserId={}, requestUserAnswer={}, recommendedUserAnswer={}",
-          similarAnswers.size(),
-          similarAnswers.get(idx).getId(), similarAnswers.get(idx).getSurveyNum(),
-          user.getId(), recommended.getId(),
-          todayAnswer.getAnswer(), similarAnswers.get(idx).getAnswer());
+      logDailySurveyBasedRecommendationLogic(similarAnswers, todayAnswer, similarAnswers.get(idx), user, recommended);
 
       result.add(buildUserProfileDto(user, recommended));
     }
+
+    if(result.size() < MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE)
+      log.info("step=추천_이성_수_조회, recommendationProfileSize={}", result.size());
 
     redisUtils.cacheUntilMidnight(
         DAILY_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
         new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
     );
     return result;
+  }
+
+  private List<GetUserProfileResponseDto> getDailyCacheProfile(User user){
+    return getCachedRecommendationProfiles(
+        DAILY_RECOMMENDATION_REDIS_KEY_PREFIX,
+        MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE,
+        redisUtils::getDailySurveyBasedCachedProfile,
+        user
+    );
+  }
+
+  private void logDailySurveyBasedRecommendationLogic(
+      List<AnsweredSurvey> similarAnswers,
+      AnsweredSurvey todayAnswer,
+      AnsweredSurvey selectedAnswer,
+      User user,
+      User recommended
+  ){
+    log.info("""
+            step=일일설문_추천_매칭,
+            similarAnswerCount={} | selectedSurveyId={} | surveyNum={},
+            requestUserId={} | recommendedUserId={} | requestUserAnswer={},
+            recommendedUserAnswer={}
+            """,
+        similarAnswers.size(),
+        selectedAnswer.getId(), selectedAnswer.getSurveyNum(),
+        user.getId(), recommended.getId(),
+        todayAnswer.getAnswer(), selectedAnswer.getAnswer());
   }
 
   /**
@@ -411,39 +437,20 @@ public class MatchService {
    * @param user 추천을 요청하는 사용자
    * @return 제외 대상 유저 ID 목록 (중복 없음)
    */
-  public List<Long> getExcludedUserIdsForRecommendation(User user) {
+  public List<Long> getRecommendationExcludedUserIds(User user) {
     Long userId = user.getId();
 
     List<Long> blockedFriendIds = blockedFriendRepository.findUsersMutuallyBlockedWith(userId);
 
-    List<Long> dormantUserIds = dormantAccountRepository.findAll()
-        .stream()
-        .map(DormantAccount::getUser)
-        .map(User::getId)
-        .toList();
+    List<Long> dormantUserIds = getDormantUserIds();
 
-    List<Long> blockedUserIds = blockedUserRepository.findAll()
-        .stream()
-        .map(BlockedUser::getBlockedUserId)
-        .toList();
+    List<Long> blockedUserIds = getBlockUserIds();
 
-    List<Long> suspendedUserIds = redisTemplate.keys("suspension::*")
-        .stream()
-        .map(s -> s.replace("suspension::", ""))
-        .map(Long::parseLong)
-        .toList();
+    List<Long> suspendedUserIds = getSuspendedUserIds();
 
-    List<Long> usersWhoRequestedMe = matchingRepository.findAllByRequestedUser(user)
-        .stream()
-        .map(Matching::getRequestUser)
-        .map(User::getId)
-        .toList();
+    List<Long> usersWhoRequestedMe = getUserWhoRequestedMe(user);
 
-    List<Long> usersIRequested = matchingRepository.findAllByRequestUser(user)
-        .stream()
-        .map(Matching::getRequestedUser)
-        .map(User::getId)
-        .toList();
+    List<Long> usersIRequested = getUsersIRequested(user);
 
     Set<Long> excluded = new HashSet<>();
     excluded.add(userId);
@@ -456,6 +463,45 @@ public class MatchService {
 
     log.info("step=추천_제외_유저_수집, excludedUserIds={}", excluded);
     return new ArrayList<>(excluded);
+  }
+
+  private List<Long> getUsersIRequested(User user){
+    return matchingRepository.findAllByRequestUser(user)
+        .stream()
+        .map(Matching::getRequestedUser)
+        .map(User::getId)
+        .toList();
+  }
+
+  private List<Long> getUserWhoRequestedMe(User user){
+    return matchingRepository.findAllByRequestedUser(user)
+        .stream()
+        .map(Matching::getRequestUser)
+        .map(User::getId)
+        .toList();
+  }
+
+  private List<Long> getSuspendedUserIds(){
+    return redisTemplate.keys("suspension::*")
+        .stream()
+        .map(s -> s.replace("suspension::", ""))
+        .map(Long::parseLong)
+        .toList();
+  }
+
+  private List<Long> getBlockUserIds(){
+    return blockedUserRepository.findAll()
+        .stream()
+        .map(BlockedUser::getBlockedUserId)
+        .toList();
+  }
+
+  private List<Long> getDormantUserIds(){
+    return dormantAccountRepository.findAll()
+        .stream()
+        .map(DormantAccount::getUser)
+        .map(User::getId)
+        .toList();
   }
 
   // ============================================================
@@ -510,20 +556,10 @@ public class MatchService {
    */
   @Transactional
   public void deleteMatching(Long matchingId, User user) {
-    Matching match = matchingRepository.findById(matchingId)
-        .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-
-    Long requestedUserId = match.getRequestedUser().getId();
-    Long requestUserId = match.getRequestUser().getId();
+    Matching match = findMatchingOrThrow(matchingId);
 
     log.info("step=매칭_삭제_요청, matchingId={}, requestorId={}", matchingId, user.getId());
-
-    if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))) {
-      log.error("step=잘못된_유저_요청, authUserId={}, matchRequestedUserId={}, status=FAILED",
-          user.getId(), requestedUserId);
-      throw new RingoException("매칭을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
-    }
-
+    matchingDomainService.validateMatchingDeletePermission(match, user);
     matchingRepository.deleteById(matchingId);
   }
 
@@ -541,21 +577,14 @@ public class MatchService {
    */
   @Transactional
   public void saveMatchingRequestMessage(SaveMatchingRequestMessageRequestDto dto, Long matchingId, User user) {
-    Matching matching = matchingRepository.findById(matchingId)
-        .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+    Matching matching = findMatchingOrThrow(matchingId);
+
+    matchingDomainService.validateMatchingMessageWritePermission(matching, user);
+
+    matching.submitRequestMessage(dto.message());
 
     User requestUser = matching.getRequestUser();
-    if (!requestUser.getId().equals(user.getId())) {
-      log.error("step=잘못된_유저_요청, authUserId={}, matchRequestUserId={}, status=FAILED",
-          user.getId(), requestUser.getId());
-      throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
-    }
-
-    matching.setMatchingStatus(MatchingStatus.PENDING);
-    matching.setMatchingRequestMessage(dto.message());
-
-    UserMatchingLog matchingLog = UserMatchingLog.of(requestUser.getId(), matching.getId(),
-        MatchingStatus.PENDING, requestUser.getGender());
+    UserMatchingLog matchingLog = matching.createMatchingLog();
 
     log.info("step=매칭_요청_메세지_저장, matchingId={}, requestUserId={}, matchingStatus={}, requestUserGender={}",
         matching.getId(), requestUser.getId(),
@@ -579,13 +608,7 @@ public class MatchService {
     Matching match = matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException("해당 매칭을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
 
-    Long requestedUserId = match.getRequestedUser().getId();
-    Long requestUserId = match.getRequestUser().getId();
-    if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))) {
-      log.error("step=잘못된_유저_요청, authUserId={}, status=FAILED", user.getId());
-      throw new RingoException("해당 매칭의 요청 메세지를 확인할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
-    }
-
+    matchingDomainService.validateMatchingMessageReadPermission(match, user);
     return match.getMatchingRequestMessage();
   }
 
@@ -610,8 +633,7 @@ public class MatchService {
     return findSortedRelatedAnswerPairs(user1, user2)
         .stream()
         .map(pair -> {
-          Survey survey = surveyRepository.findById(pair.getSurveyId())
-              .orElseThrow(() -> new RingoException("적절하지 않은 설문아이디입니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+          Survey survey = findSurveyByIdOrThrow(pair.getSurveyId());
           return positiveAnswers.contains(pair.getAnswer())
               ? survey.getMatchedReasonForHigherAnswer()
               : survey.getMatchedReasonForLowerAnswer();
@@ -620,32 +642,61 @@ public class MatchService {
         .toList();
   }
 
+  public List<Place> getMatchedUserPlaces(Long user1, Long user2){
+    List<String> keywords = getMatchedKeywords(user1, user2);
+    List<Integer> selectionCount = List.of(7, 5, 3, 3, 3);
+    List<Place> result = new ArrayList<>();
+    for(int index = 0; index < keywords.size(); index++) {
+      List<Place> places = placeRepository.findAllByKeywordContainingIgnoreCase(keywords.get(index));
+      int max = Math.min(selectionCount.get(index), places.size());
+      Collections.shuffle(places);
+      result.addAll(places.subList(0, max));
+    }
+    Collections.shuffle(result);
+    return result;
+  }
+
   /**
    * 두 사용자의 공통 설문 응답을 기반으로 추천 장소 목록을 반환한다.
    *
-   * <p>공통 설문 쌍에서 도출된 키워드로 {@link Recommendation}을 검색합니다.
+   * <p>공통 설문 쌍에서 도출된 키워드로 {@link Place}을 검색합니다.
    * 최대 1,000개 제한이 있으며, 중복 장소가 포함될 수 있습니다.</p>
    *
    * @param user1 첫 번째 사용자 ID
    * @param user2 두 번째 사용자 ID
    * @return 추천 장소 목록
    */
-  public List<Recommendation> getRecommendationsForMatchedPreference(Long user1, Long user2) {
+  public List<String> getMatchedKeywords(Long user1, Long user2) {
     List<Integer> positiveAnswers = List.of(3, 4, 5);
 
     return findSortedRelatedAnswerPairs(user1, user2)
         .stream()
-        .map(pair -> {
-          Survey survey = surveyRepository.findById(pair.getSurveyId())
-              .orElseThrow(() -> new RingoException("설문을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+        .flatMap(pair -> {
+          Survey survey = findSurveyByIdOrThrow(pair.getSurveyId());
           String keyword = positiveAnswers.contains(pair.getAnswer())
-              ? survey.getKeywordForHigherAnswer()
-              : survey.getKeywordForLowerAnswer();
-          return findRecommendationsByKeywords(keyword);
+              ? survey.getKeywordForHigherAnswer().strip()
+              : survey.getKeywordForLowerAnswer().strip();
+          return tokenizeKeywords(keyword).stream()
+              .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
+              .entrySet()
+              .stream()
+              .map(entry -> Map.entry(entry.getKey(), entry.getValue() * pair.getOrderWeight()));
         })
-        .flatMap(Collection::stream)
-        .limit(1000)
+        .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)))
+        .entrySet()
+        .stream()
+        .map(entry -> {
+          int score = keywordRepository.findAllByKeywordContaining(entry.getKey());
+          return Map.entry(entry.getKey(), score * entry.getValue());
+        })
+        .sorted((entry1, entry2) -> Math.toIntExact(entry2.getValue() - entry1.getValue()))
+        .map(Map.Entry::getKey)
         .toList();
+  }
+
+  private Survey findSurveyByIdOrThrow(Long surveyId){
+    return surveyRepository.findById(surveyId)
+        .orElseThrow(() -> new RingoException("적절하지 않은 설문아이디입니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
   }
 
   /**
@@ -657,16 +708,18 @@ public class MatchService {
    * @param user 추천을 요청하는 사용자
    * @return 추천 장소 목록 (최대 5개)
    */
-  public List<Recommendation> getRecommendationsForIndividualSurvey(User user) {
+  public List<Place> getIndividualSurveyBasedPlaces(User user) {
+    List<Integer> positiveAnswers = List.of(3, 4, 5);
+
     return answeredSurveyRepository.findAllByUser(user)
         .stream()
-        .sorted((a, b) -> calculateAnswerScore(b.getAnswer()) - calculateAnswerScore(a.getAnswer()))
+        .sorted((a, b) -> recommendationDomainService.calculateAnswerScore(b.getAnswer()) - recommendationDomainService.calculateAnswerScore(a.getAnswer()))
         .map(answeredSurvey -> {
           Survey survey = surveyRepository.findBySurveyNum(answeredSurvey.getSurveyNum());
-          String keyword = List.of(3, 4, 5).contains(answeredSurvey.getAnswer())
+          String keyword = positiveAnswers.contains(answeredSurvey.getAnswer())
               ? survey.getKeywordForHigherAnswer()
               : survey.getKeywordForLowerAnswer();
-          return findRecommendationsByKeywords(keyword);
+          return findPlacesByKeywords(keyword);
         })
         .flatMap(Collection::stream)
         .limit(5)
@@ -691,19 +744,12 @@ public class MatchService {
     Long userId = user.getId();
 
     List<Long> cumulativeRecommendedIds =
-        Optional.ofNullable(redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString()))
-            .orElseGet(Collections::emptyList)
-            .stream()
-            .map(GetUserProfileResponseDto::getUserId)
-            .toList();
+        extractIdFromProfileDtos(getCumulativeCachedProfile(user));
+
     log.info("step=스크랩_누적설문_추천목록, recommendedIds={}", cumulativeRecommendedIds);
 
     List<Long> dailyRecommendedIds =
-        Optional.ofNullable(redisUtils.getRecommendUserForDailySurvey(userId.toString()))
-            .orElseGet(Collections::emptyList)
-            .stream()
-            .map(GetUserProfileResponseDto::getUserId)
-            .toList();
+        extractIdFromProfileDtos(getDailyCacheProfile(user));
     log.info("step=스크랩_일일설문_추천목록, recommendedIds={}", dailyRecommendedIds);
 
     List<Long> allRecommendedIds = new ArrayList<>();
@@ -716,10 +762,25 @@ public class MatchService {
       return;
     }
 
-    User recommendedUser = userRepository.findById(recommendedUserId)
-        .orElseThrow(() -> new RingoException("유저를 스크랩하던 도중 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+    User recommendedUser = findUserOrThrow(recommendedUserId);
 
     scrappedUserRepository.save(ScrappedUser.of(user, recommendedUser));
+  }
+
+  private List<GetUserProfileResponseDto> getCumulativeCachedProfile(User user){
+    return getCachedRecommendationProfiles(
+        CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX,
+        MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE,
+        redisUtils::getCumulativeSurveyBasedCachedProfile,
+        user);
+  }
+
+  private List<Long> extractIdFromProfileDtos(List<GetUserProfileResponseDto> profiles){
+    return Optional.ofNullable(profiles)
+            .orElseGet(Collections::emptyList)
+            .stream()
+            .map(GetUserProfileResponseDto::getUserId)
+            .toList();
   }
 
   /**
@@ -739,7 +800,7 @@ public class MatchService {
               user.getNickname(),
               LocalDate.now().getYear() - user.getBirthday().getYear(),
               profile.getImageUrl(),
-              InspectStatus.PASS == profile.getInspectStatus() ? 1 : 0
+              FaceVerify.PASS == profile.getFaceVerify() ? 1 : 0
           );
         })
         .toList();
@@ -748,6 +809,52 @@ public class MatchService {
   // ============================================================
   // private helpers
   // ============================================================
+
+  private User findUserOrThrow(Long userId){
+    return userRepository.findById(userId)
+        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+  }
+
+  private List<AnsweredSurvey> getSimilarAnswers(List<Long> excludedUserIds, AnsweredSurvey todayAnswer){
+    int surveyNum = todayAnswer.getSurveyNum();
+    return answeredSurveyRepository.findAllByUserIdNotInAndAnswerAndSurveyNumIn(
+        excludedUserIds,
+        todayAnswer.getAnswer(),
+        List.of(surveyNum, surveyNum + 1, surveyNum - 1)
+    );
+  }
+
+  private List<AnsweredSurvey> getUserTodayDailyAnswer(User user){
+    return answeredSurveyRepository.findAllByUserAndUpdatedAtAfter(
+        user, LocalDate.now().atStartOfDay()
+    );
+  }
+
+  private List<GetUserProfileResponseDto> getCachedRecommendationProfiles(
+      String keyPrefix,
+      int maxRecommendationSize,
+      Function<String, List<GetUserProfileResponseDto>> function,
+      User user
+  ){
+    Long userId = user.getId();
+    if (redisTemplate.hasKey(keyPrefix + userId)) {
+      List<GetUserProfileResponseDto> cached = function.apply(userId.toString());
+
+      logDailyCachedProfile(user, cached);
+
+      if (cached.size() == maxRecommendationSize) return cached;
+    }
+    return null;
+  }
+
+  private void logDailyCachedProfile(User user, List<GetUserProfileResponseDto> profiles){
+    profiles.forEach(profile -> log.info(
+        "step=일일설문_추천_캐시_조회, requestUserId={}, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, matchingStatus={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
+        user.getId(), profile.getUserId(), profile.getAge(), profile.getGender(),
+        profile.getNickname(), profile.getMatchingScore(), profile.getMatchingStatus(),
+        profile.getHashtags(), profile.getVerify(), profile.getDaysFromLastAccess(), profile.getMbti()
+    ));
+  }
 
   /** Redis에서 활성 유저 ID 목록을 가져온다. 캐시가 없거나 비어 있으면 빈 리스트를 반환한다. */
   @SuppressWarnings("unchecked")
@@ -771,21 +878,14 @@ public class MatchService {
   private GetUserProfileResponseDto buildUserProfileDto(User requestUser, User recommendedUser) {
     Profile profile = recommendedUser.getProfile();
 
-    List<String> hashtags = hashtagRepository.findAllByUser(recommendedUser)
-        .stream()
-        .map(Hashtag::getHashtag)
-        .toList();
-
-    UserAccessLog access = userAccessLogRepository.findFirstByUserIdOrderByCreateAtDesc(recommendedUser.getId());
+    float matchScore =  matchScoreCalculator.calculate(requestUser.getId(), recommendedUser.getId());
+    int isVerify = FaceVerify.PASS == profile.getFaceVerify() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG;
+    int accessBefore = getUserAccessDaysBefore(recommendedUser);
+    List<String> hashtags = findAllStringHashTagValueByUser(recommendedUser);
 
     GetUserProfileResponseDto dto = GetUserProfileResponseDto.of(
-        recommendedUser,
-        matchScoreCalculator.calculate(requestUser.getId(), recommendedUser.getId()),
-        hashtags,
-        InspectStatus.PASS == profile.getInspectStatus() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG,
-        EXPOSE_PROFILE_FLAG,
-        (int) ChronoUnit.DAYS.between(access.getCreateAt(), LocalDateTime.now()),
-        requestUser.getMbti());
+        recommendedUser, matchScore, hashtags, isVerify,
+        EXPOSE_PROFILE_FLAG, accessBefore, requestUser.getMbti());
 
     log.info("step=추천이성_프로필_빌드, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
         dto.getUserId(), dto.getAge(), dto.getGender(), dto.getNickname(),
@@ -795,10 +895,15 @@ public class MatchService {
     return dto;
   }
 
+  private int getUserAccessDaysBefore(User user){
+    UserActivityLog activityLog = userActivityLogRepository.findFirstByUserOrderByCreateAtDesc(user);
+    return (int) ChronoUnit.DAYS.between(activityLog.getCreateAt(), LocalDateTime.now());
+  }
+
   /** 지정된 Redis 키의 추천 목록에서 특정 유저의 hide 플래그를 설정한다. */
   private void applyHideFlagToCache(String redisKeyPrefix, Long userId, Long targetUserId) {
     if (!redisTemplate.hasKey(redisKeyPrefix + userId)) return;
-    List<GetUserProfileResponseDto> profiles = redisUtils.getRecommendedUserForCumulativeSurvey(userId.toString());
+    List<GetUserProfileResponseDto> profiles = redisUtils.getCumulativeSurveyBasedCachedProfile(userId.toString());
     if (profiles == null) return;
     markProfileAsHidden(profiles, targetUserId, userId);
     redisUtils.cacheUntilMidnight(redisKeyPrefix + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), profiles));
@@ -818,14 +923,11 @@ public class MatchService {
   /** 프로필 목록에 해시태그·나이 등 추가 사용자 정보를 채워넣는다. */
   private void enrichProfilesWithUserInfo(List<GetUserProfileResponseDto> profiles) {
     profiles.forEach(profile -> {
-      User user = userRepository.findById(profile.getUserId()).orElse(null);
-      if (user == null) return;
-      profile.setHashtags(
-          hashtagRepository.findAllByUser(user).stream()
-              .map(Hashtag::getHashtag)
-              .toList()
-      );
+      User user = findUserOrThrow(profile.getUserId());
+
+      profile.setHashtags(findAllStringHashTagValueByUser(user));
       profile.setAge(LocalDate.now().getYear() - user.getBirthday().getYear());
+
       log.info("step=매칭_프로필_조회, userId={}, age={}, gender={}, nickname={}, matchingScore={}, matchingStatus={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
           profile.getUserId(), profile.getAge(), profile.getGender(),
           profile.getNickname(), profile.getMatchingScore(), profile.getMatchingStatus(),
@@ -834,60 +936,54 @@ public class MatchService {
     });
   }
 
-  /**
-   * 두 사용자의 공통 설문 응답 쌍을 점수 순으로 정렬하여 반환한다.
-   *
-   * <p>두 응답의 차이가 2 이하인 쌍만 포함하고,
-   * {@link #calculateAnswerPairScore}로 계산된 점수 내림차순으로 정렬합니다.</p>
-   */
-  private List<RelatedSurveyAnswerPairInterface> findSortedRelatedAnswerPairs(Long user1, Long user2) {
+  private List<String> findAllStringHashTagValueByUser(User user){
+    return extractStringValueFromHashTagEntity(hashtagRepository.findAllByUser(user));
+  }
+
+  private List<String> extractStringValueFromHashTagEntity(List<Hashtag> hashtags){
+    return hashtags.stream().map(Hashtag::getHashtag).toList();
+  }
+
+
+  private List<SortedAnswerPairWithWeight> findSortedRelatedAnswerPairs(Long user1, Long user2) {
     return answeredSurveyRepository.getRelatedSurveyAnswerPairs(user1, user2)
         .stream()
         .filter(pair -> Math.abs(pair.getAnswer() - pair.getConfrontAnswer()) <= 2)
         .sorted((a, b) -> {
-          int scoreA = calculateAnswerPairScore(a.getAnswer(), a.getConfrontAnswer());
-          int scoreB = calculateAnswerPairScore(b.getAnswer(), a.getConfrontAnswer());
+          int scoreA = recommendationDomainService.calculateAnswerPairScore(a.getAnswer(), a.getConfrontAnswer());
+          int scoreB = recommendationDomainService.calculateAnswerPairScore(b.getAnswer(), a.getConfrontAnswer());
           return scoreB - scoreA;
+        })
+        .map(pair -> {
+          int weight = recommendationDomainService.calculateAnswerPairScore(pair.getAnswer(), pair.getConfrontAnswer());
+          return new SortedAnswerPairWithWeight(pair.getAnswer(), pair.getConfrontAnswer(),
+              pair.getSurveyId(), weight);
         })
         .toList();
   }
 
-  /*
-   * 쌍문항에서 같은 응답을 할수록 그리고 극단적인 응답을 할수록
-   * 높은 점수를 부여하여 매칭에 원인이 되는 문항이 될 확률이 높아지도록 함
-   *
-   * (5, 5) -> 15, (5, 4) -> 12, (5, 3) -> 5
-   * (4, 4) -> 13, (4, 3) -> 10, (4, 2) -> 3
-   * (3, 3) -> 10, (3, 1) -> 5
-   * (2, 2) -> 13, (2, 1) -> 12
-   * (1, 1) -> 15
-   */
-  private int calculateAnswerPairScore(int answer, int confrontAnswer) {
-    int score = 0;
-    if (Math.abs(answer - confrontAnswer) == 0) score += 10;
-    else if (Math.abs(answer - confrontAnswer) == 1) score += 7;
-
-    if ((answer == 5 || answer == 1) || (confrontAnswer == 5 || confrontAnswer == 1)) score += 5;
-    else if ((answer == 4 || answer == 2) || (confrontAnswer == 4 || confrontAnswer == 2)) score += 3;
-
-    return score;
+  @Getter
+  public static class SortedAnswerPairWithWeight{
+    private final int answer;
+    private final int confront;
+    private final Long surveyId;
+    private final int orderWeight;
+    public SortedAnswerPairWithWeight(int answer, int confront, Long surveyId, int orderWeight){
+      this.answer = answer;
+      this.confront = confront;
+      this.surveyId = surveyId;
+      this.orderWeight = orderWeight;
+    }
   }
 
-  /*
-   * 1, 5 처럼 극단적인 값에 더 높은 점수를 부여
-   */
-  private int calculateAnswerScore(int answer) {
-    if (answer == 1 || answer == 5) return 1;
-    else if (answer == 2 || answer == 4) return 0;
-    else return -1;
+  private List<String> tokenizeKeywords(String keywords){
+    return Arrays.stream(keywords.split(",")).toList();
   }
 
-  private List<Recommendation> findRecommendationsByKeywords(String keywords) {
-    List<Recommendation> result = new ArrayList<>();
+  private List<Place> findPlacesByKeywords(String keywords) {
+    List<Place> result = new ArrayList<>();
     Arrays.stream(keywords.split(","))
-        .forEach(keyword ->
-            result.addAll(recommendationRepository.findAllByKeywordContainingIgnoreCase(keyword))
-        );
+        .forEach(keyword -> result.addAll(placeRepository.findAllByKeywordContainingIgnoreCase(keyword)));
     return result;
   }
 

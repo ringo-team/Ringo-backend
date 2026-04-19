@@ -41,8 +41,8 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E0004", description = "해당 id의 추천 장소가 존재하지 않습니다.", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class))),
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
-  @GetMapping("/recommendations/{recommendation-id}")
-  ResponseEntity<List<GetPostResponseDto>> getPost(@PathVariable(value = "recommendation-id") Long recommendationId, @RequestParam(value = "topic") String topic, @RequestParam(value = "page") int page, @RequestParam(value = "size") int size, @AuthenticationPrincipal User user);
+  @GetMapping("/posts")
+  ResponseEntity<List<GetPostResponseDto>> getPost(@RequestParam(value = "topic") String topic, @RequestParam(value = "page") int page, @RequestParam(value = "size") int size, @AuthenticationPrincipal User user);
 
   @Operation(summary = "게시물 업로드")
   @ApiResponses(value = {

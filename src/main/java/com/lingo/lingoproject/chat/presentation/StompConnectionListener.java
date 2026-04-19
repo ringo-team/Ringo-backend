@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.chat.presentation;
 
+import com.lingo.lingoproject.chat.application.ChatService;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -23,6 +24,7 @@ public class StompConnectionListener {
 
   private final RedisTemplate<String, Object> redisTemplate;
   private final UserRepository userRepository;
+  private final ChatService chatService;
 
   @EventListener
   public void onConnected(SessionSubscribeEvent event){
@@ -32,18 +34,16 @@ public class StompConnectionListener {
       StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
       if (accessor.getUser() == null) return;
       String loginId = accessor.getUser().getName();
-      User user = userRepository.findByLoginId(loginId).orElseThrow(() -> new RingoException(
-              "세션에 해당하는 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+      User user = chatService.findUserByLoginIdOrThrow(loginId);
 
       // 접속 중인 채팅방 조회
       String destination = accessor.getDestination();
-      Long roomId = extractRoomIdFromDestination(destination);
+      Long roomId = chatService.extractRoomIdFromDestination(destination);
       if (roomId == null) return;
 
       // 유저 채팅방 레디스에 저장
       log.info("step=채팅방_입장, userId={}, chatroomId={}", user.getId(), roomId);
-      ValueOperations<String, Object> ops = redisTemplate.opsForValue();
-      ops.set("connect::" + user.getId() + "::" + roomId, true);
+      redisTemplate.opsForValue().set("connect::" + user.getId() + "::" + roomId, true);
 
     } catch (Exception e) {
       log.error("step=채팅방_입장_오류, 레디스 연결 상태 저장 중 오류 발생");
@@ -54,17 +54,6 @@ public class StompConnectionListener {
     }
   }
 
-  private Long extractRoomIdFromDestination(String destination){
-    if (destination == null) return null;
-    String lastWord = destination.substring(destination.lastIndexOf("/") + 1);
-    long roomId;
-    try{
-      roomId = Long.parseLong(lastWord);
-    }catch (Exception e){
-      return null;
-    }
-    return roomId;
-  }
 
   @EventListener
   public void onDisconnected(SessionDisconnectEvent event){
@@ -80,13 +69,13 @@ public class StompConnectionListener {
       }
 
       String username = accessor.getUser().getName();
-      User user = userRepository.findByLoginId(username).orElseThrow(() ->
-          new RingoException("세션에 해당하는 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+      User user = chatService.findUserByLoginIdOrThrow(username);
 
       // 유저 id 로 저장된 키 모두 삭제
       Set<String> keyset = redisTemplate.keys("connect::" + user.getId() + "*");
-      if (keyset.isEmpty() || keyset == null){
-        log.info("error");
+      if (keyset.isEmpty()){
+        log.info("redis key cannot found");
+        throw new RingoException("redis key cannot found", ErrorCode.NOT_FOUND, HttpStatus.INTERNAL_SERVER_ERROR);
       }
       for (String key : keyset) {
         log.info("step=WebSocket_연결_키_삭제, key={}", key);

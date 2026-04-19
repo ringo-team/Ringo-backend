@@ -38,10 +38,7 @@ public class ChatController implements ChatApi {
 
 
   public ResponseEntity<GetChatResponseDto> getChattingMessages(Long roomId, int page, int size, User user) {
-    if (!chatService.isParticipant(roomId, user.getId())) {
-      log.error("step=잘못된_유저_요청, authUserId={}, chatroomId={}, status=FAILED", user.getId(), roomId);
-      throw new RingoException("채팅방 메세지를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
+    chatService.validateParticipant(roomId, user.getId());
 
     log.info("step=메세지_조회_시작, userId={}, chatroomId={}", user.getId(), roomId);
     GetChatResponseDto responses = chatService.fetchChatMessages(user, roomId, page, size);
@@ -71,8 +68,11 @@ public class ChatController implements ChatApi {
 
 
   public ResponseEntity<ResultMessageResponseDto> deleteChatroom(Long roomId, User user) {
+
+    chatService.validateParticipant(roomId, user.getId());
+
     log.info("step=채팅방_삭제_시작, userId={}, chatroomId={}", user.getId(), roomId);
-    chatService.deleteChatroom(roomId, user);
+    chatService.deleteChatroom(roomId);
     log.info("step=채팅방_삭제_완료, userId={}, chatroomId={}", user.getId(), roomId);
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "채팅방을 성공적으로 삭제했습니다."));

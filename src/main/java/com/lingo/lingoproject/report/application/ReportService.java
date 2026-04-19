@@ -1,18 +1,17 @@
 package com.lingo.lingoproject.report.application;
 
-import com.lingo.lingoproject.shared.domain.model.Report;
-import com.lingo.lingoproject.shared.domain.model.ReportIntensity;
-import com.lingo.lingoproject.shared.domain.model.ReportStatus;
-import com.lingo.lingoproject.shared.exception.ErrorCode;
-import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.report.domain.event.UserSuspendedEvent;
+import com.lingo.lingoproject.report.domain.service.ReportDomainService;
 import com.lingo.lingoproject.report.presentation.dto.GetReportInfoRequestDto;
 import com.lingo.lingoproject.report.presentation.dto.GetReportInfoResponseDto;
 import com.lingo.lingoproject.report.presentation.dto.SaveReportRequestDto;
+import com.lingo.lingoproject.shared.domain.event.DomainEventPublisher;
+import com.lingo.lingoproject.shared.domain.model.Report;
+import com.lingo.lingoproject.shared.domain.model.ReportStatus;
+import com.lingo.lingoproject.shared.exception.ErrorCode;
+import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ReportRepository;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 사용자 신고 접수 및 관리자 조치 처리 비즈니스 로직을 담당하는 서비스.
@@ -51,14 +51,8 @@ public class ReportService {
 
   private final ReportRepository reportRepository;
   private final RedisUtils redisUtils;
-  private final ApplicationEventPublisher eventPublisher;
-
-  /** 경미한 이용정지 기간 (일). Redis TTL로 사용. */
-  private static final int MINOR_ACCOUNT_SUSPENSION_INTERVAL_DAY = 2;
-  /** 위험 이용정지 기간 (일). Redis TTL로 사용. */
-  private static final int RISKY_ACCOUNT_SUSPENSION_INTERVAL_DAY = 3;
-  /** 심각 이용정지 기간 (일). Redis TTL로 사용. */
-  private static final int SEVERE_ACCOUNT_SUSPENSION_INTERVAL_DAY = 7;
+  private final DomainEventPublisher eventPublisher;
+  private final ReportDomainService reportDomainService;
   private final RedisTemplate<String, Object> redisTemplate;
 
   /**
@@ -71,12 +65,7 @@ public class ReportService {
    * @throws RingoException 이미 처리 대기 중인 신고가 존재하는 경우
    */
   public void report(SaveReportRequestDto dto){
-    if (reportRepository.existsByReportUserIdAndReportedUserIdAndReportedUserStatus(
-        dto.reportUserId(), dto.reportedUserId(), ReportStatus.PENDING
-    )){
-      log.warn("step=신고_중복_접수, reportUserId={}, reportedUserId={}", dto.reportUserId(), dto.reportedUserId());
-      throw new RingoException("이미 접수된 신고입니다.", ErrorCode.DUPLICATED, HttpStatus.BAD_REQUEST);
-    }
+    reportDomainService.validateNoDuplicateReport(dto.reportUserId(), dto.reportedUserId());
     reportRepository.save(Report.of(dto.reportUserId(), dto.reportedUserId(), dto.reason()));
     log.info("step=신고_접수_완료, reportUserId={}, reportedUserId={}", dto.reportUserId(), dto.reportedUserId());
   }
@@ -123,37 +112,37 @@ public class ReportService {
     Report report = reportRepository.findById(reportId)
         .orElseThrow(() -> new RingoException("해당 신고가 존재하지 않습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
     report.setAdminId(adminId);
-    switch (reportedUserStatus){
-      case "INNOCENT_REPORT":
-        report.setReportedUserStatus(ReportStatus.INNOCENT_REPORT);
-        break;
-      case "WARNING":
-        report.setReportedUserStatus(ReportStatus.WARNING);
-        break;
-      case "MINOR_ACCOUNT_SUSPENSION":
-        report.setReportedUserStatus(ReportStatus.MINOR_ACCOUNT_SUSPENSION);
-        redisTemplate.opsForValue().set("suspension::" + report.getReportedUserId(), true, MINOR_ACCOUNT_SUSPENSION_INTERVAL_DAY, TimeUnit.DAYS);
-        break;
-      case "RISKY_ACCOUNT_SUSPENSION":
-        report.setReportedUserStatus(ReportStatus.RISKY_ACCOUNT_SUSPENSION);
-        redisTemplate.opsForValue().set("suspension::" + report.getReportedUserId(), true, RISKY_ACCOUNT_SUSPENSION_INTERVAL_DAY, TimeUnit.DAYS);
-        break;
-      case "SEVERE_ACCOUNT_SUSPENSION":
-        report.setReportedUserStatus(ReportStatus.SEVERE_ACCOUNT_SUSPENSION);
-        redisTemplate.opsForValue().set("suspension::" + report.getReportedUserId(), true, SEVERE_ACCOUNT_SUSPENSION_INTERVAL_DAY, TimeUnit.DAYS);
-        break;
-      case "PERMANENT_ACCOUNT_SUSPENSION":
-        report.setReportedUserStatus(ReportStatus.PERMANENT_ACCOUNT_SUSPENSION);
-        eventPublisher.publishEvent(new UserSuspendedEvent(report.getReportedUserId(), adminId, true));
-        break;
-      case "LEGAL_REVIEW":
-        report.setReportedUserStatus(ReportStatus.LEGAL_REVIEW);
-        break;
-      default:
-        log.warn("step=신고_처리_잘못된_조치, reportId={}, reportedUserStatus={}, adminId={}", reportId, reportedUserStatus, adminId);
-        throw new RingoException("적절하지 못한 조치가 입력되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+
+    ReportStatus status = parseReportStatus(reportedUserStatus, reportId, adminId);
+    report.setReportedUserStatus(status);
+
+    int suspensionDays = reportDomainService.determineSuspensionDays(status);
+    if (suspensionDays > 0) {
+      redisTemplate.opsForValue().set(
+          "suspension::" + report.getReportedUserId(), true, suspensionDays, TimeUnit.DAYS);
+    }
+
+    if (reportDomainService.isPermanentSuspension(status)) {
+      eventPublisher.publish(new UserSuspendedEvent(report.getReportedUserId(), adminId, true));
     }
     log.info("step=신고_처리_완료, reportId={}, reportedUserId={}, reportedUserStatus={}, adminId={}", reportId, report.getReportedUserId(), reportedUserStatus, adminId);
     reportRepository.save(report);
+  }
+
+  private ReportStatus parseReportStatus(String reportedUserStatus, Long reportId, Long adminId) {
+    return switch (reportedUserStatus) {
+      case "INNOCENT_REPORT"           -> ReportStatus.INNOCENT_REPORT;
+      case "WARNING"                   -> ReportStatus.WARNING;
+      case "MINOR_ACCOUNT_SUSPENSION"  -> ReportStatus.MINOR_ACCOUNT_SUSPENSION;
+      case "RISKY_ACCOUNT_SUSPENSION"  -> ReportStatus.RISKY_ACCOUNT_SUSPENSION;
+      case "SEVERE_ACCOUNT_SUSPENSION" -> ReportStatus.SEVERE_ACCOUNT_SUSPENSION;
+      case "PERMANENT_ACCOUNT_SUSPENSION" -> ReportStatus.PERMANENT_ACCOUNT_SUSPENSION;
+      case "LEGAL_REVIEW"              -> ReportStatus.LEGAL_REVIEW;
+      default -> {
+        log.warn("step=신고_처리_잘못된_조치, reportId={}, reportedUserStatus={}, adminId={}",
+            reportId, reportedUserStatus, adminId);
+        throw new RingoException("적절하지 못한 조치가 입력되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+      }
+    };
   }
 }

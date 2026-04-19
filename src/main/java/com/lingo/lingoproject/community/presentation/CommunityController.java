@@ -31,9 +31,9 @@ public class CommunityController implements CommunityApi {
   private final CommunityService communityService;
 
   @Override
-  public ResponseEntity<List<GetPostResponseDto>> getPost(Long recommendationId, String topic, int page, int size, User user) {
+  public ResponseEntity<List<GetPostResponseDto>> getPost(String topic, int page, int size, User user) {
     log.info("step=게시물_조회_시작, userId={}", user.getId());
-    List<GetPostResponseDto> response = communityService.findPostsByRecommendation(recommendationId, topic, page, size);
+    List<GetPostResponseDto> response = communityService.findPosts(topic, page, size);
     log.info("step=게시물_조회_완료, userId={}", user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(response);
   }

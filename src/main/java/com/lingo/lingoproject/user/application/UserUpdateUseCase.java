@@ -1,8 +1,8 @@
 package com.lingo.lingoproject.user.application;
 
 import com.lingo.lingoproject.shared.domain.model.Drinking;
+import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Hashtag;
-import com.lingo.lingoproject.shared.domain.model.InspectStatus;
 import com.lingo.lingoproject.shared.domain.model.Profile;
 import com.lingo.lingoproject.shared.domain.model.Religion;
 import com.lingo.lingoproject.shared.domain.model.Smoking;
@@ -85,7 +85,7 @@ public class UserUpdateUseCase {
 
   public void updateUserProfileVerification(User user) {
     Profile profile = user.getProfile();
-    profile.setInspectStatus(InspectStatus.PASS);
+    profile.setFaceVerify(FaceVerify.PASS);
     profileRepository.save(profile);
   }
 

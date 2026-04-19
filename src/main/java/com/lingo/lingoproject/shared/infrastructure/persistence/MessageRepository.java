@@ -14,7 +14,7 @@ public interface MessageRepository extends MongoRepository<Message, String> {
   void deleteAllByChatroomId(Long chatroomId);
 
   @Query(value = "{ 'chatroomId': ?0, 'readerIds':  { $ne:  ?1 }, 'senderId':  { $ne:  ?1 }}", count = true)
-  int findNumberOfNotReadMessages(Long chatroomId, Long userId);
+  int findNumberOfUnreadMessages(Long chatroomId, Long userId);
 
   @Query(value = """
         {

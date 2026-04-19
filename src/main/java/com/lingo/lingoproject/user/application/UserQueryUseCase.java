@@ -42,10 +42,10 @@ public class UserQueryUseCase {
   }
 
   public GetUserInfoResponseDto getUserInfo(Long findUserId, User user) {
-    List<Long> cumulativeList = Optional.ofNullable(redisUtils.getRecommendedUserForCumulativeSurvey(user.getId().toString()))
+    List<Long> cumulativeList = Optional.ofNullable(redisUtils.getCumulativeSurveyBasedCachedProfile(user.getId().toString()))
         .orElseGet(Collections::emptyList)
         .stream().map(GetUserProfileResponseDto::getUserId).toList();
-    List<Long> dailyList = Optional.ofNullable(redisUtils.getRecommendUserForDailySurvey(user.getId().toString()))
+    List<Long> dailyList = Optional.ofNullable(redisUtils.getDailySurveyBasedCachedProfile(user.getId().toString()))
         .orElseGet(Collections::emptyList)
         .stream().map(GetUserProfileResponseDto::getUserId).toList();
 

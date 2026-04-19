@@ -30,10 +30,9 @@ import org.hibernate.annotations.DynamicInsert;
 @Getter@Setter
 public class Post extends Timestamp {
 
-  public static Post of(User author, Recommendation recommendation, String title, String content, PostTopic topic) {
+  public static Post of(User author, String title, String content, PostTopic topic) {
     return Post.builder()
         .author(author)
-        .recommendation(recommendation)
         .title(title)
         .content(content)
         .topic(topic)
@@ -43,10 +42,6 @@ public class Post extends Timestamp {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
-
-  @ManyToOne
-  @JoinColumn(name = "recommendation_id")
-  private Recommendation recommendation;
 
   @Column(length = 100)
   private String title;
