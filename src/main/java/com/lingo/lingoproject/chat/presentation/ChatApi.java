@@ -110,4 +110,5 @@ public interface ChatApi {
       }
   )
   ResponseEntity<ResultMessageResponseDto> saveAppointment(@Valid @RequestBody SaveAppointmentRequestDto dto, @AuthenticationPrincipal User user);
+
 }

@@ -23,7 +23,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class MatchingDomainService {
+public class MatchingValidationService {
 
   /**
    * 매칭 수락·거절 권한을 검증한다.

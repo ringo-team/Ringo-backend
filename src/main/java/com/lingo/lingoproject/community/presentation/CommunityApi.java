@@ -5,9 +5,12 @@ import com.lingo.lingoproject.community.presentation.dto.CommentResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.CreateSubCommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.CreateSubCommentResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetCommentResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.GetPlaceResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.ScrapPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
@@ -15,6 +18,7 @@ import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequest
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -22,6 +26,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -31,6 +36,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Community API", description = "커뮤니티 기능 api")
@@ -42,7 +48,7 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
   @GetMapping("/posts")
-  ResponseEntity<List<GetPostResponseDto>> getPost(@RequestParam(value = "topic") String topic, @RequestParam(value = "page") int page, @RequestParam(value = "size") int size, @AuthenticationPrincipal User user);
+  ResponseEntity<List<GetPostResponseDto>> getPost(@RequestParam(value = "category") String category, @RequestParam(value = "page") int page, @RequestParam(value = "size") int size, @AuthenticationPrincipal User user);
 
   @Operation(summary = "게시물 업로드")
   @ApiResponses(value = {
@@ -52,7 +58,7 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
   @PostMapping("/posts")
-  ResponseEntity<SavePostResponseDto> post(@Valid @RequestBody SavePostRequestDto dto, @RequestParam(value = "images") List<MultipartFile> images, @AuthenticationPrincipal User user);
+  ResponseEntity<SavePostResponseDto> post(@Valid @RequestBody SavePostRequestDto dto, @RequestPart(value = "images", required = false) List<MultipartFile> images, @AuthenticationPrincipal User user);
 
   @Operation(summary = "게시물 삭제")
   @ApiResponses(value = {
@@ -159,4 +165,23 @@ public interface CommunityApi {
   })
   @PatchMapping("/like/comments/{comment-id}")
   ResponseEntity<ResultMessageResponseDto> likeComment(@PathVariable("comment-id") Long commentId, @AuthenticationPrincipal User user);
+
+  @Operation(summary = "장소/컨텐츠 관련 게시물 조회")
+  @GetMapping("/posts/search")
+  ResponseEntity<List<GetPostResponseDto>> getPlaceRelatedPost(@RequestParam(required = false) String keyword, @RequestParam(required = false) String place, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
+
+  @PostMapping(value = "/places/excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  ResponseEntity<ResultMessageResponseDto> savePlace(@RequestParam("file") MultipartFile file);
+
+  @GetMapping(value = "/places")
+  ResponseEntity<GetPlaceResponseDto> getIndividualRecommendationPlaces(@AuthenticationPrincipal User user);
+
+  @GetMapping(value = "/places/rank")
+  ResponseEntity<List<GetPlaceDetailResponseDto>> getRankedPagedPlaces(@AuthenticationPrincipal User user, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
+
+  @PatchMapping(value = "/places/{place-id}")
+  ResponseEntity<ResultMessageResponseDto> updatePlaceClickCount(@PathVariable(value = "place-id") Long placeId);
+
+  @PostMapping(value = "/places/scrap")
+  ResponseEntity<ResultMessageResponseDto> scrapPlace(@RequestBody ScrapPlaceRequestDto request, @AuthenticationPrincipal User user);
 }

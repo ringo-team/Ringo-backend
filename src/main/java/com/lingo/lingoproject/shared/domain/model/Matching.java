@@ -1,6 +1,5 @@
 package com.lingo.lingoproject.shared.domain.model;
 
-import com.lingo.lingoproject.shared.domain.model.MatchingStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -48,11 +47,11 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 )
 public class Matching {
 
-  public static Matching of(User requestUser, User requestedUser, float matchingScore) {
+  public static Matching of(User requestUser, User requestedUser, float matchingScore, MatchingStatus status) {
     return Matching.builder()
         .requestUser(requestUser)
         .requestedUser(requestedUser)
-        .matchingStatus(MatchingStatus.PRE_REQUESTED)
+        .matchingStatus(status)
         .matchingScore(matchingScore)
         .build();
   }
@@ -90,7 +89,7 @@ public class Matching {
     this.matchingStatus = MatchingStatus.REJECTED;
   }
 
-  public void submitRequestMessage(String message) {
+  public void updateRequestMessage(String message) {
     this.matchingStatus = MatchingStatus.PENDING;
     this.matchingRequestMessage = message;
   }

@@ -171,7 +171,8 @@ public class S3ImageStorageService {
     for (FeedImageDataRequestDto request : requests) {
       if (containsInappropriateContent(request.getImage())) continue;
 
-      FeedImage feedImage = buildFeedImage(request, user);
+      String imageUrl = uploadImageToS3(request.getImage(), "feeds");
+      FeedImage feedImage = FeedImage.of(user, imageUrl, request.getContent());
       feedImages.add(feedImage);
       log.info("userId={}, imageUrl={}, description={}",
           user.getId(), feedImage.getImageUrl(), feedImage.getDescription());
@@ -555,10 +556,6 @@ public class S3ImageStorageService {
     userRepository.save(user);
   }
 
-  private FeedImage buildFeedImage(FeedImageDataRequestDto dto, User user) {
-    String imageUrl = uploadImageToS3(dto.getImage(), "feeds");
-    return FeedImage.of(user, imageUrl, dto.getContent());
-  }
 
   private User findUserOrThrow(Long userId) {
     return userRepository.findById(userId)

@@ -88,7 +88,7 @@ public class RedisExpireListener implements MessageListener {
 
       log.info("step=유저_활동_기록, userId={}, minutes={}", userId, minutes);
 
-      userActivityLogRepository.save(UserActivityLog.of(user, startTime, endTime, minutes));
+      userActivityLogRepository.save(UserActivityLog.of(user, startTime, endTime,(int) minutes));
     }
 
   }

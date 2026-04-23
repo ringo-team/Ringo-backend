@@ -8,7 +8,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -34,6 +36,15 @@ public class Comment extends Timestamp {
         .build();
   }
 
+  public static Comment of(Post post, Comment parent, User user, String content){
+    return Comment.builder()
+        .post(post)
+        .parentComment(parent)
+        .user(user)
+        .content(content)
+        .build();
+  }
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -52,4 +63,8 @@ public class Comment extends Timestamp {
 
   @Lob
   private String content;
+
+  @ManyToOne
+  @JoinColumn(name = "parent_comment_id")
+  private Comment parentComment;
 }

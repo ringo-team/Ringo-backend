@@ -56,13 +56,14 @@ public class AuthTokenUseCase {
     throw new RingoException("유효하지 않은 토큰입니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
   }
 
-  @Transactional
   public void logout(HttpServletRequest request) {
     String accessToken = request.getHeader(AUTHORIZATION_HEADER_KEY);
     if (!accessToken.startsWith(ACCESS_TOKEN_PREFIX))
-      throw new RingoException("토큰이 잘못전달되었습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+      throw new RingoException("토큰이 형식이 잘못되었습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+
     accessToken = accessToken.substring(7);
     Claims claims = jwtUtil.getClaims(accessToken);
+
     redisTemplate.delete("redis::refresh::" + claims.getSubject());
     redisTemplate.opsForValue().set("logoutUser::" + claims.getId(), accessToken, 1, TimeUnit.DAYS);
   }

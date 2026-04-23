@@ -13,4 +13,6 @@ public interface SubCommentRepository extends JpaRepository<SubComment, Long> {
   List<SubComment> findAllByComment(Comment comment);
 
   boolean existsByIdAndUser(Long id, User user);
+
+  int countByComment(Comment comment);
 }

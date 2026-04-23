@@ -15,8 +15,9 @@ public record GetPostResponseDto(
     String authorProfileUrl,
     Integer likeCount,
     Integer commentCount,
+    String category,
     List<GetPostImageResponseDto> images,
-    LocalDateTime updatedAt,
+    String updatedAt,
     String result
 ) {
 
@@ -29,8 +30,9 @@ public record GetPostResponseDto(
         .authorName(post.getAuthor().getNickname())
         .likeCount(post.getLikeCount())
         .commentCount(post.getCommentCount())
+        .category(post.getCategory().toString())
         .images(images)
-        .updatedAt(post.getUpdatedAt())
+        .updatedAt(post.getUpdatedAt() == null ? post.getCreatedAt().toString() : post.getUpdatedAt().toString())
         .result(ErrorCode.SUCCESS.getCode())
         .build();
   }

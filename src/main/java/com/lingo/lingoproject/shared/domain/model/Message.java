@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.shared.domain.model;
 
+import com.lingo.lingoproject.chat.presentation.dto.GetChatMessageResponseDto;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -20,13 +21,13 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @AllArgsConstructor
 public class Message {
 
-  public static Message of(Long chatroomId, Long senderId, String content, List<Long> readerIds) {
+  public static Message of(Long chatroomId, GetChatMessageResponseDto messageDto) {
     return Message.builder()
         .id(UUID.randomUUID().toString())
         .chatroomId(chatroomId)
-        .senderId(senderId)
-        .content(content)
-        .readerIds(readerIds)
+        .senderId(messageDto.getSenderId())
+        .content(messageDto.getContent())
+        .readerIds(messageDto.getReaderIds())
         .createdAt(LocalDateTime.now())
         .build();
   }

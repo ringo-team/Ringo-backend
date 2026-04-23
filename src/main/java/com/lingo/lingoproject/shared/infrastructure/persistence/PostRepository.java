@@ -1,7 +1,9 @@
 package com.lingo.lingoproject.shared.infrastructure.persistence;
 
 import com.lingo.lingoproject.shared.domain.model.Post;
-import com.lingo.lingoproject.shared.domain.model.PostTopic;
+import com.lingo.lingoproject.shared.domain.model.PostCategory;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,7 +23,17 @@ public interface PostRepository extends JpaRepository<Post, Long> {
   @Query("update Post p set p.likeCount = p.likeCount - 1 where p.id = :postId")
   void decreasePostLikeCount(@Param("postId") Long postId);
 
-  Page<Post> findByTopic(PostTopic topic, Pageable pageable);
+  @Modifying
+  @Query("update Post p set p.commentCount = p.commentCount + 1 where p.id = :postId")
+  void increaseCommentCount(Long postId);
 
-  //Page<Post> findByRecommendationAndTopic(Place recommendation, PostTopic topic, Pageable pageable);
+  @Modifying
+  @Query("update Post p set p.commentCount = p.commentCount - :count where p.id = :postId")
+  void decreaseCommentCount(Long postId, int count);
+
+  Page<Post> findByCategory(PostCategory category, Pageable pageable);
+
+  List<Post> findAllByIdIn(Collection<Long> ids);
+
+  //Page<Post> findByRecommendationAndTopic(Place recommendation, PostCategory topic, Pageable pageable);
 }

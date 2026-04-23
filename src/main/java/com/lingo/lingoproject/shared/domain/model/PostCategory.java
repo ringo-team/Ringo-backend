@@ -1,6 +1,6 @@
 package com.lingo.lingoproject.shared.domain.model;
 
-public enum PostTopic {
+public enum PostCategory {
   ENTIRE,
   CAFE,
   RESTAURANT,

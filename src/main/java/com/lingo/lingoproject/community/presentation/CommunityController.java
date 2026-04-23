@@ -5,21 +5,29 @@ import com.lingo.lingoproject.community.presentation.dto.CommentResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.CreateSubCommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.CreateSubCommentResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetCommentResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.GetPlaceResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.ScrapPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
+import com.lingo.lingoproject.matching.application.MatchService;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
+import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,11 +37,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class CommunityController implements CommunityApi {
 
   private final CommunityService communityService;
+  private final MatchService matchService;
 
   @Override
-  public ResponseEntity<List<GetPostResponseDto>> getPost(String topic, int page, int size, User user) {
+  public ResponseEntity<List<GetPostResponseDto>> getPost(String category, int page, int size, User user) {
     log.info("step=게시물_조회_시작, userId={}", user.getId());
-    List<GetPostResponseDto> response = communityService.findPosts(topic, page, size);
+    List<GetPostResponseDto> response = communityService.findPosts(category, page, size);
     log.info("step=게시물_조회_완료, userId={}", user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(response);
   }
@@ -133,5 +142,49 @@ public class CommunityController implements CommunityApi {
     communityService.toggleCommentLike(commentId, user);
     log.info("step=댓글_좋아요_완료, userId={}", user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "해당 댓글을 좋아요 혹은 좋아요 취소하였습니다."));
+  }
+
+  @Override
+  public ResponseEntity<List<GetPostResponseDto>> getPlaceRelatedPost(String keyword, String place, int page, int size) {
+    log.info("step=게시물_관련_장소/컨텐츠_조회_시작");
+    List<GetPostResponseDto> dtos = communityService.searchPostsByKeywordOrPlace(keyword, place, page, size);
+    log.info("step=게시물_관련_장소/컨텐츠_조회_완료");
+
+    return ResponseEntity.status(HttpStatus.OK).body(dtos);
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> savePlace(MultipartFile file){
+    communityService.parseExcelAndPersistEntity(file);
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
+        ErrorCode.SUCCESS.getCode(), "성공적으로 업로드 되었습니다."));
+  }
+
+  @Override
+  public ResponseEntity<GetPlaceResponseDto> getIndividualRecommendationPlaces(User user){
+    List<GetPlaceDetailResponseDto> individual = matchService.getIndividualUserPlaces(user);
+    List<GetPlaceDetailResponseDto> common = matchService.getRandomlySelectedPlaces(user);
+
+    GetPlaceResponseDto response = new GetPlaceResponseDto(individual, common, ErrorCode.SUCCESS.getCode());
+
+    return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
+  public ResponseEntity<List<GetPlaceDetailResponseDto>> getRankedPagedPlaces(User user, int page, int size) {
+    List<GetPlaceDetailResponseDto> rankedPlaces = matchService.getRankedPagedPlaces(user, page, size);
+    return ResponseEntity.status(HttpStatus.OK).body(rankedPlaces);
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> updatePlaceClickCount(Long placeId) {
+    communityService.updatePlaceClickCount(placeId);
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 업데이트 하였습니다."));
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> scrapPlace(ScrapPlaceRequestDto request, User user) {
+    communityService.scrapPlace(request.placeId(), user);
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "장소를 스크랩했습니다."));
   }
 }

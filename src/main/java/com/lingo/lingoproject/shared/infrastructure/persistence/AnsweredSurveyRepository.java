@@ -2,7 +2,7 @@ package com.lingo.lingoproject.shared.infrastructure.persistence;
 
 import com.lingo.lingoproject.shared.domain.model.AnsweredSurvey;
 import com.lingo.lingoproject.shared.domain.model.User;
-import com.lingo.lingoproject.matching.presentation.dto.MatchScoreResultInterface;
+import com.lingo.lingoproject.matching.presentation.dto.SurveyScoreResultInterface;
 import com.lingo.lingoproject.matching.presentation.dto.MatchedSurveyAnswerInterface;
 import com.lingo.lingoproject.matching.presentation.dto.RelatedSurveyAnswerPairInterface;
 import com.lingo.lingoproject.survey.presentation.dto.GetUserSurveyResponseDto;
@@ -31,7 +31,7 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
           and A.answer = B.answer
         group by S.category
         """)
-  List<MatchScoreResultInterface> calcMatchScore(@Param("user1") Long user1, @Param("user2") Long user2);
+  List<SurveyScoreResultInterface> calcSurveyScore(@Param("user1") Long user1, @Param("user2") Long user2);
 
   @Query(value = """
     select S.id as surveyId, A.answer as answer

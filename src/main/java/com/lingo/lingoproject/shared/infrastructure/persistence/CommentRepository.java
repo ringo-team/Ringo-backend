@@ -13,10 +13,6 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
   void deleteAllByPost(Post post);
 
-  List<Comment> findByIdAndUser(Long id, User user);
-
-  boolean existsByIdAndUser(Long id, User user);
-
   List<Comment> findAllByPost(Post post);
 
   @Modifying
@@ -26,4 +22,6 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
   @Modifying
   @Query("update Comment c set c.likeCount = c.likeCount - 1 where c.id = :commentId")
   void decreaseCommentLikeCount(@Param("commentId") Long commentId);
+
+  List<Comment> findAllByParentComment(Comment parentComment);
 }

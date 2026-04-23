@@ -53,6 +53,12 @@ public class Profile extends Timestamp {
 
   private String description;
 
+  @Builder.Default
+  private int clickCount = 0;
+
+  @Builder.Default
+  private int impressionCount = 0;
+
   @Enumerated(EnumType.STRING)
   @ColumnDefault("'PENDING'")
   @Builder.Default

@@ -104,13 +104,13 @@ public class ChatController implements ChatApi {
         log.info("step=메세지_전송, senderId={}, receiverId={}", chatMessageDto.getSenderId(), member.getId());
         simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/topic/" + roomId, chatMessageDto);
       } catch (Exception e) {
-        chatService.recordMessageDeliveryFailure(e, savedMessage, roomId, member.getLoginId(), "/topic/");
+        chatService.recordMessageDeliveryFailure(e, savedMessage, member.getLoginId(), "/topic/" + roomId);
       }
       try {
         simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/room-list", chatMessageDto);
       } catch (Exception e) {
         log.error("step=채팅_미리보기_전송_실패, chatroomId={}, userLoginId={}, status=FAILED", roomId, member.getLoginId(), e);
-        chatService.recordMessageDeliveryFailure(e, savedMessage, roomId, member.getLoginId(), "/room-list/");
+        chatService.recordMessageDeliveryFailure(e, savedMessage, member.getLoginId(), "/room-list/" + roomId);
       }
 
       if (!connectedUserIdList.contains(member.getId())) {

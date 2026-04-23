@@ -97,10 +97,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
       // 회원가입을 마치치 않은 회원의 경우 접근을 차단함
       // /signup/** 경로와 공개 조회 엔드포인트는 예외적으로 허용
-      if(!(request.getRequestURI().startsWith("/signup") ||
-          request.getRequestURI().equals("/profiles") ||
-          request.getRequestURI().equals("/feeds") ||
-          user.getStatus().equals(SignupStatus.COMPLETED))){
+      if(!user.getStatus().equals(SignupStatus.COMPLETED)){
         throw new RingoException("회원가입을 마치고 요청 주시길 바랍니다.", ErrorCode.BEFORE_SIGNUP ,HttpStatus.FORBIDDEN);
       }
 

@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.community.domain.service;
 
 import com.lingo.lingoproject.shared.domain.model.Comment;
+import com.lingo.lingoproject.shared.domain.model.Place;
 import com.lingo.lingoproject.shared.domain.model.Post;
 import com.lingo.lingoproject.shared.domain.model.SubComment;
 import com.lingo.lingoproject.shared.domain.model.User;
@@ -50,19 +51,6 @@ public class CommunityDomainService {
       log.warn("step=댓글_권한없음, commentId={}, requestUserId={}, ownerId={}",
           comment.getId(), user.getId(), comment.getUser().getId());
       throw new RingoException("댓글을 처리할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
-  }
-
-  /**
-   * 대댓글 소유권을 검증한다. 작성자 본인만 수정·삭제할 수 있다.
-   *
-   * @throws RingoException 소유자가 아닌 경우
-   */
-  public void validateSubCommentOwnership(SubComment subComment, User user) {
-    if (!subComment.getUser().getId().equals(user.getId())) {
-      log.warn("step=대댓글_권한없음, subCommentId={}, requestUserId={}, ownerId={}",
-          subComment.getId(), user.getId(), subComment.getUser().getId());
-      throw new RingoException("대댓글을 처리할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
   }
 }

@@ -102,7 +102,12 @@ public class ChatService {
    * @return 상대방 정보 + 메시지 목록 + 각 메시지의 읽음 상태
    */
   @Transactional
-  public GetChatResponseDto fetchChatMessages(User user, Long chatroomId, int page, int size) {
+  public GetChatResponseDto fetchChatMessages(
+      User user,
+      Long chatroomId,
+      int page,
+      int size
+  ) {
     validateParticipant(chatroomId, user.getId());
 
     Chatroom chatroom = findChatroomOrThrow(chatroomId);
@@ -121,7 +126,8 @@ public class ChatService {
     log.info("step=메세지_조회, chatroomId={}, requestUserId={}, opponentId={}, opponentNickname={}, hashtags={}",
         chatroomId, user.getId(), opponent.getId(), opponent.getNickname(), hashtags);
 
-    return GetChatResponseDto.of(GetChatroomMemberInfoResponseDto.from(opponent, hashtags), messages);
+    GetChatroomMemberInfoResponseDto chatOpponentInfo = GetChatroomMemberInfoResponseDto.from(opponent, hashtags);
+    return GetChatResponseDto.of(chatOpponentInfo, messages);
   }
 
   /**
@@ -205,8 +211,7 @@ public class ChatService {
    * @return 저장된 Message 엔티티
    */
   public Message persistChatMessage(GetChatMessageResponseDto messageDto, Long chatroomId) {
-    return messageRepository.save(
-        Message.of(chatroomId, messageDto.getSenderId(), messageDto.getContent(), messageDto.getReaderIds()));
+    return messageRepository.save(Message.of(chatroomId, messageDto));
   }
 
   /**
@@ -217,24 +222,24 @@ public class ChatService {
    * 후속 분석 및 재처리에 활용합니다.</p>
    *
    * @param e           발생한 예외
-   * @param savedMessage 저장된 메시지 엔티티 (null 가능 — 저장 전 실패한 경우)
-   * @param chatroomId  채팅방 ID
+   * @param savedMessage 저장된 메시지 엔티티
    * @param senderLoginId 발신자 로그인 ID
    * @param destination STOMP destination 접두사 (예: {@code /user/queue/chatroom/})
    */
   public void recordMessageDeliveryFailure(
       Exception e,
       Message savedMessage,
-      Long chatroomId,
       String senderLoginId,
       String destination
   ) {
-    log.error("step=메시지_전송_실패, chatroomId={}, senderLoginId={}, status=FAILED",
-        chatroomId, senderLoginId, e);
+    log.error("step=메시지_전송_실패, destination={}, senderLoginId={}, status=FAILED",
+        destination, senderLoginId, e);
+
+    Long chatroomId = extractRoomIdFromDestination(destination);
 
     failedChatMessageLogRepository.save(
-        FailedChatMessageLog.of(chatroomId, e, savedMessage != null ? savedMessage.getId() : null,
-            destination + chatroomId, senderLoginId));
+        FailedChatMessageLog.of(chatroomId, e, savedMessage.getId(), destination, senderLoginId)
+    );
   }
 
   /**
@@ -243,10 +248,10 @@ public class ChatService {
   public List<Long> findConnectedUserIds(List<User> roomMembers, Long chatroomId) {
     try {
       List<Long> connectedIds = roomMembers.stream()
-          .filter(member -> Boolean.TRUE.equals(
-              redisTemplate.hasKey("connect::" + member.getId() + "::" + chatroomId)
-          ))
           .map(User::getId)
+          .filter(memberId -> Boolean.TRUE.equals(
+              redisTemplate.hasKey("connect::" + memberId + "::" + chatroomId)
+          ))
           .toList();
 
       log.info("chatroomId={}, connectedUserIds={}", chatroomId, connectedIds);
@@ -353,7 +358,12 @@ public class ChatService {
     opponentNickname = profile.nickname;
     opponentProfileUrl = profile.imageUrl;
 
-    return buildChatroomResponseDto(chatroom, opponentNickname, opponentProfileUrl, user);
+    return buildChatroomResponseDto(
+        chatroom,
+        opponentNickname,
+        opponentProfileUrl,
+        user
+    );
   }
 
   private OpponentProfile findOpponentProfileOrUnknown(Chatroom chatroom, User user){
@@ -377,7 +387,9 @@ public class ChatService {
 
     User opponent = resolveOpponent(chatroom, user);
 
-    return new OpponentProfile(opponent.getNickname(), opponent.getProfile().getImageUrl());
+    String nickname = opponent.getNickname();
+    String profileUrl = opponent.getProfile().getImageUrl();
+    return new OpponentProfile(nickname, profileUrl);
   }
 
 

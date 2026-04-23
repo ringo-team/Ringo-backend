@@ -8,7 +8,6 @@ import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageServic
 import com.lingo.lingoproject.matching.application.MatchService;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueMessagePayLoad;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueService;
-import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

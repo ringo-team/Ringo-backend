@@ -1,6 +1,6 @@
 package com.lingo.lingoproject.shared.domain.model;
 
-import com.lingo.lingoproject.shared.domain.model.PostTopic;
+import com.lingo.lingoproject.shared.domain.elastic.PostDocument;
 import com.lingo.lingoproject.shared.utils.Timestamp;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -30,12 +30,20 @@ import org.hibernate.annotations.DynamicInsert;
 @Getter@Setter
 public class Post extends Timestamp {
 
-  public static Post of(User author, String title, String content, PostTopic topic) {
+  public static Post of(User author, String title, String content, PostCategory category) {
     return Post.builder()
         .author(author)
         .title(title)
         .content(content)
-        .topic(topic)
+        .category(category)
+        .build();
+  }
+
+  public PostDocument createPostDocument(){
+    return PostDocument.builder()
+        .id(this.id)
+        .title(this.title)
+        .place(this.place)
         .build();
   }
 
@@ -48,8 +56,11 @@ public class Post extends Timestamp {
   @Lob
   private String content;
 
+  @Column(length = 10)
+  private String place;
+
   @Enumerated(value = EnumType.STRING)
-  private PostTopic topic;
+  private PostCategory category;
 
   @ColumnDefault(value = "0")
   @Builder.Default

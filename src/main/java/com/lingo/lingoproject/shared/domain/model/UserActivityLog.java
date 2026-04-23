@@ -24,7 +24,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @EntityListeners(AuditingEntityListener.class)
 public class UserActivityLog {
 
-  public static UserActivityLog of(User user, LocalDateTime start, LocalDateTime end, long activityMinuteDuration) {
+  public static UserActivityLog of(User user, LocalDateTime start, LocalDateTime end, int activityMinuteDuration) {
     return UserActivityLog.builder()
         .user(user)
         .start(start)
@@ -42,7 +42,7 @@ public class UserActivityLog {
   private User user;
 
   @Column(updatable = false)
-  private long activityMinuteDuration;
+  private int activityMinuteDuration;
 
   @Column(updatable = false)
   private LocalDateTime start;
