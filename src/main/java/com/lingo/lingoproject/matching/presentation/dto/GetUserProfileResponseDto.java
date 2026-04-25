@@ -68,9 +68,12 @@ public class GetUserProfileResponseDto {
   @Schema(description = "mbti", example = "ESFP")
   private String mbti;
 
+  @Schema(description = "스크랩 여부", example = "true")
+  private boolean isScrap;
+
 
   public static GetUserProfileResponseDto of(User recommendedUser, float matchingScore,
-      List<String> hashtags, int verify, int hide, int daysFromLastAccess, String mbti) {
+      List<String> hashtags, int verify, int hide, String mbti, boolean isScrap) {
     return GetUserProfileResponseDto.builder()
         .userId(recommendedUser.getId())
         .age(java.time.LocalDate.now().getYear() - recommendedUser.getBirthday().getYear())
@@ -81,7 +84,6 @@ public class GetUserProfileResponseDto {
         .hashtags(hashtags)
         .hide(hide)
         .verify(verify)
-        .daysFromLastAccess(daysFromLastAccess)
         .mbti(mbti)
         .build();
   }

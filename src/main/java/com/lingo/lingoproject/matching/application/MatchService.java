@@ -131,7 +131,7 @@ public class MatchService {
   private static final int EXPOSE_PROFILE_FLAG = 0;
   private static final int PROFILE_VERIFICATION_FLAG = 1;
   private static final int PROFILE_NON_VERIFICATION_FLAG = 0;
-  private static final String REDIS_ACTIVE_USER_IDS = "redis:active:ids";
+  private static final String REDIS_ACTIVE_USER_IDS = "redis::active::ids";
   private static final String DAILY_RECOMMENDATION_REDIS_KEY_PREFIX = "recommend-for-daily-survey::";
   private static final String CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX = "recommend::";
   private static final List<Integer> PLACE_SELECTION_COUNT = List.of(7, 4, 3, 2, 1);
@@ -159,14 +159,25 @@ public class MatchService {
     User requestUser = findUserOrThrow(dto.requestId());
     User requestedUser = findUserOrThrow(dto.requestedId());
 
+    matchingValidationService.validateAlreadyMatched(requestUser, requestedUser);
+
     float surveyScore = surveyScoreCalculator.calculate(requestedUser.getId(), requestUser.getId());
 
-    Matching matching = Matching.of(requestUser, requestedUser, surveyScore, MatchingStatus.PRE_REQUESTED);
+    Matching matching = Matching.of(
+        requestUser,
+        requestedUser,
+        surveyScore,
+        MatchingStatus.PENDING,
+        dto.message()
+    );
 
     log.info("step=매칭_요청, requestUserId={}, requestedUserId={}, surveyScore={}",
         requestUser.getId(), requestedUser.getId(), surveyScore);
 
     Matching saved = matchingRepository.save(matching);
+    UserMatchingLog matchingLog = saved.createMatchingLog();
+    userMatchingLogRepository.save(matchingLog);
+
     eventPublisher.publish(new MatchingRequestedEvent(
         saved.getId(),
         requestUser.getId(),
@@ -179,10 +190,12 @@ public class MatchService {
    * 매칭 수락 시 ACCEPTED 상태 변경 + 채팅방 생성 이벤트 발행
    * 거절 시 REJECTED 상태 변경
    */
+  @Transactional
   public void respondToMatchingRequest(String decision, Long matchingId, User user) {
     Matching matching = findMatchingOrThrow(matchingId);
 
     matchingValidationService.validateMatchingRespondPermission(matching, user);
+    matchingValidationService.validateIsAlreadyDecidedMatching(matching);
 
     switch (decision) {
       case "ACCEPTED" -> acceptMatching(matching);
@@ -204,6 +217,7 @@ public class MatchService {
     return matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException("적절하지 않은 매칭 id 입니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
   }
+
 
   private void acceptMatching(Matching matching) {
     matching.accept();
@@ -239,18 +253,23 @@ public class MatchService {
   @Transactional
   public void refreshActiveUserCache() {
     LocalDateTime cutoff = LocalDate.now().minusDays(ACTIVE_DAY_DURATION).atStartOfDay();
-    List<Long> activeUserIds = userActivityLogRepository.findAllByStartAfter(cutoff)
+    Set<Long> activeUserIds = userActivityLogRepository.findAllByStartAfter(cutoff)
         .stream()
         .map(UserActivityLog::getUser)
         .map(User::getId)
-        .distinct()
-        .toList();
+        .collect(Collectors.toSet());
+    Set<Long> connectedUserIds = redisTemplate.keys("connect-app::*")
+        .stream()
+        .map(s -> Long.parseLong(s.split("::")[1]))
+        .collect(Collectors.toSet());
+    activeUserIds.addAll(connectedUserIds);
+    List<Long>allActiveUserIds = activeUserIds.stream().toList();
     redisTemplate.delete(REDIS_ACTIVE_USER_IDS);
     redisTemplate.opsForValue().set(
         REDIS_ACTIVE_USER_IDS,
-        new ApiListResponseDto<>(ErrorCode.SUCCESS.toString(), activeUserIds),
-        1,
-        TimeUnit.HOURS
+        new ApiListResponseDto<>(ErrorCode.SUCCESS.toString(), allActiveUserIds),
+        5,
+        TimeUnit.MINUTES
     );
   }
 
@@ -271,7 +290,10 @@ public class MatchService {
     Long userId = user.getId();
 
     List<GetUserProfileResponseDto> cached = getCumulativeCachedProfile(user);
-    if (cached != null) return cached;
+    if (cached != null && cached.size() == MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE) {
+      log.info("step=누적설문_추천_캐시_히트, userId={}, cacheSize={}", userId, cached.size());
+      return cached;
+    }
 
     List<Long> activeUserIds = findActiveUserIds(user);
 
@@ -296,7 +318,7 @@ public class MatchService {
       refreshActiveUserCache();
       activeUserIds = getCachedActiveUserIds();
     }
-    log.info("step=누적설문_추천_활성유저_조회, activeUserCount={}", activeUserIds.size());
+    log.info("step=누적설문_추천_활성유저_조회, activeUserCount={}", activeUserIds);
 
     List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
     log.info("step=누적설문_추천_제외유저_조회, excludedUserCount={}", excludedUserIds.size());
@@ -359,7 +381,7 @@ public class MatchService {
     Long userId = user.getId();
 
     List<GetUserProfileResponseDto> cached = getDailyCacheProfile(user);
-    if(cached != null) return cached;
+    if(cached != null && cached.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) return cached;
 
     List<AnsweredSurvey> todayAnswers = getUserTodayDailyAnswer(user);
     if (todayAnswers.isEmpty()) {
@@ -372,6 +394,22 @@ public class MatchService {
     List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
     log.info("step=일일설문_추천_제외유저_조회, excludedUserCount={}", excludedUserIds.size());
 
+    List<GetUserProfileResponseDto> result = getSimlarAnsweredUserProfileList(
+        user, todayAnswers, excludedUserIds
+    );
+
+    redisUtils.cacheUntilMidnight(
+        DAILY_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
+        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
+    );
+    return result;
+  }
+
+  private List<GetUserProfileResponseDto> getSimlarAnsweredUserProfileList(
+      User user,
+      List<AnsweredSurvey> todayAnswers,
+      List<Long> excludedUserIds
+  ){
     List<GetUserProfileResponseDto> result = new ArrayList<>();
     for (AnsweredSurvey todayAnswer : todayAnswers) {
       if (result.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) break;
@@ -379,16 +417,9 @@ public class MatchService {
       User recommendedUser = getRandomlySimilarAnsweredUser(todayAnswer, excludedUserIds);
       if (recommendedUser == null)  continue;
 
-      result.add(buildUserProfileDto(user, recommendedUser));
+      GetUserProfileResponseDto response = buildUserProfileDto(user, recommendedUser);
+      result.add(response);
     }
-
-    if(result.size() < MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE)
-      log.info("step=추천_이성_수_조회, recommendationProfileSize={}", result.size());
-
-    redisUtils.cacheUntilMidnight(
-        DAILY_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
-        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
-    );
     return result;
   }
 
@@ -402,7 +433,12 @@ public class MatchService {
 
     User recommendedUser = similarAnswers.get(index).getUser();
 
-    logDailySurveyBasedRecommendationLogic(todayAnswer, similarAnswers.get(index), todayAnswer.getUser(), recommendedUser);
+    logDailySurveyBasedRecommendationLogic(
+        todayAnswer,
+        similarAnswers.get(index),
+        todayAnswer.getUser(),
+        recommendedUser
+    );
 
     return recommendedUser;
   }
@@ -410,7 +446,6 @@ public class MatchService {
   private List<GetUserProfileResponseDto> getDailyCacheProfile(User user){
     return getCachedRecommendationProfiles(
         DAILY_RECOMMENDATION_REDIS_KEY_PREFIX,
-        MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE,
         redisUtils::getDailySurveyBasedCachedProfile,
         user
     );
@@ -443,8 +478,18 @@ public class MatchService {
    * @param recommendedUserId 숨김 처리할 추천 이성의 유저 ID
    */
   public void hideRecommendedUser(User user, Long recommendedUserId) {
-    applyHideFlagToCache(CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX, user, recommendedUserId, this::getCumulativeCachedProfile);
-    applyHideFlagToCache(DAILY_RECOMMENDATION_REDIS_KEY_PREFIX, user, recommendedUserId, this::getDailyCacheProfile);
+    applyHideFlagToCache(
+        CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX,
+        user,
+        recommendedUserId,
+        this::getCumulativeCachedProfile
+    );
+    applyHideFlagToCache(
+        DAILY_RECOMMENDATION_REDIS_KEY_PREFIX,
+        user,
+        recommendedUserId,
+        this::getDailyCacheProfile
+    );
   }
 
   /**
@@ -607,6 +652,7 @@ public class MatchService {
     Matching matching = findMatchingOrThrow(matchingId);
 
     matchingValidationService.validateMatchingMessageWritePermission(matching, user);
+    matchingValidationService.validateIsAlreadyDecidedMatching(matching);
 
     matching.updateRequestMessage(dto.message());
 
@@ -818,6 +864,7 @@ public class MatchService {
    * @param user              스크랩을 요청하는 사용자
    * @throws RingoException 스크랩 대상 유저가 존재하지 않는 경우
    */
+  @Transactional
   public void scrapUser(Long recommendedUserId, User user) {
     Long userId = user.getId();
 
@@ -842,13 +889,16 @@ public class MatchService {
 
     User recommendedUser = findUserOrThrow(recommendedUserId);
 
+    if (scrappedUserRepository.existsByUserAndScrappedUser(user, recommendedUser)){
+      scrappedUserRepository.deleteByUserAndScrappedUser(user, recommendedUser);
+      return;
+    }
     scrappedUserRepository.save(ScrappedUser.of(user, recommendedUser));
   }
 
   private List<GetUserProfileResponseDto> getCumulativeCachedProfile(User user){
     return getCachedRecommendationProfiles(
         CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX,
-        MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE,
         redisUtils::getCumulativeSurveyBasedCachedProfile,
         user);
   }
@@ -910,7 +960,6 @@ public class MatchService {
 
   private List<GetUserProfileResponseDto> getCachedRecommendationProfiles(
       String keyPrefix,
-      int maxRecommendationSize,
       Function<String, List<GetUserProfileResponseDto>> function,
       User user
   ){
@@ -918,11 +967,25 @@ public class MatchService {
     if (redisTemplate.hasKey(keyPrefix + userId)) {
       List<GetUserProfileResponseDto> cached = function.apply(userId.toString());
 
+      updateIsScrapFlag(user, cached, keyPrefix);
+
       logDailyCachedProfile(user, cached);
 
-      if (cached.size() == maxRecommendationSize) return cached;
+      return cached;
     }
     return null;
+  }
+
+  private void updateIsScrapFlag(User user, List<GetUserProfileResponseDto> profiles, String keyPrefix){
+    for (GetUserProfileResponseDto profile : profiles) {
+      User scrappedUser = findUserOrThrow(profile.getUserId());
+      boolean isScrap = scrappedUserRepository.existsByUserAndScrappedUser(user, scrappedUser);
+      profile.setScrap(isScrap);
+    }
+    redisUtils.cacheUntilMidnight(
+        keyPrefix + user.getId(),
+        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), profiles)
+    );
   }
 
   private void logDailyCachedProfile(User user, List<GetUserProfileResponseDto> profiles){
@@ -958,12 +1021,18 @@ public class MatchService {
 
     float surveyScore = surveyScoreCalculator.calculate(requestUser.getId(), recommendedUser.getId());
     int isVerify = FaceVerify.PASS == profile.getFaceVerify() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG;
-    int accessBefore = getUserAccessDaysBefore(recommendedUser);
-    List<String> hashtags = findAllStringHashTagValueByUser(recommendedUser);
+    List<String> hashtags = getAllStringHashTagValueByUser(recommendedUser);
+    boolean isScrap = scrappedUserRepository.existsByUserAndScrappedUser(requestUser, recommendedUser);
 
     GetUserProfileResponseDto dto = GetUserProfileResponseDto.of(
-        recommendedUser, surveyScore, hashtags, isVerify,
-        EXPOSE_PROFILE_FLAG, accessBefore, requestUser.getMbti());
+        recommendedUser,
+        surveyScore,
+        hashtags,
+        isVerify,
+        EXPOSE_PROFILE_FLAG,
+        requestUser.getMbti(),
+        isScrap
+    );
 
     log.info("step=추천이성_프로필_빌드, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
         dto.getUserId(), dto.getAge(), dto.getGender(), dto.getNickname(),
@@ -983,11 +1052,15 @@ public class MatchService {
       String redisKeyPrefix,
       User user,
       Long targetUserId,
-      Function<User, List<GetUserProfileResponseDto>> function) {
+      Function<User, List<GetUserProfileResponseDto>> function
+  ) {
     List<GetUserProfileResponseDto> profiles = function.apply(user);
     if (profiles == null) return;
     markProfileAsHidden(profiles, targetUserId, user.getId());
-    redisUtils.cacheUntilMidnight(redisKeyPrefix + user.getId(), new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), profiles));
+    redisUtils.cacheUntilMidnight(
+        redisKeyPrefix + user.getId(),
+        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), profiles)
+    );
   }
 
   /** 프로필 목록에서 targetUserId에 해당하는 항목의 hide 플래그를 1로 설정한다. */
@@ -1006,7 +1079,7 @@ public class MatchService {
     profiles.forEach(profile -> {
       User user = findUserOrThrow(profile.getUserId());
 
-      profile.setHashtags(findAllStringHashTagValueByUser(user));
+      profile.setHashtags(getAllStringHashTagValueByUser(user));
       profile.setAge(LocalDate.now().getYear() - user.getBirthday().getYear());
 
       log.info("step=매칭_프로필_조회, userId={}, age={}, gender={}, nickname={}, matchingScore={}, matchingStatus={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
@@ -1017,7 +1090,7 @@ public class MatchService {
     });
   }
 
-  private List<String> findAllStringHashTagValueByUser(User user){
+  private List<String> getAllStringHashTagValueByUser(User user){
     return extractStringValueFromHashTagEntity(hashtagRepository.findAllByUser(user));
   }
 

@@ -58,7 +58,7 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
   @PostMapping("/posts")
-  ResponseEntity<SavePostResponseDto> post(@Valid @RequestBody SavePostRequestDto dto, @RequestPart(value = "images", required = false) List<MultipartFile> images, @AuthenticationPrincipal User user);
+  ResponseEntity<SavePostResponseDto> post(@Valid @RequestPart SavePostRequestDto dto, @RequestPart(value = "images", required = false) List<MultipartFile> images, @AuthenticationPrincipal User user);
 
   @Operation(summary = "게시물 삭제")
   @ApiResponses(value = {
@@ -168,7 +168,7 @@ public interface CommunityApi {
 
   @Operation(summary = "장소/컨텐츠 관련 게시물 조회")
   @GetMapping("/posts/search")
-  ResponseEntity<List<GetPostResponseDto>> getPlaceRelatedPost(@RequestParam(required = false) String keyword, @RequestParam(required = false) String place, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
+  ResponseEntity<List<GetPostResponseDto>> getPlaceRelatedPost(@AuthenticationPrincipal User user, @RequestParam(required = false) String keyword, @RequestParam(required = false) String place, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
 
   @PostMapping(value = "/places/excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   ResponseEntity<ResultMessageResponseDto> savePlace(@RequestParam("file") MultipartFile file);
@@ -184,4 +184,7 @@ public interface CommunityApi {
 
   @PostMapping(value = "/places/scrap")
   ResponseEntity<ResultMessageResponseDto> scrapPlace(@RequestBody ScrapPlaceRequestDto request, @AuthenticationPrincipal User user);
+
+  @GetMapping(value = "/places/scrap")
+  ResponseEntity<List<GetPlaceDetailResponseDto>> getScrappedPlace(@AuthenticationPrincipal User user);
 }

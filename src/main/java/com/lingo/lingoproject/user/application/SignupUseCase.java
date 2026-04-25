@@ -17,6 +17,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.UserPointReposit
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
 import com.lingo.lingoproject.user.presentation.dto.LoginInfoDto;
+import com.lingo.lingoproject.user.presentation.dto.SignupInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupUserInfoDto;
 import jakarta.transaction.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
@@ -58,9 +59,9 @@ public class SignupUseCase {
   private final FriendInvitationLogRepository friendInvitationLogRepository;
   private final ApplicationEventPublisher eventPublisher;
 
-  public User signup(LoginInfoDto dto) {
+  public User signup(SignupInfoDto dto) {
     validateLoginDto(dto);
-    return userRepository.save(User.forSignup(dto.loginId(), passwordEncoder.encode(dto.password())));
+    return userRepository.save(User.forSignup(dto.loginId(), passwordEncoder.encode(dto.password()), dto.isMarketingReceptionConsent()));
   }
 
   public boolean verifyDuplicatedLoginId(String loginId) {
@@ -141,7 +142,7 @@ public class SignupUseCase {
     return Base64.getEncoder().encodeToString(UUID.randomUUID().toString().getBytes()).substring(0, 8);
   }
 
-  private void validateLoginDto(LoginInfoDto dto) {
+  private void validateLoginDto(SignupInfoDto dto) {
     if (!dto.loginId().matches("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]+$")) {
       log.warn("회원가입 로그인 요청값: {}", dto.loginId());
       throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.NOT_ACCEPTABLE);
@@ -155,7 +156,7 @@ public class SignupUseCase {
   }
 
   private void validateSignupUserAndDto(User user, SignupUserInfoDto dto) {
-    if (user.getBirthday().getYear() + 19 > LocalDate.now().getYear()) {
+    if (LocalDate.parse(dto.birthday()).getYear() + 19 > LocalDate.now().getYear()) {
       throw new RingoException("미성년자는 회원가입이 불가합니다.", ErrorCode.NOT_ADULT, HttpStatus.FORBIDDEN);
     }
     GenericUtils.validateAndReturnEnumValue(Smoking.values(), dto.isSmoking());

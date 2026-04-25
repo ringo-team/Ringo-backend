@@ -19,4 +19,8 @@ public interface MatchingRepository extends JpaRepository<Matching, Long> {
   List<Matching> findAllByRequestedUser(User requestedUser);
 
   Matching findFirstByRequestUserAndRequestedUser(User user1, User user2);
+
+  boolean existsByRequestUserAndRequestedUser(User requestUser, User requestedUser);
+
+  List<Matching> findAllByRequestUserOrRequestedUser(User requestUser, User requestedUser);
 }

@@ -14,14 +14,16 @@ public record GetPostResponseDto(
     String authorName,
     String authorProfileUrl,
     Integer likeCount,
+    boolean isLike,
     Integer commentCount,
     String category,
     List<GetPostImageResponseDto> images,
+    String createdAt,
     String updatedAt,
     String result
 ) {
 
-  public static GetPostResponseDto from(Post post, List<GetPostImageResponseDto> images) {
+  public static GetPostResponseDto from(Post post, boolean isLike, List<GetPostImageResponseDto> images) {
     return GetPostResponseDto.builder()
         .postId(post.getId())
         .title(post.getTitle())
@@ -29,9 +31,11 @@ public record GetPostResponseDto(
         .authorProfileUrl(post.getAuthor().getProfile().getImageUrl())
         .authorName(post.getAuthor().getNickname())
         .likeCount(post.getLikeCount())
+        .isLike(isLike)
         .commentCount(post.getCommentCount())
         .category(post.getCategory().toString())
         .images(images)
+        .createdAt(post.getCreatedAt().toString())
         .updatedAt(post.getUpdatedAt() == null ? post.getCreatedAt().toString() : post.getUpdatedAt().toString())
         .result(ErrorCode.SUCCESS.getCode())
         .build();

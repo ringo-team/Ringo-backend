@@ -9,6 +9,7 @@ import com.lingo.lingoproject.chat.presentation.dto.SaveAppointmentRequestDto;
 import com.lingo.lingoproject.shared.domain.model.Appointment;
 import com.lingo.lingoproject.shared.domain.model.Chatroom;
 import com.lingo.lingoproject.shared.domain.model.Message;
+import com.lingo.lingoproject.shared.domain.model.NotificationType;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -35,6 +36,7 @@ public class ChatController implements ChatApi {
 
   private final ChatService chatService;
   private final SimpMessagingTemplate simpMessagingTemplate;
+  private final FcmNotificationUseCase fcmNotificationUseCase;
 
 
   public ResponseEntity<GetChatResponseDto> getChattingMessages(Long roomId, int page, int size, User user) {
@@ -114,7 +116,7 @@ public class ChatController implements ChatApi {
       }
 
       if (!connectedUserIdList.contains(member.getId())) {
-        //fcmService.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
+        fcmNotificationUseCase.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
       }
     }
   }

@@ -45,6 +45,10 @@ public class Comment extends Timestamp {
         .build();
   }
 
+  public boolean hasParent(){
+    return parentComment != null;
+  }
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

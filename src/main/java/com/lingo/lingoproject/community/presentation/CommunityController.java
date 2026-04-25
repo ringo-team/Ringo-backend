@@ -42,7 +42,7 @@ public class CommunityController implements CommunityApi {
   @Override
   public ResponseEntity<List<GetPostResponseDto>> getPost(String category, int page, int size, User user) {
     log.info("step=게시물_조회_시작, userId={}", user.getId());
-    List<GetPostResponseDto> response = communityService.findPosts(category, page, size);
+    List<GetPostResponseDto> response = communityService.findPosts(user, category, page, size);
     log.info("step=게시물_조회_완료, userId={}", user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(response);
   }
@@ -74,7 +74,7 @@ public class CommunityController implements CommunityApi {
   @Override
   public ResponseEntity<List<GetCommentResponseDto>> getComments(Long postId, User user) {
     log.info("step=댓글_조회_시작, userId={}", user.getId());
-    List<GetCommentResponseDto> response = communityService.findCommentsByPost(postId);
+    List<GetCommentResponseDto> response = communityService.findCommentsByPost(postId, user);
     log.info("step=댓글_조회_완료, userId={}", user.getId());
     return ResponseEntity.status(HttpStatus.OK).body(response);
   }
@@ -145,9 +145,9 @@ public class CommunityController implements CommunityApi {
   }
 
   @Override
-  public ResponseEntity<List<GetPostResponseDto>> getPlaceRelatedPost(String keyword, String place, int page, int size) {
+  public ResponseEntity<List<GetPostResponseDto>> getPlaceRelatedPost(User user, String keyword, String place, int page, int size) {
     log.info("step=게시물_관련_장소/컨텐츠_조회_시작");
-    List<GetPostResponseDto> dtos = communityService.searchPostsByKeywordOrPlace(keyword, place, page, size);
+    List<GetPostResponseDto> dtos = communityService.searchPostsByKeywordOrPlace(user, keyword, place, page, size);
     log.info("step=게시물_관련_장소/컨텐츠_조회_완료");
 
     return ResponseEntity.status(HttpStatus.OK).body(dtos);
@@ -186,5 +186,11 @@ public class CommunityController implements CommunityApi {
   public ResponseEntity<ResultMessageResponseDto> scrapPlace(ScrapPlaceRequestDto request, User user) {
     communityService.scrapPlace(request.placeId(), user);
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "장소를 스크랩했습니다."));
+  }
+
+  @Override
+  public ResponseEntity<List<GetPlaceDetailResponseDto>> getScrappedPlace(User user) {
+    List<GetPlaceDetailResponseDto> scrappedPlaces = communityService.getScrappedPlace(user);
+    return ResponseEntity.status(HttpStatus.OK).body(scrappedPlaces);
   }
 }

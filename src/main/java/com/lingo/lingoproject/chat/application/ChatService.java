@@ -162,6 +162,7 @@ public class ChatService {
    * @return 생성된 채팅방 엔티티
    * @throws RingoException 두 사용자가 ACCEPTED 매칭 관계가 아닌 경우
    */
+  @Transactional
   public Chatroom createChatroom(CreateChatroomRequestDto dto) {
     ChatType chatType = GenericUtils.validateAndReturnEnumValue(ChatType.values(), dto.chatType());
 
@@ -249,9 +250,7 @@ public class ChatService {
     try {
       List<Long> connectedIds = roomMembers.stream()
           .map(User::getId)
-          .filter(memberId -> Boolean.TRUE.equals(
-              redisTemplate.hasKey("connect::" + memberId + "::" + chatroomId)
-          ))
+          .filter(memberId -> checkIsConnected(memberId, chatroomId))
           .toList();
 
       log.info("chatroomId={}, connectedUserIds={}", chatroomId, connectedIds);
@@ -264,6 +263,12 @@ public class ChatService {
           ErrorCode.INTERNAL_SERVER_ERROR,
           HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  private boolean checkIsConnected(Long memberId, Long chatroomId){
+    return Boolean.TRUE.equals(
+        redisTemplate.hasKey("connect::" + memberId + "::" + chatroomId)
+    );
   }
 
 
@@ -421,7 +426,13 @@ public class ChatService {
     String lastMessageContent = lastMessage != null ? lastMessage.getContent() : null;
 
     GetChatroomResponseDto response = GetChatroomResponseDto.of(
-        chatroom, opponentNickname, opponentProfileUrl, lastMessageContent, unreadCount, lastSentAt);
+        chatroom,
+        opponentNickname,
+        opponentProfileUrl,
+        lastMessageContent,
+        unreadCount,
+        lastSentAt
+    );
 
     log.info("step=채팅방_요약_빌드, chatroomId={}, opponentNickname={}, unreadCount={}, lastSentAt={}",
         response.chatroomId(), response.chatOpponent(),

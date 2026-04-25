@@ -28,7 +28,7 @@ public class MatchController implements MatchingApi {
   private final MatchService matchService;
 
 
-  public ResponseEntity<?> requestMatching(MatchingRequestDto matchingRequestDto, @AuthenticationPrincipal User user) {
+  public ResponseEntity<RequestMatchingResponseDto> requestMatching(MatchingRequestDto matchingRequestDto, @AuthenticationPrincipal User user) {
     // 매칭 요청자 검증
     Long requestUserId = matchingRequestDto.requestId();
     if (!requestUserId.equals(user.getId())) {
@@ -70,6 +70,7 @@ public class MatchController implements MatchingApi {
   }
 
 
+  @Override
   public ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> recommendByCumulativeSurveys(Long userId, User user) {
     if (!userId.equals(user.getId())) {
       log.error("step=잘못된_유저_요청, authUserId={}, userId={}, status=FAILED", user.getId(), userId);

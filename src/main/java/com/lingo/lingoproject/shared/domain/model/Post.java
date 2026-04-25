@@ -1,6 +1,8 @@
 package com.lingo.lingoproject.shared.domain.model;
 
+import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.shared.domain.elastic.PostDocument;
+import com.lingo.lingoproject.shared.utils.GenericUtils;
 import com.lingo.lingoproject.shared.utils.Timestamp;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -39,12 +41,14 @@ public class Post extends Timestamp {
         .build();
   }
 
-  public PostDocument createPostDocument(){
-    return PostDocument.builder()
-        .id(this.id)
-        .title(this.title)
-        .place(this.place)
-        .build();
+  public void updatePost(UpdatePostRequestDto dto){
+    PostCategory postCategory = dto.topic() != null
+        ? GenericUtils.validateAndReturnEnumValue(PostCategory.values(), dto.topic())
+        : null;
+
+    if (dto.title() != null && !dto.title().isBlank()) this.setTitle(dto.title());
+    if (dto.content() != null && !dto.content().isBlank()) this.setContent(dto.content());
+    if (postCategory != null) this.setCategory(postCategory);
   }
 
   @Id

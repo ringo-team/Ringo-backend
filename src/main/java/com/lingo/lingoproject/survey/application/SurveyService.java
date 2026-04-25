@@ -66,6 +66,7 @@ public class SurveyService {
   private static final int SEQUENTIAL_SURVEY_PERIOD_DAYS = 10;
   /** 하루에 제공하는 설문 개수. */
   private static final int DAILY_SURVEY_COUNT = 5;
+  private static final int SIGNUP_SURVEY_COUNT = 12;
   /** 순차 제공에서 랜덤 제공으로 전환되는 누적 응답 수 임계값. */
   private static final int SEQUENTIAL_SURVEY_THRESHOLD =
       INITIAL_SURVEY_COUNT + DAILY_SURVEY_COUNT * SEQUENTIAL_SURVEY_PERIOD_DAYS;
@@ -134,6 +135,7 @@ public class SurveyService {
    * - 임계값 이상이면 랜덤 설문 제공 (자정까지 캐싱)
    */
   public List<GetSurveyResponseDto> fetchDailySurveys(User user) {
+
     if (hasCompletedTodaySurveys(user)) {
       return null;
     }
@@ -249,6 +251,8 @@ public class SurveyService {
     int from = answeredSurveyCount + 1;
     int to = answeredSurveyCount + DAILY_SURVEY_COUNT;
 
+    if (from == 1) to = answeredSurveyCount + SIGNUP_SURVEY_COUNT;
+
     List<GetSurveyResponseDto> surveys = surveyRepository.findAllBySurveyNumBetween(from, to)
         .stream()
         .map(GetSurveyResponseDto::from)
@@ -258,10 +262,12 @@ public class SurveyService {
         user.getId(), answeredSurveyCount, from, to, surveys.size());
     logDailySurveyDetails(user.getId(), surveys);
 
-    redisUtils.cacheUntilMidnight(
-        "recommend-for-daily-survey::" + user.getId(),
-        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), surveys)
-    );
+    if (from != 1) {
+      redisUtils.cacheUntilMidnight(
+          "dailySurvey::" + user.getId(),
+          new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), surveys)
+      );
+    }
     return surveys;
   }
 

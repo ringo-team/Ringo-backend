@@ -6,6 +6,7 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import com.lingo.lingoproject.user.presentation.dto.GetUserInfoResponseDto;
@@ -34,6 +35,7 @@ public class UserQueryUseCase {
   private final HashtagRepository hashtagRepository;
   private final RedisUtils redisUtils;
   private final RedisTemplate<String, Object> redisTemplate;
+  private final MatchingRepository matchingRepository;
 
   public String findUserLoginId(User user) {
     boolean isAuthenticated = redisTemplate.hasKey("self-auth::" + user.getId());
@@ -41,17 +43,36 @@ public class UserQueryUseCase {
     throw new RingoException("아이디를 얻을 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
   }
 
+  private List<Long> getCumulativeCachedUserIds(User user){
+    return Optional.ofNullable(redisUtils.getCumulativeSurveyBasedCachedProfile(user.getId().toString()))
+        .orElseGet(Collections::emptyList)
+        .stream().map(GetUserProfileResponseDto::getUserId).toList();
+  }
+  private List<Long> getDailyCachedUserIds(User user){
+    return Optional.ofNullable(redisUtils.getDailySurveyBasedCachedProfile(user.getId().toString()))
+        .orElseGet(Collections::emptyList)
+        .stream().map(GetUserProfileResponseDto::getUserId).toList();
+  }
+
+  private List<Long> getMatchingUserIds(User user){
+    return matchingRepository.findAllByRequestUserOrRequestedUser(user, user)
+        .stream()
+        .map(m -> {
+          User requestUser = m.getRequestUser();
+          User requestedUser = m.getRequestedUser();
+          return requestUser.getId().equals(user.getId()) ? requestedUser.getId() : requestUser.getId();
+        })
+        .toList();
+  }
   public GetUserInfoResponseDto getUserInfo(Long findUserId, User user) {
-    List<Long> cumulativeList = Optional.ofNullable(redisUtils.getCumulativeSurveyBasedCachedProfile(user.getId().toString()))
-        .orElseGet(Collections::emptyList)
-        .stream().map(GetUserProfileResponseDto::getUserId).toList();
-    List<Long> dailyList = Optional.ofNullable(redisUtils.getDailySurveyBasedCachedProfile(user.getId().toString()))
-        .orElseGet(Collections::emptyList)
-        .stream().map(GetUserProfileResponseDto::getUserId).toList();
+    List<Long> cumulativeList = getCumulativeCachedUserIds(user);
+    List<Long> dailyList = getDailyCachedUserIds(user);
+    List<Long> matchingList = getMatchingUserIds(user);
 
     List<Long> userIdList = new ArrayList<>();
-    if (!cumulativeList.isEmpty()) userIdList.addAll(cumulativeList);
-    if (!dailyList.isEmpty()) userIdList.addAll(dailyList);
+    userIdList.addAll(cumulativeList);
+    userIdList.addAll(dailyList);
+    userIdList.addAll(matchingList);
 
     log.info("cumulative-recommended: {}, daily-recommended: {}, find-user-id: {}",
         cumulativeList, dailyList, findUserId);

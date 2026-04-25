@@ -10,4 +10,6 @@ public interface PostLikeUserMappingRepository extends JpaRepository<PostLikeUse
   boolean existsByPostAndUser(Post post, User user);
 
   PostLikeUserMapping findByPostAndUser(Post post, User user);
+
+  void deleteAllByPost(Post post);
 }

@@ -2,6 +2,7 @@ package com.lingo.lingoproject.user.presentation;
 
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.user.presentation.dto.LoginInfoDto;
+import com.lingo.lingoproject.user.presentation.dto.SignupInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.shared.security.dto.LoginResponseDto;
@@ -76,7 +77,7 @@ public interface UserApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @PostMapping("/signup")
-  ResponseEntity<SignupResponseDto> signup(@Valid @RequestBody LoginInfoDto dto);
+  ResponseEntity<SignupResponseDto> signup(@Valid @RequestBody SignupInfoDto dto);
 
   @Operation(summary = "회원 정보 입력", description = "회원가입 시 유저 정보 저장")
   @ApiResponses(value = {

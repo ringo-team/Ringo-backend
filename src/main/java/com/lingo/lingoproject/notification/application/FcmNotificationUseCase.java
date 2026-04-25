@@ -46,6 +46,7 @@ public class FcmNotificationUseCase {
 
   public void sendFcmNotification(User receiver, String title, String body, NotificationType type) {
 
+    log.info("fcm message sending start");
     notificationRepository.save(com.lingo.lingoproject.shared.domain.model.Notification.of(receiver, type, title, body));
 
     if(notificationOptionOutUserRepository.existsByUserAndType(receiver, type)) return;

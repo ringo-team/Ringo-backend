@@ -7,6 +7,7 @@ import com.lingo.lingoproject.community.presentation.dto.CommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.CommentResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.CreateSubCommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.GetCommentResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostImageResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostImageResponseDto;
@@ -49,6 +50,7 @@ import jakarta.transaction.Transactional;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -151,16 +153,20 @@ public class CommunityService {
   public UpdatePostResponseDto updatePost(Long postId, UpdatePostRequestDto dto, User user) {
     Post post = findPostOrThrow(postId);
     communityDomainService.validatePostOwnership(post, user);
-    applyPostUpdates(post, dto);
+    post.updatePost(dto);
 
-    List<UpdatePostImageResponseDto> updatedImages = dto.imagelist().stream()
-        .map(this::replacePostImage)
-        .toList();
+    List<UpdatePostImageResponseDto> updatedImages = updatePostImageAndGetResponseDto(dto.imagelist());
 
     postRepository.save(post);
     log.info("step=게시물_수정_완료, postId={}, userId={}", postId, user.getId());
 
     return new UpdatePostResponseDto(updatedImages, ErrorCode.SUCCESS.getCode());
+  }
+
+  private List<UpdatePostImageResponseDto> updatePostImageAndGetResponseDto(List<UpdatePostImageRequestDto> imagelist){
+    return imagelist.stream()
+        .map(this::replacePostImage)
+        .toList();
   }
 
   /**
@@ -180,9 +186,15 @@ public class CommunityService {
 
     deleteAllPostImages(post);
     deleteAllPostComments(post);
+    deleteAllPostLike(post);
     postRepository.delete(post);
 
     log.info("step=게시물_삭제_완료, postId={}, userId={}", postId, user.getId());
+  }
+
+  @Transactional
+  void deleteAllPostLike(Post post){
+    postLikeUserMappingRepository.deleteAllByPost(post);
   }
 
   /**
@@ -195,7 +207,7 @@ public class CommunityService {
    * @param size             페이지당 게시물 수
    * @return 게시물 요약 목록 (이미지 포함)
    */
-  public List<GetPostResponseDto> findPosts(String topic, int page, int size) {
+  public List<GetPostResponseDto> findPosts(User user, String topic, int page, int size) {
     PostCategory postCategory = GenericUtils.validateAndReturnEnumValue(PostCategory.values(), topic);
     Pageable pageable = PageRequest.of(page, size);
 
@@ -203,10 +215,10 @@ public class CommunityService {
         ? postRepository.findAll(pageable)
         : postRepository.findByCategory(postCategory, pageable);
 
-    return buildPostResponseDto(posts.stream().toList());
+    return buildPostResponseDto(posts.stream().toList(), user);
   }
 
-  public List<GetPostResponseDto> searchPostsByKeywordOrPlace(String keyword, String place, int page, int size){
+  public List<GetPostResponseDto> searchPostsByKeywordOrPlace(User user, String keyword, String place, int page, int size){
     String stripKeyword =null;
     if (keyword != null) stripKeyword = keyword.strip();
 
@@ -217,13 +229,13 @@ public class CommunityService {
 
     List<Post> posts = postRepository.findAllByIdIn(postIds);
 
-    return buildPostResponseDto(posts);
+    return buildPostResponseDto(posts, user);
   }
 
-  private List<GetPostResponseDto> buildPostResponseDto(Collection<Post> posts){
+  private List<GetPostResponseDto> buildPostResponseDto(Collection<Post> posts, User user){
     List<GetPostResponseDto> result = new ArrayList<>();
     for (Post post : posts){
-      GetPostResponseDto dto = buildPostResponse(post);
+      GetPostResponseDto dto = buildPostResponse(post, user);
       result.add(dto);
     }
     return result;
@@ -278,20 +290,18 @@ public class CommunityService {
   public void deleteComment(Long commentId, User user) {
     Comment comment = findCommentOrThrow(commentId);
     communityDomainService.validateCommentOwnership(comment, user);
-    List<Comment> allCommentsUnderParent = new ArrayList<>();
-    findAllSubCommentsIncludeSelf(comment, allCommentsUnderParent);
+    List<Comment> allCommentsUnderParent = findAllSubCommentsIncludeSelf(comment);
     postRepository.decreaseCommentCount(comment.getPost().getId(), allCommentsUnderParent.size());
+    commentLikeUserMappingRepository.deleteAllByCommentIn(allCommentsUnderParent);
     commentRepository.deleteAll(allCommentsUnderParent);
   }
 
-  private void findAllSubCommentsIncludeSelf(Comment comment, List<Comment> result){
+  private List<Comment> findAllSubCommentsIncludeSelf(Comment comment){
+    List<Comment> result = new ArrayList<>();
     result.add(comment);
     List<Comment> subcomments = commentRepository.findAllByParentComment(comment);
-    if (!subcomments.isEmpty()) {
-      for (Comment subComment : subcomments) {
-        findAllSubCommentsIncludeSelf(subComment, result);
-      }
-    }
+    result.addAll(subcomments);
+    return result;
   }
 
   /**
@@ -303,41 +313,34 @@ public class CommunityService {
    * @return 댓글 목록 (대댓글 포함)
    * @throws RingoException 게시물이 존재하지 않는 경우
    */
-  public List<GetCommentResponseDto> findCommentsByPost(Long postId) {
+  public List<GetCommentResponseDto> findCommentsByPost(Long postId, User user) {
     Post post = findPostOrThrow(postId);
     List<Comment> comments = commentRepository.findAllByPost(post);
-    return buildCommentResponseDto(comments);
+    return buildCommentResponseDto(comments, user);
   }
 
-  private List<GetCommentResponseDto> buildCommentResponseDto(List<Comment> comments){
+  private List<GetCommentResponseDto> buildCommentResponseDto(List<Comment> comments, User user){
     List<GetCommentResponseDto> result = new ArrayList<>();
+    Map<Long, GetCommentResponseDto> map = new HashMap<>();
     for (Comment comment : comments){
       if (comment.getParentComment() == null){
-        result.add(createCommentResponseDto(comment));
+        GetCommentResponseDto response = createCommentResponseDto(comment, user);
+        result.add(response);
+        map.put(comment.getId(), response);
         continue;
       }
-      for (GetCommentResponseDto parent : result){
-        if(recursivelyAddSubComments(parent, comment)) break;
-      }
+      GetCommentResponseDto parent = map.get(comment.getParentComment().getId());
+      boolean isLike = commentLikeUserMappingRepository.existsByCommentAndUser(comment, user);
+      parent.addSubCommentDto(comment, isLike);
     }
     return result;
   }
 
-  private GetCommentResponseDto createCommentResponseDto(Comment comment){
-    return GetCommentResponseDto.from(comment);
+  private GetCommentResponseDto createCommentResponseDto(Comment comment, User user){
+    boolean isLike = commentLikeUserMappingRepository.existsByCommentAndUser(comment, user);
+    return GetCommentResponseDto.from(comment, isLike);
   }
 
-  private boolean recursivelyAddSubComments(GetCommentResponseDto dto, Comment comment){
-    Comment parent = comment.getParentComment();
-    if (dto.commentId().equals(parent.getId())){
-      dto.addSubCommentDto(comment);
-      return true;
-    }
-    for (GetCommentResponseDto p : dto.subComments()){
-      return recursivelyAddSubComments(p, comment);
-    }
-    return false;
-  }
   /**
    * 대댓글을 작성한다.
    *
@@ -349,9 +352,16 @@ public class CommunityService {
   @Transactional
   public Long createSubComment(CreateSubCommentRequestDto dto, User user) {
     Comment comment = findCommentOrThrow(dto.commentId());
+    validateCreateSubComment(comment);
     postRepository.increaseCommentCount(comment.getPost().getId());
     Comment savedComment = commentRepository.save(Comment.of(comment.getPost(), comment, user, dto.content()));
     return savedComment.getId();
+  }
+
+  private void validateCreateSubComment(Comment comment){
+    if (comment.hasParent()){
+      throw new RingoException("대댓글에 댓글을 달 수 없습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+    }
   }
 
   /**
@@ -385,6 +395,7 @@ public class CommunityService {
   public void deleteSubComment(Long subCommentId, User user) {
     Comment subComment = findCommentOrThrow(subCommentId);
     communityDomainService.validateCommentOwnership(subComment, user);
+    commentLikeUserMappingRepository.deleteAllByComment(subComment);
     commentRepository.delete(subComment);
   }
 
@@ -432,6 +443,7 @@ public class CommunityService {
     if (mapping != null && comment.getLikeCount() > 0) {
       commentRepository.decreaseCommentLikeCount(commentId);
       commentLikeUserMappingRepository.delete(mapping);
+      return;
     }
 
     commentRepository.increaseCommentLikeCount(commentId);
@@ -470,17 +482,6 @@ public class CommunityService {
     return savedPostImages;
   }
 
-  /** DTO에 포함된 null/공백이 아닌 필드만 게시물 엔티티에 반영한다. */
-  private void applyPostUpdates(Post post, UpdatePostRequestDto dto) {
-    PostCategory postCategory = dto.topic() != null
-        ? GenericUtils.validateAndReturnEnumValue(PostCategory.values(), dto.topic())
-        : null;
-
-    if (dto.title() != null && !dto.title().isBlank()) post.setTitle(dto.title());
-    if (dto.content() != null && !dto.content().isBlank()) post.setContent(dto.content());
-    if (postCategory != null) post.setCategory(postCategory);
-  }
-
   /** 기존 S3 이미지를 삭제하고 새 이미지를 업로드하여 {@link PostImage} URL을 교체한다. */
   @Transactional
   UpdatePostImageResponseDto replacePostImage(UpdatePostImageRequestDto imageDto) {
@@ -510,12 +511,15 @@ public class CommunityService {
   /** 게시물에 달린 모든 댓글과 대댓글을 삭제한다. */
   @Transactional
   void deleteAllPostComments(Post post) {
+    List<Comment> comments = commentRepository.findAllByPost(post);
+    commentLikeUserMappingRepository.deleteAllByCommentIn(comments);
     commentRepository.deleteAllByPost(post);
   }
 
   /** 게시물 엔티티와 이미지 DTO 목록으로 응답 DTO를 생성한다. */
-  private GetPostResponseDto buildPostResponse(Post post) {
-    return GetPostResponseDto.from(post, buildPostImageDtos(post));
+  private GetPostResponseDto buildPostResponse(Post post, User user) {
+    boolean isLike = postLikeUserMappingRepository.existsByPostAndUser(post, user);
+    return GetPostResponseDto.from(post, isLike,  buildPostImageDtos(post));
   }
 
   /** 게시물에 연결된 이미지를 조회해 응답 DTO 목록으로 변환한다. */
@@ -589,5 +593,16 @@ public class CommunityService {
     Place place = findPlaceOrThrow(placeId);
     UserScrapPlace scrap = UserScrapPlace.of(place, user);
     userScrapPlaceRepository.save(scrap);
+  }
+
+  public List<GetPlaceDetailResponseDto> getScrappedPlace(User user){
+    List<Place> userScrapPlaces = userScrapPlaceRepository.findAllByUser(user)
+        .stream()
+        .map(UserScrapPlace::getPlace)
+        .toList();
+    return userScrapPlaces.stream()
+        .map(p -> p.createPlaceDetailDto(true))
+        .toList();
+
   }
 }

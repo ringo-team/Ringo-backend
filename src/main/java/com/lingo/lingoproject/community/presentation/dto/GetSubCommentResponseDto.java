@@ -12,11 +12,12 @@ public record GetSubCommentResponseDto(
     Long userId,
     String userProfileUrl,
     String userNickname,
-    String updatedAt,
-    List<GetSubCommentResponseDto> subComments
+    int commentLikeCount,
+    boolean isLike,
+    String updatedAt
 ) {
 
-  public static GetSubCommentResponseDto from(Comment subComment) {
+  public static GetSubCommentResponseDto from(Comment subComment, boolean isLike) {
     return GetSubCommentResponseDto.builder()
         .subCommentId(subComment.getId())
         .content(subComment.getContent())
@@ -24,6 +25,8 @@ public record GetSubCommentResponseDto(
         .userNickname(subComment.getUser().getNickname())
         .userProfileUrl(subComment.getUser().getProfile().getImageUrl())
         .updatedAt(subComment.getUpdatedAt() == null ? subComment.getCreatedAt().toString() : subComment.getUpdatedAt().toString())
+        .isLike(isLike)
+        .commentLikeCount(subComment.getLikeCount())
         .build();
   }
 }

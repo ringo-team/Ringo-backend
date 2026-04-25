@@ -231,6 +231,8 @@ public class User extends Timestamp implements UserDetails {
   @Column(length = 10)
   private String mbti;
 
+  private boolean isMarketingReceptionConsent;
+
   /**
    * 일반 회원가입용 정적 팩토리 메서드.
    * 로그인 ID와 BCrypt 인코딩된 비밀번호만 가지고 유저를 생성합니다.
@@ -239,12 +241,13 @@ public class User extends Timestamp implements UserDetails {
    * @param loginId        사용자가 입력한 로그인 ID
    * @param encodedPassword BCrypt 인코딩된 비밀번호
    */
-  public static User forSignup(String loginId, String encodedPassword) {
+  public static User forSignup(String loginId, String encodedPassword, boolean isMarketingReceptionConsent) {
     return User.builder()
         .loginId(loginId)
         .password(encodedPassword)
         .role(Role.USER)
         .status(SignupStatus.IN_PROGRESS)
+        .isMarketingReceptionConsent(isMarketingReceptionConsent)
         .build();
   }
 
@@ -272,7 +275,7 @@ public class User extends Timestamp implements UserDetails {
   public void setUserInfo(SignupUserInfoDto dto){
     this.nickname = dto.nickname();
     this.gender = Gender.valueOf(dto.gender().toUpperCase());
-    this.birthday = (LocalDate) DateTimeFormatter.ofPattern("yyyy-MM-dd").parse(dto.birthday());
+    this.birthday = LocalDate.parse(dto.birthday());
     this.residenceProvince = dto.address().province();
     this.residenceCity = dto.address().city();
     this.activityLocProvince = dto.activeAddress().province();
@@ -285,7 +288,9 @@ public class User extends Timestamp implements UserDetails {
     this.isDrinking = Drinking.valueOf(dto.isDrinking());
     this.religion = Religion.valueOf(dto.religion());
     this.biography = dto.biography();
-    this.status = SignupStatus.IN_PROGRESS;
+    if (this.status != SignupStatus.COMPLETED) {
+      this.status = SignupStatus.IN_PROGRESS;
+    }
     this.mbti = dto.mbti();
   }
 

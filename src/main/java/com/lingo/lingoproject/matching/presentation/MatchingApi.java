@@ -39,7 +39,7 @@ public interface MatchingApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @PostMapping("/matches")
-  ResponseEntity<?> requestMatching(
+  ResponseEntity<RequestMatchingResponseDto> requestMatching(
       @Valid @RequestBody MatchingRequestDto matchingRequestDto,
       @AuthenticationPrincipal User user
   );
@@ -66,7 +66,7 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 운의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
       }
   )
-  @GetMapping("users/{user-id}/match-requests") // 나를 지목한 사람
+  @GetMapping("users/{user-id}/match-requests")
   ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> getMatchRequestsByDirection(
       @Parameter(description = "유저id", example = "5") @PathVariable(value = "user-id") Long userId,
       @Parameter(description = "SENT 경우 내가 매칭 요청한 사람, RECEIVED 경우 나에게 매칭 요청한 사람", example = "SENT", schema = @Schema(allowableValues = {"SENT", "RECEIVED"})) @RequestParam(value = "direction") String direction,

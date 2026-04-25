@@ -19,6 +19,7 @@ import com.lingo.lingoproject.user.presentation.dto.GetUserLoginIdResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.LoginInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.ResetPasswordRequestDto;
 import com.lingo.lingoproject.user.presentation.dto.SaveMembershipRequestDto;
+import com.lingo.lingoproject.user.presentation.dto.SignupInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.UpdateUserInfoRequestDto;
@@ -66,7 +67,7 @@ public class UserController implements UserApi {
     return ResponseEntity.status(HttpStatus.OK).body(response);
   }
 
-  public ResponseEntity<SignupResponseDto> signup(LoginInfoDto dto) {
+  public ResponseEntity<SignupResponseDto> signup(SignupInfoDto dto) {
     log.info("step=회원가입_시작, status=SUCCESS");
     User user = signupUseCase.signup(dto);
     log.info("step=회원가입_완료, status=SUCCESS");

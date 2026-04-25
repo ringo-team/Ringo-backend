@@ -87,7 +87,10 @@ public class S3ImageStorageService {
     User user = findUserOrThrow(userId);
 
     if (profileRepository.existsByUser(user)) {
-      log.error("userId={}, step=프로필_중복_업로드", user.getId());
+      log.warn("userId={}, step=프로필_중복_업로드", user.getId());
+      if (user.getStatus() != SignupStatus.COMPLETED) {
+        completeSignupStatus(user);
+      }
       return null;
     }
 
@@ -551,7 +554,8 @@ public class S3ImageStorageService {
     return saved;
   }
 
-  private void completeSignupStatus(User user) {
+
+  public void completeSignupStatus(User user) {
     user.setStatus(SignupStatus.COMPLETED);
     userRepository.save(user);
   }

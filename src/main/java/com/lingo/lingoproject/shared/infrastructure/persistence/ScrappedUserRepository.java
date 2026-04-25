@@ -10,4 +10,8 @@ public interface ScrappedUserRepository extends JpaRepository<ScrappedUser, Long
   List<ScrappedUser> findByUser(User user);
 
   List<ScrappedUser> findAllByUser(User user);
+
+  boolean existsByUserAndScrappedUser(User user, User scrappedUser);
+
+  void deleteByUserAndScrappedUser(User user, User scrappedUser);
 }

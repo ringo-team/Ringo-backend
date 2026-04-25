@@ -47,12 +47,19 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 )
 public class Matching {
 
-  public static Matching of(User requestUser, User requestedUser, float matchingScore, MatchingStatus status) {
+  public static Matching of(
+      User requestUser,
+      User requestedUser,
+      float matchingScore,
+      MatchingStatus status,
+      String message
+  ) {
     return Matching.builder()
         .requestUser(requestUser)
         .requestedUser(requestedUser)
         .matchingStatus(status)
         .matchingScore(matchingScore)
+        .matchingRequestMessage(message)
         .build();
   }
 
