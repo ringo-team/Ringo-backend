@@ -43,7 +43,7 @@ public class ChatController implements ChatApi {
     chatService.validateParticipant(roomId, user.getId());
 
     log.info("step=메세지_조회_시작, userId={}, chatroomId={}", user.getId(), roomId);
-    GetChatResponseDto responses = chatService.fetchChatMessages(user, roomId, page, size);
+    GetChatResponseDto responses = chatService.getChatMessages(user, roomId, page, size);
     log.info("step=메세지_조회_완료, userId={}, chatroomId={}", user.getId(), roomId);
 
     return ResponseEntity.status(HttpStatus.OK).body(responses);
@@ -62,7 +62,7 @@ public class ChatController implements ChatApi {
     }
 
     log.info("step=채팅방_조회_시작, userId={}", user.getId());
-    List<GetChatroomResponseDto> dtos = chatService.findChatroomsByUser(user);
+    List<GetChatroomResponseDto> dtos = chatService.getChatroomsByUser(user);
     log.info("step=채팅방_조회_완료, userId={}", user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));
@@ -85,8 +85,8 @@ public class ChatController implements ChatApi {
 
     chatService.validateParticipant(roomId, chatMessageDto.getSenderId());
 
-    List<User> roomMembers = chatService.findParticipants(roomId);
-    List<Long> connectedUserIdList = chatService.findConnectedUserIds(roomMembers, roomId);
+    List<User> roomMembers = chatService.getParticipants(roomId);
+    List<Long> connectedUserIdList = chatService.getConnectedUserIds(roomMembers, roomId);
     if (!connectedUserIdList.contains(chatMessageDto.getSenderId())) {
       throw new RingoException("레디스에 채팅방에 존재하는 유저 id가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -97,7 +97,7 @@ public class ChatController implements ChatApi {
 
     Message savedMessage = null;
     if (!chatMessageDto.getType().equalsIgnoreCase("CONNECT")) {
-      savedMessage = chatService.persistChatMessage(chatMessageDto, roomId);
+      savedMessage = chatService.saveMessage(chatMessageDto, roomId);
       if (savedMessage == null) return;
     }
 
@@ -133,14 +133,14 @@ public class ChatController implements ChatApi {
 
   @Scheduled(fixedDelay = 60000)
   public void alertScheduling() {
-    List<Appointment> alertAppointments = chatService.findDueAppointments();
+    List<Appointment> alertAppointments = chatService.getDueAppointments();
     for (Appointment appointment : alertAppointments) {
       Long roomId = appointment.getChatroom().getId();
       GetChatMessageResponseDto dto = GetChatMessageResponseDto.forAppointmentAlert(appointment);
       sendMessage(roomId, dto);
       appointment.setAlert(false);
     }
-    chatService.persistAppointments(alertAppointments);
+    chatService.saveAppointments(alertAppointments);
   }
 
 }

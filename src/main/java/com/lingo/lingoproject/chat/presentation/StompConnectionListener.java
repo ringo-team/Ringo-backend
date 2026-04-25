@@ -38,7 +38,7 @@ public class StompConnectionListener {
 
       // 접속 중인 채팅방 조회
       String destination = accessor.getDestination();
-      Long roomId = chatService.extractRoomIdFromDestination(destination);
+      Long roomId = chatService.extractChatroomIdFromDestination(destination);
       if (roomId == null) return;
 
       // 유저 채팅방 레디스에 저장

@@ -56,7 +56,7 @@ import org.springframework.stereotype.Service;
  * <h2>WebSocket 접속 상태 감지</h2>
  * <p>사용자가 특정 채팅방에 STOMP SUBSCRIBE하면
  * {@code connect::{userId}::{chatroomId}} 키가 Redis에 저장됩니다.
- * {@link #findConnectedUserIds}는 이 키의 존재 여부로 현재 채팅방에 연결된 사용자를 판별합니다.</p>
+ * {@link #getConnectedUserIds}는 이 키의 존재 여부로 현재 채팅방에 연결된 사용자를 판별합니다.</p>
  *
  * <h2>탈퇴 사용자 처리</h2>
  * <p>{@link ChatroomParticipant#isWithdrawn()}이 true인 참여자가 있으면
@@ -71,7 +71,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ChatService {
 
-  /** 채팅방 목록에서 마지막 메시지 시간을 표시할 때 사용하는 날짜 포맷. */
   private static final DateTimeFormatter CHAT_TIME_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -86,23 +85,11 @@ public class ChatService {
   private final AppointmentRepository appointmentRepository;
 
   // ============================================================
-  // Public API
+  // Public API — 채팅 메시지
   // ============================================================
 
-  /**
-   * 채팅방 메시지를 페이지 단위로 조회한다.
-   *
-   * <p>요청자가 채팅방 참여자인지 검증한 뒤, 상대방 정보와 함께 메시지 목록을 반환합니다.
-   * 상대방이 탈퇴한 경우 닉네임·프로필을 "알 수 없음"으로 마스킹합니다.</p>
-   *
-   * @param user      요청 사용자 (JWT 인증된 현재 사용자)
-   * @param chatroomId 조회할 채팅방 ID
-   * @param page      페이지 번호 (0부터 시작)
-   * @param size      페이지당 메시지 수
-   * @return 상대방 정보 + 메시지 목록 + 각 메시지의 읽음 상태
-   */
   @Transactional
-  public GetChatResponseDto fetchChatMessages(
+  public GetChatResponseDto getChatMessages(
       User user,
       Long chatroomId,
       int page,
@@ -111,146 +98,34 @@ public class ChatService {
     validateParticipant(chatroomId, user.getId());
 
     Chatroom chatroom = findChatroomOrThrow(chatroomId);
-    List<ChatroomParticipant> participants = fetchChatroomParticipantsByChatroomOrThrow(chatroom);
+    List<ChatroomParticipant> participants = fetchParticipantsOrThrow(chatroom);
 
     messageRepository.readAllMessages(chatroomId, user.getId());
-    List<GetChatMessageResponseDto> messages = fetchPagedMessages(chatroomId, page, size);
+    List<GetChatMessageResponseDto> messages = loadPagedMessages(chatroomId, page, size);
 
     if (hasWithdrawnParticipant(participants)) {
       return GetChatResponseDto.of(GetChatroomMemberInfoResponseDto.withdrawn(), messages);
     }
 
-    User opponent = resolveOpponent(chatroom, user);
+    User opponent = getOpponent(participants, user);
     List<String> hashtags = getUserHashtags(opponent);
 
     log.info("step=메세지_조회, chatroomId={}, requestUserId={}, opponentId={}, opponentNickname={}, hashtags={}",
         chatroomId, user.getId(), opponent.getId(), opponent.getNickname(), hashtags);
 
-    GetChatroomMemberInfoResponseDto chatOpponentInfo = GetChatroomMemberInfoResponseDto.from(opponent, hashtags);
-    return GetChatResponseDto.of(chatOpponentInfo, messages);
+    return GetChatResponseDto.of(GetChatroomMemberInfoResponseDto.from(opponent, hashtags), messages);
   }
 
-  /**
-   * 사용자가 속한 모든 채팅방 목록을 조회한다.
-   *
-   * <p>나간 채팅방(isActive=false)은 목록에서 제외됩니다.
-   * 탈퇴한 상대방이 있는 채팅방은 "알 수 없음"으로 마스킹된 상태로 포함됩니다.</p>
-   *
-   * @param user 채팅방 목록을 조회할 사용자
-   * @return 채팅방 요약 목록 (상대방 닉네임, 프로필, 미읽음 수, 마지막 메시지)
-   */
-  public List<GetChatroomResponseDto> findChatroomsByUser(User user) {
-    List<Chatroom> chatrooms = chatroomRepository.findAllByUser(user);
-    List<GetChatroomResponseDto> result = new ArrayList<>();
-
-    for (Chatroom chatroom : chatrooms) {
-      GetChatroomResponseDto summary = buildChatroomSummary(chatroom, user);
-      if (summary != null) result.add(summary);
-    }
-
-    log.info("userId={}, chatroomCount={}", user.getId(), result.size());
-    return result;
-  }
-
-  /**
-   * 두 사용자 간의 채팅방을 생성한다.
-   *
-   * <p>매칭 수락(ACCEPTED) 상태인 두 사용자만 채팅방을 생성할 수 있습니다.
-   * 일반적으로 {@link MatchingAcceptedEventHandler}가 매칭 수락 이벤트를 받아 자동으로 호출합니다.</p>
-   *
-   * @param dto user1Id, user2Id, chatType을 포함한 채팅방 생성 요청 DTO
-   * @return 생성된 채팅방 엔티티
-   * @throws RingoException 두 사용자가 ACCEPTED 매칭 관계가 아닌 경우
-   */
-  @Transactional
-  public Chatroom createChatroom(CreateChatroomRequestDto dto) {
-    ChatType chatType = GenericUtils.validateAndReturnEnumValue(ChatType.values(), dto.chatType());
-
-    User user1 = findUserOrThrow(dto.user1Id());
-    User user2 = findUserOrThrow(dto.user2Id());
-
-    validateUsersAreMatched(user1, user2);
-
-    Chatroom savedChatroom = saveNewChatroom(user1, user2, chatType);
-    saveParticipants(savedChatroom, user1, user2);
-
-    log.info("step=채팅방_생성, user1Id={}, user1Nickname={}, user1Gender={}, user1Birthday={}, user2Id={}, user2Nickname={}, user2Gender={}, user2Birthday={}, chatType={}, createdAt={}",
-        user1.getId(), user1.getNickname(), user1.getGender(), user1.getBirthday(),
-        user2.getId(), user2.getNickname(), user2.getGender(), user2.getBirthday(),
-        savedChatroom.getType(), savedChatroom.getCreatedDate());
-
-    return savedChatroom;
-  }
-
-  /**
-   * 채팅방을 삭제한다. (참여자 → 메시지 → 채팅방 순으로 제거)
-   *
-   * <p>채팅방 참여자만 삭제할 수 있으며, 관련 데이터(ChatroomParticipant, Message)를
-   * 먼저 삭제한 후 채팅방을 제거합니다.</p>
-   *
-   * @param chatroomId 삭제할 채팅방 Id
-   * @throws RingoException 채팅방 참여자가 아닌 경우
-   */
-  @Transactional
-  public void deleteChatroom(Long chatroomId) {
-
-    Chatroom chatroom = findChatroomOrThrow(chatroomId);
-
-    chatroomParticipantRepository.deleteAllByChatroom(chatroom);
-    messageRepository.deleteAllByChatroomId(chatroomId);
-    chatroomRepository.delete(chatroom);
-  }
-
-  /**
-   * 채팅 메시지를 MongoDB에 저장한다.
-   *
-   * <p>STOMP 메시지 핸들러({@code ChatController})에서 메시지를 수신한 직후 호출됩니다.
-   * Message는 MongoDB에 저장되고, 이후 STOMP를 통해 상대방에게 전달됩니다.</p>
-   *
-   * @param messageDto STOMP로 수신된 메시지 DTO (senderId, content, readerIds 포함)
-   * @param chatroomId 메시지가 전송된 채팅방 ID
-   * @return 저장된 Message 엔티티
-   */
-  public Message persistChatMessage(GetChatMessageResponseDto messageDto, Long chatroomId) {
+  public Message saveMessage(GetChatMessageResponseDto messageDto, Long chatroomId) {
     return messageRepository.save(Message.of(chatroomId, messageDto));
   }
 
-  /**
-   * STOMP 메시지 전송 실패 이력을 기록한다.
-   *
-   * <p>메시지 저장 또는 STOMP 전달 도중 예외가 발생했을 때 호출됩니다.
-   * 실패 원인, 메시지 ID, 대상 destination 등을 {@link FailedChatMessageLog}에 기록하여
-   * 후속 분석 및 재처리에 활용합니다.</p>
-   *
-   * @param e           발생한 예외
-   * @param savedMessage 저장된 메시지 엔티티
-   * @param senderLoginId 발신자 로그인 ID
-   * @param destination STOMP destination 접두사 (예: {@code /user/queue/chatroom/})
-   */
-  public void recordMessageDeliveryFailure(
-      Exception e,
-      Message savedMessage,
-      String senderLoginId,
-      String destination
-  ) {
-    log.error("step=메시지_전송_실패, destination={}, senderLoginId={}, status=FAILED",
-        destination, senderLoginId, e);
-
-    Long chatroomId = extractRoomIdFromDestination(destination);
-
-    failedChatMessageLogRepository.save(
-        FailedChatMessageLog.of(chatroomId, e, savedMessage.getId(), destination, senderLoginId)
-    );
-  }
-
-  /**
-   * 채팅방에 현재 WebSocket으로 접속 중인 사용자 ID 목록을 조회한다.
-   */
-  public List<Long> findConnectedUserIds(List<User> roomMembers, Long chatroomId) {
+  public List<Long> getConnectedUserIds(List<User> roomMembers, Long chatroomId) {
     try {
       List<Long> connectedIds = roomMembers.stream()
           .map(User::getId)
-          .filter(memberId -> checkIsConnected(memberId, chatroomId))
+          .filter(memberId -> Boolean.TRUE.equals(
+              redisTemplate.hasKey("connect::" + memberId + "::" + chatroomId)))
           .toList();
 
       log.info("chatroomId={}, connectedUserIds={}", chatroomId, connectedIds);
@@ -265,16 +140,99 @@ public class ChatService {
     }
   }
 
-  private boolean checkIsConnected(Long memberId, Long chatroomId){
-    return Boolean.TRUE.equals(
-        redisTemplate.hasKey("connect::" + memberId + "::" + chatroomId)
-    );
+  public void recordMessageDeliveryFailure(
+      Exception e,
+      Message savedMessage,
+      String senderLoginId,
+      String destination
+  ) {
+    log.error("step=메시지_전송_실패, destination={}, senderLoginId={}, status=FAILED",
+        destination, senderLoginId, e);
+
+    Long chatroomId = extractChatroomIdFromDestination(destination);
+    failedChatMessageLogRepository.save(
+        FailedChatMessageLog.of(
+            chatroomId, e, savedMessage.getId(), destination, senderLoginId));
   }
 
+  // ============================================================
+  // Public API — 채팅방 관리
+  // ============================================================
 
-  /**
-   * 약속을 저장하고 채팅 메시지 형태의 DTO를 반환한다.
-   */
+  public List<GetChatroomResponseDto> getChatroomsByUser(User user) {
+    List<Chatroom> chatrooms = chatroomRepository.findAllByUser(user);
+    List<GetChatroomResponseDto> result = new ArrayList<>();
+
+    for (Chatroom chatroom : chatrooms) {
+      GetChatroomResponseDto summary = buildChatroomSummary(chatroom, user);
+      if (summary != null) result.add(summary);
+    }
+
+    log.info("userId={}, chatroomCount={}", user.getId(), result.size());
+    return result;
+  }
+
+  @Transactional
+  public Chatroom createChatroom(CreateChatroomRequestDto dto) {
+    ChatType chatType = GenericUtils.validateAndReturnEnumValue(ChatType.values(), dto.chatType());
+
+    User user1 = findUserOrThrow(dto.user1Id());
+    User user2 = findUserOrThrow(dto.user2Id());
+
+    validateUsersAreMatched(user1, user2);
+
+    Chatroom savedChatroom = chatroomRepository.save(
+        Chatroom.of(user1.getId() + "_" + user2.getId(), chatType));
+    chatroomParticipantRepository.saveAll(List.of(
+        ChatroomParticipant.of(user1, savedChatroom),
+        ChatroomParticipant.of(user2, savedChatroom)
+    ));
+
+    log.info("step=채팅방_생성, user1Id={}, user1Nickname={}, user1Gender={}, user1Birthday={}, user2Id={}, user2Nickname={}, user2Gender={}, user2Birthday={}, chatType={}, createdAt={}",
+        user1.getId(), user1.getNickname(), user1.getGender(), user1.getBirthday(),
+        user2.getId(), user2.getNickname(), user2.getGender(), user2.getBirthday(),
+        savedChatroom.getType(), savedChatroom.getCreatedDate());
+
+    return savedChatroom;
+  }
+
+  @Transactional
+  public void deleteChatroom(Long chatroomId) {
+    Chatroom chatroom = findChatroomOrThrow(chatroomId);
+    chatroomParticipantRepository.deleteAllByChatroom(chatroom);
+    messageRepository.deleteAllByChatroomId(chatroomId);
+    chatroomRepository.delete(chatroom);
+  }
+
+  public void validateParticipant(Long chatroomId, Long userId) {
+    if (!isParticipant(chatroomId, userId)) {
+      log.error("chatroomId={}, userId={}, step=채팅방_접근_권한_없음", chatroomId, userId);
+      throw new RingoException(
+          "채팅방에 소속되지 않은 유저입니다.",
+          ErrorCode.NO_AUTH,
+          HttpStatus.FORBIDDEN);
+    }
+  }
+
+  public boolean isParticipant(Long chatroomId, Long userId) {
+    List<Long> participantIds = getParticipants(chatroomId).stream()
+        .map(User::getId).toList();
+    logParticipantCheck(chatroomId, userId, participantIds);
+    return participantIds.contains(userId);
+  }
+
+  public List<User> getParticipants(Long chatroomId) {
+    Chatroom chatroom = findChatroomOrThrow(chatroomId);
+    return fetchParticipantsOrThrow(chatroom).stream()
+        .filter(p -> !p.isWithdrawn())
+        .map(ChatroomParticipant::getParticipant)
+        .toList();
+  }
+
+  // ============================================================
+  // Public API — 약속
+  // ============================================================
+
   public GetChatMessageResponseDto createAppointment(SaveAppointmentRequestDto dto) {
     User registrant = findUserOrThrow(dto.registerId());
     Chatroom chatroom = findChatroomOrThrow(dto.chatroomId());
@@ -299,120 +257,97 @@ public class ChatService {
     return GetChatMessageResponseDto.forAppointment(savedAppointment);
   }
 
-  /**
-   * 알림 시간이 도래한 약속 목록을 조회한다.
-   */
-  public List<Appointment> findDueAppointments() {
+  public List<Appointment> getDueAppointments() {
     return appointmentRepository.findAllByAlertTimeBeforeAndIsAlert(LocalDateTime.now(), true);
   }
 
-  /**
-   * 약속 목록을 일괄 저장한다.
-   */
-  public void persistAppointments(List<Appointment> appointments) {
+  public void saveAppointments(List<Appointment> appointments) {
     appointmentRepository.saveAll(appointments);
   }
 
-  /**
-   * 사용자가 해당 채팅방의 참여자인지 확인한다.
-   */
-  public boolean isParticipant(Long chatroomId, Long userId) {
-    List<Long> participantIds = findParticipants(chatroomId).stream()
-        .map(User::getId).toList();
-    logParticipantCheckResult(chatroomId, userId, participantIds);
-    return participantIds.contains(userId);
+  // ============================================================
+  // Public API — 사용자 / 유틸
+  // ============================================================
+
+  public User findUserOrThrow(Long userId) {
+    return userRepository.findById(userId)
+        .orElseThrow(() -> new RingoException(
+            "해당 id의 유저를 찾을 수 없습니다.",
+            ErrorCode.NOT_FOUND_USER,
+            HttpStatus.BAD_REQUEST));
   }
 
-  /**
-   * 채팅방의 탈퇴하지 않은 참여자 목록을 조회한다.
-   */
-  public List<User> findParticipants(Long chatroomId) {
-    Chatroom chatroom = findChatroomOrThrow(chatroomId);
-    return fetchChatroomParticipantsByChatroomOrThrow(chatroom)
-        .stream()
-        .filter(p -> !p.isWithdrawn())
-        .map(ChatroomParticipant::getParticipant)
-        .toList();
+  public User findUserByLoginIdOrThrow(String loginId) {
+    return userRepository.findByLoginId(loginId)
+        .orElseThrow(() -> new RingoException(
+            "유저 정보가 올바르지 않습니다.",
+            ErrorCode.FORBIDDEN,
+            HttpStatus.FORBIDDEN));
   }
 
-  private Chatroom findChatroomOrThrow(Long chatroomId){
+  /** destination 경로의 마지막 세그먼트에서 채팅방 ID를 추출한다. 예: "/user/queue/topic/42" → 42L */
+  public Long extractChatroomIdFromDestination(String destination) {
+    if (destination == null) return null;
+    String[] parts = destination.split("/");
+    if (parts.length == 0) return null;
+    try {
+      return Long.valueOf(parts[parts.length - 1]);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  // ============================================================
+  // Private helpers
+  // ============================================================
+
+  private Chatroom findChatroomOrThrow(Long chatroomId) {
     return chatroomRepository.findById(chatroomId)
-        .orElseThrow(() -> new RingoException("채팅방 찾을 수 없음", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException(
+            "채팅방 찾을 수 없음",
+            ErrorCode.BAD_PARAMETER,
+            HttpStatus.BAD_REQUEST));
   }
 
-  // ============================================================
-  // Private helpers — chatroom summary
-  // ============================================================
-
-  private List<ChatroomParticipant> fetchChatroomParticipantsByChatroomOrThrow(Chatroom chatroom){
+  private List<ChatroomParticipant> fetchParticipantsOrThrow(Chatroom chatroom) {
     List<ChatroomParticipant> participants = chatroomParticipantRepository.findAllByChatroom(chatroom);
-    if (participants.size() < 2){
-      throw new RingoException("chat_participants가_2미만_입니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    if (participants.size() < 2) {
+      throw new RingoException(
+          "chat_participants가_2미만_입니다.",
+          ErrorCode.INTERNAL_SERVER_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return participants;
   }
 
-  /** 단일 채팅방 요약 DTO를 생성한다. 나간 채팅방이면 null을 반환한다. */
   private GetChatroomResponseDto buildChatroomSummary(Chatroom chatroom, User user) {
-
-    String opponentNickname;
-    String opponentProfileUrl;
-
-    OpponentProfile profile = findOpponentProfileOrUnknown(chatroom, user);
+    OpponentProfile profile = resolveOpponentProfile(chatroom, user);
     if (profile == null) return null;
-    opponentNickname = profile.nickname;
-    opponentProfileUrl = profile.imageUrl;
-
-    return buildChatroomResponseDto(
-        chatroom,
-        opponentNickname,
-        opponentProfileUrl,
-        user
-    );
+    return buildChatroomResponseDto(chatroom, profile.nickname(), profile.imageUrl(), user);
   }
 
-  private OpponentProfile findOpponentProfileOrUnknown(Chatroom chatroom, User user){
-    List<ChatroomParticipant> participants = fetchChatroomParticipantsByChatroomOrThrow(chatroom);
+  /**
+   * 채팅방 상대방 프로필을 반환한다.
+   * 탈퇴한 참여자가 있으면 "알 수 없음"을 반환하고, 현재 사용자가 나간 채팅방이면 null을 반환한다.
+   */
+  private OpponentProfile resolveOpponentProfile(Chatroom chatroom, User user) {
+    List<ChatroomParticipant> participants = fetchParticipantsOrThrow(chatroom);
+
     if (hasWithdrawnParticipant(participants)) {
       log.info("chatroomId={}, step=탈퇴_유저_채팅방", chatroom.getId());
       return new OpponentProfile("알 수 없음", null);
-    } else {
-      return resolveOpponentProfile(chatroom, user);
     }
-  }
 
-  /** 참여자 목록에서 상대방의 닉네임/프로필 정보를 추출한다. 사용자가 나간 채팅방이면 null을 반환한다. */
-  private OpponentProfile resolveOpponentProfile(Chatroom chatroom, User user) {
-    boolean hasLeft = hasUserLeftChatroom(chatroom, user);
-
-    if (hasLeft) {
+    ChatroomParticipant self = getSelf(participants, user);
+    if (!self.isActive()) {
       log.info("userId={}, step=나간_채팅방_제외", user.getId());
       return null;
     }
 
-    User opponent = resolveOpponent(chatroom, user);
-
-    String nickname = opponent.getNickname();
-    String profileUrl = opponent.getProfile().getImageUrl();
-    return new OpponentProfile(nickname, profileUrl);
+    User opponent = getOpponent(participants, user);
+    return new OpponentProfile(opponent.getNickname(), opponent.getProfile().getImageUrl());
   }
 
-
-  private boolean hasUserLeftChatroom(Chatroom chatroom, User user){
-    List<ChatroomParticipant> participants = fetchChatroomParticipantsByChatroomOrThrow(chatroom);
-    ChatroomParticipant currentUser = resolveSelfParticipant(participants, user);
-    return !currentUser.isActive();
-  }
-
-  private ChatroomParticipant resolveSelfParticipant(List<ChatroomParticipant> participants, User user){
-    ChatroomParticipant participant1 = participants.get(0);
-    ChatroomParticipant participant2 = participants.get(1);
-    User user1 = participant1.getParticipant();
-
-    return user1.getId().equals(user.getId()) ? participant1 : participant2;
-  }
-
-  /** 채팅방 목록 응답 DTO를 빌드한다. */
   private GetChatroomResponseDto buildChatroomResponseDto(
       Chatroom chatroom,
       String opponentNickname,
@@ -420,7 +355,6 @@ public class ChatService {
       User user
   ) {
     Message lastMessage = messageRepository.findFirstByChatroomIdOrderByCreatedAtDesc(chatroom.getId()).orElse(null);
-
     int unreadCount = messageRepository.findNumberOfUnreadMessages(chatroom.getId(), user.getId());
     String lastSentAt = lastMessage != null ? CHAT_TIME_FORMATTER.format(lastMessage.getCreatedAt()) : null;
     String lastMessageContent = lastMessage != null ? lastMessage.getContent() : null;
@@ -441,16 +375,6 @@ public class ChatService {
     return response;
   }
 
-  // ============================================================
-  // Private helpers — chatroom creation
-  // ============================================================
-
-  public User findUserOrThrow(Long userId){
-    return userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("해당 id의 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
-  }
-
-  /** 두 사용자가 매칭 수락 상태인지 검증한다. */
   private void validateUsersAreMatched(User user1, User user2) {
     boolean matched =
         matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(
@@ -459,24 +383,15 @@ public class ChatService {
             user2, user1, MatchingStatus.ACCEPTED);
 
     if (!matched) {
-      logMatchingStatusError(user1, user2);
-      throw new RingoException("매칭되지 않은 쌍은 채팅방을 생성할 수 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+      logMatchingCreationError(user1, user2);
+      throw new RingoException(
+          "매칭되지 않은 쌍은 채팅방을 생성할 수 없습니다.",
+          ErrorCode.NO_AUTH,
+          HttpStatus.BAD_REQUEST);
     }
   }
 
-  private Chatroom saveNewChatroom(User user1, User user2, ChatType chatType) {
-    return chatroomRepository.save(Chatroom.of(user1.getId() + "_" + user2.getId(), chatType));
-  }
-
-  private void saveParticipants(Chatroom chatroom, User user1, User user2) {
-    chatroomParticipantRepository.saveAll(List.of(
-        ChatroomParticipant.of(user1, chatroom),
-        ChatroomParticipant.of(user2, chatroom)
-    ));
-  }
-
-  /** 채팅방 생성 실패 원인을 매칭 상태 기준으로 로깅한다. */
-  private void logMatchingStatusError(User user1, User user2) {
+  private void logMatchingCreationError(User user1, User user2) {
     Matching matching1 = matchingRepository.findFirstByRequestUserAndRequestedUser(user1, user2);
     Matching matching2 = matchingRepository.findFirstByRequestUserAndRequestedUser(user2, user1);
 
@@ -502,66 +417,36 @@ public class ChatService {
         requestUser.getId(), requestedUser.getId(), status);
   }
 
-  // ============================================================
-  // Private helpers — message / read status
-  // ============================================================
-
-  private List<GetChatMessageResponseDto> fetchPagedMessages(Long chatroomId, int page, int size) {
+  private List<GetChatMessageResponseDto> loadPagedMessages(Long chatroomId, int page, int size) {
     Pageable pageable = PageRequest.of(page, size);
-    List<GetChatMessageResponseDto> messages =
-        messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable)
-            .stream().map(message -> GetChatMessageResponseDto.from(chatroomId, message))
-            .toList();
-    //messages.forEach(this::applyReadStatus);
-    return messages;
+    return messageRepository.findAllByChatroomIdOrderByCreatedAtDesc(chatroomId, pageable)
+        .stream()
+        .map(message -> GetChatMessageResponseDto.from(chatroomId, message))
+        .toList();
   }
 
-  /* 메시지 DTO에 읽음/미읽음 상태를 적용한다.
-  private void applyReadStatus(GetChatMessageResponseDto dto) {
-    List<Long> readerIds = dto.getReaderIds();
-
-    if (!readerIds.contains(dto.getSenderId())) {
-      log.error("readerIds={}, senderId={}, step=보낸사람_미포함", readerIds, dto.getSenderId());
-      throw new RingoException(
-          "readerIds에 보낸 사람의 id가 존재하지 않습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-    }
-    boolean onlySenderRead = readerIds.size() == 1;
-    dto.setIsRead(onlySenderRead ? 0 : 1);
-  }
-  */
-
-  // ============================================================
-  // Private helpers — misc
-  // ============================================================
-
-  public void validateParticipant(Long chatroomId, Long userId) {
-    if (!isParticipant(chatroomId, userId)) {
-      log.error("chatroomId={}, userId={}, step=채팅방_접근_권한_없음", chatroomId, userId);
-      throw new RingoException("채팅방에 소속되지 않은 유저입니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
-    }
+  private User getOpponent(List<ChatroomParticipant> participants, User user) {
+    User first = participants.get(0).getParticipant();
+    User second = participants.get(1).getParticipant();
+    return first.getId().equals(user.getId()) ? second : first;
   }
 
-
-
-  private List<String> getUserHashtags(User opponent){
-    return hashtagRepository.findAllByUser(opponent).stream()
-        .map(Hashtag::getHashtag).toList();
+  private ChatroomParticipant getSelf(List<ChatroomParticipant> participants, User user) {
+    ChatroomParticipant p1 = participants.getFirst();
+    ChatroomParticipant p2 = participants.get(1);
+    return p1.getParticipant().getId().equals(user.getId()) ? p1 : p2;
   }
 
   private boolean hasWithdrawnParticipant(List<ChatroomParticipant> participants) {
     return participants.get(0).isWithdrawn() || participants.get(1).isWithdrawn();
   }
 
-  private User resolveOpponent(Chatroom chatroom, User user) {
-    List<ChatroomParticipant> participants = fetchChatroomParticipantsByChatroomOrThrow(chatroom);
-
-    User first = participants.get(0).getParticipant();
-    User second = participants.get(1).getParticipant();
-    return first.getId().equals(user.getId()) ? second : first;
+  private List<String> getUserHashtags(User user) {
+    return hashtagRepository.findAllByUser(user).stream()
+        .map(Hashtag::getHashtag).toList();
   }
 
-
-  private void logParticipantCheckResult(Long chatroomId, Long userId, List<Long> participantIds) {
+  private void logParticipantCheck(Long chatroomId, Long userId, List<Long> participantIds) {
     int size = participantIds.size();
     if (size == 0) {
       log.error("chatroomId={}, userId={}, step=전원_탈퇴_채팅방", chatroomId, userId);
@@ -570,30 +455,6 @@ public class ChatService {
           chatroomId, userId, participantIds.get(0));
     } else {
       log.info("chatroomId={}, userId={}, participantIds={}", chatroomId, userId, participantIds);
-    }
-  }
-
-  public User findUserByLoginIdOrThrow(String loginId){
-    return userRepository.findByLoginId(loginId)
-        .orElseThrow(() -> new RingoException("유저 정보가 올바르지 않습니다.", ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN));
-  }
-
-  /**
-   * destination 경로의 마지막 세그먼트에서 채팅방 ID를 추출합니다.
-   * 예: "/app/42" → 42L, "/user/queue/topic/42" → 42L
-   *
-   * @param destination STOMP 메시지의 목적지 경로
-   * @return 파싱된 채팅방 ID, 파싱 실패 시 null
-   */
-  // 목적지 패턴이 /topic/{id}일 때 id만 가져옴
-  public Long extractRoomIdFromDestination(String destination) {
-    if (destination == null) return null;
-    String[] parts = destination.split("/");
-    if (parts.length == 0) return null;
-    try {
-      return Long.valueOf(parts[parts.length - 1]);
-    } catch (Exception e) {
-      return null;
     }
   }
 
