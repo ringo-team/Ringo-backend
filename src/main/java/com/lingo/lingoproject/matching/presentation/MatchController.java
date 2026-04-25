@@ -37,7 +37,7 @@ public class MatchController implements MatchingApi {
     }
 
     log.info("step=매칭_요청_시작, requestId={}, requestedId={}", matchingRequestDto.requestId(), matchingRequestDto.requestedId());
-    Matching matching = matchService.matchRequest(matchingRequestDto);
+    Matching matching = matchService.requestMatching(matchingRequestDto);
     log.info("step=매칭_요청_완료, requestId={}, requestedId={}", matchingRequestDto.requestId(), matchingRequestDto.requestedId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new RequestMatchingResponseDto(ErrorCode.SUCCESS.getCode(), matching.getId()));

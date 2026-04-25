@@ -43,14 +43,20 @@ public class MatchingValidationService {
     Long requestedUserId = matching.getRequestedUser().getId();
     if (!requestedUserId.equals(user.getId())) {
       log.error("step=매칭_응답_권한없음, authUserId={}, matchRequestedUserId={}, status=FAILED", user.getId(), requestedUserId);
-      throw new RingoException("매칭 수락 여부를 결정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException(
+          "매칭 수락 여부를 결정할 권한이 없습니다.",
+          ErrorCode.NO_AUTH,
+          HttpStatus.FORBIDDEN);
     }
   }
 
-  public void validateAlreadyMatched(User requestUser, User requestedUser){
+  public void validateAlreadyMatched(User requestUser, User requestedUser) {
     if (matchingRepository.existsByRequestUserAndRequestedUser(requestUser, requestedUser) ||
         matchingRepository.existsByRequestUserAndRequestedUser(requestedUser, requestUser)){
-      throw new RingoException("이미 매칭된 연결입니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+      throw new RingoException(
+          "이미 매칭된 연결입니다.",
+          ErrorCode.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -62,11 +68,14 @@ public class MatchingValidationService {
    */
   public void validateMatchingDeletePermission(Matching matching, User user) {
     Long requestedUserId = matching.getRequestedUser().getId();
-    Long requestUserId   = matching.getRequestUser().getId();
+    Long requestUserId = matching.getRequestUser().getId();
     if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))) {
       log.error("step=매칭_삭제_권한없음, authUserId={}, matchRequestedUserId={}, status=FAILED",
           user.getId(), requestedUserId);
-      throw new RingoException("매칭을 삭제할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+      throw new RingoException(
+          "매칭을 삭제할 권한이 없습니다.",
+          ErrorCode.NO_AUTH,
+          HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -80,15 +89,21 @@ public class MatchingValidationService {
     Long requestUserId = matching.getRequestUser().getId();
     if (!requestUserId.equals(user.getId())) {
       log.error("step=매칭_메시지_작성_권한없음, authUserId={}, matchRequestUserId={}, status=FAILED", user.getId(), requestUserId);
-      throw new RingoException("요청 메세지를 저장 및 수정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+      throw new RingoException(
+          "요청 메세지를 저장 및 수정할 권한이 없습니다.",
+          ErrorCode.NO_AUTH,
+          HttpStatus.BAD_REQUEST);
     }
   }
 
   public void validateIsAlreadyDecidedMatching(Matching matching){
     if (matching.getMatchingStatus().equals(MatchingStatus.ACCEPTED) ||
         matching.getMatchingStatus().equals(MatchingStatus.REJECTED)) {
-      throw new RingoException("이미 매칭된 연결입니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
-    };
+      throw new RingoException(
+          "이미 매칭된 연결입니다.",
+          ErrorCode.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST);
+    }
   }
 
   /**
@@ -102,7 +117,10 @@ public class MatchingValidationService {
     Long requestUserId   = matching.getRequestUser().getId();
     if (!(requestedUserId.equals(user.getId()) || requestUserId.equals(user.getId()))) {
       log.error("step=매칭_메시지_조회_권한없음, authUserId={}, status=FAILED", user.getId());
-      throw new RingoException("해당 매칭의 요청 메세지를 확인할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+      throw new RingoException(
+          "해당 매칭의 요청 메세지를 확인할 권한이 없습니다.",
+          ErrorCode.NO_AUTH,
+          HttpStatus.BAD_REQUEST);
     }
   }
 }
