@@ -21,14 +21,13 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
 
   @Query(value = """ 
         select
-            S.category,
+            S.category as category,
             avg(1 - abs(A.answer-B.answer)/4.0) as avgAnswer
         from Survey S, AnsweredSurvey A, AnsweredSurvey B
         where S.surveyNum = A.surveyNum
           and S.confrontSurveyNum = B.surveyNum
           and A.user.id = :user1
           and B.user.id = :user2
-          and A.answer = B.answer
         group by S.category
         """)
   List<SurveyScoreResultInterface> calcSurveyScore(@Param("user1") Long user1, @Param("user2") Long user2);
@@ -59,7 +58,7 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
   @Query(value = """
       select
           new com.lingo.lingoproject.survey.presentation.dto.GetUserSurveyResponseDto
-          (s.surveyNum, s.content, a.answer, :userId)
+          (s.surveyNum, s.content, a.answer, :userId, s.content)
       from Survey s
       join AnsweredSurvey a on s.surveyNum = a.surveyNum
       where a.user.id = :userId

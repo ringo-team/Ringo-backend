@@ -136,7 +136,7 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @PatchMapping("users/{user-id}/recommendations/hide")
-  ResponseEntity<?> hideRecommendationUser(
+  ResponseEntity<ResultMessageResponseDto> hideRecommendationUser(
       @Parameter(description = "가리고 싶은 유저의 아이디", example = "5") @PathVariable(value = "user-id") Long recommendedUserId,
       @AuthenticationPrincipal User user
   );

@@ -1,0 +1,15 @@
+{
+  "properties": {
+    "id": {
+      "type": "long"
+    },
+    "image": {
+      "type": "keyword"
+    },
+    "name": {
+      "type": "text",
+      "analyzer": "index_analyzer",
+      "search_analyzer": "search_analyzer"
+    }
+  }
+}

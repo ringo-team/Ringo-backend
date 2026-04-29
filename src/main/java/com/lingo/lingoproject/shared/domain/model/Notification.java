@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.shared.domain.model;
 
 import com.lingo.lingoproject.shared.domain.model.NotificationType;
+import com.lingo.lingoproject.shared.utils.Timestamp;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -23,7 +24,7 @@ import org.hibernate.annotations.DynamicInsert;
 @AllArgsConstructor
 @NoArgsConstructor
 @DynamicInsert
-public class Notification {
+public class Notification extends Timestamp {
 
   public static Notification of(User user, NotificationType type, String title, String message) {
     return Notification.builder()

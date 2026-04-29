@@ -25,14 +25,23 @@ import lombok.Setter;
 @Getter
 public class Survey {
 
-  public static Survey of(int surveyNum, int confrontSurveyNum, SurveyCategory category,
-      String content, String purpose) {
+  public static Survey of(
+      int surveyNum,
+      int confrontSurveyNum,
+      SurveyCategory category,
+      String content,
+      String purpose,
+      String positiveKeyword,
+      String negativeKeyword
+  ) {
     return Survey.builder()
         .surveyNum(surveyNum)
         .confrontSurveyNum(confrontSurveyNum)
         .category(category)
         .content(content)
         .purpose(purpose)
+        .keywordForHigherAnswer(positiveKeyword)
+        .keywordForLowerAnswer(negativeKeyword)
         .build();
   }
 

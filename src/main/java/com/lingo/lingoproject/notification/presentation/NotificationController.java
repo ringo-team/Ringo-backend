@@ -91,7 +91,7 @@ public class NotificationController {
           )
       }
   )
-  @PostMapping("/notification/out")
+  @PostMapping("/notifications/alter")
   public ResponseEntity<ResultMessageResponseDto> alterNotificationOptionReception(
 
       @Parameter(description = "notification 타입", example = "MARKETING")

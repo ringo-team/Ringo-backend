@@ -13,6 +13,7 @@ import com.lingo.lingoproject.shared.domain.model.BlockedUser;
 import com.lingo.lingoproject.shared.domain.model.DormantAccount;
 import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Hashtag;
+import com.lingo.lingoproject.shared.domain.model.Keyword;
 import com.lingo.lingoproject.shared.domain.model.Matching;
 import com.lingo.lingoproject.shared.domain.model.MatchingStatus;
 import com.lingo.lingoproject.shared.domain.model.Place;
@@ -55,6 +56,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -611,7 +613,7 @@ public class MatchService {
   }
 
   public List<GetPlaceDetailResponseDto> getRandomlySelectedPlaces(User user) {
-    List<Place> places = placeRepository.findAll();
+    List<Place> places = placeRepository.findAllByTypeNotNull();
     Collections.shuffle(places);
     return buildPlaceDetailInfo(places.subList(0, 50), user);
   }
@@ -649,7 +651,7 @@ public class MatchService {
         .entrySet()
         .stream()
         .map(entry -> {
-          int score = keywordRepository.findAllByKeywordContaining(entry.getKey());
+          int score = keywordRepository.findByKeyword(entry.getKey()).getScore();
           return Map.entry(entry.getKey(), score * entry.getValue());
         })
         .sorted((entry1, entry2) -> Math.toIntExact(entry2.getValue() - entry1.getValue()))
@@ -678,11 +680,15 @@ public class MatchService {
         .entrySet()
         .stream()
         .map(entry -> {
-          int score = keywordRepository.findAllByKeywordContaining(entry.getKey());
+          Keyword keyword = keywordRepository.findByKeyword(entry.getKey());
+          if (keyword == null) return null;
+          int score = keyword.getScore();
           return Map.entry(entry.getKey(), score * entry.getValue());
         })
+        .filter(Objects::nonNull)
         .sorted((entry1, entry2) -> Math.toIntExact(entry2.getValue() - entry1.getValue()))
         .map(Map.Entry::getKey)
+        .limit(5)
         .toList();
   }
 
@@ -711,8 +717,7 @@ public class MatchService {
     List<Place> places = placeRepository.findAllByType("RINGO_PICK");
     Collections.shuffle(places);
 
-    places.subList(0, 10);
-    return places;
+    return places.subList(0, Math.min(places.size(), 10));
   }
 
   private List<SortedAnswerPairWithWeight> findSortedRelatedAnswerPairs(Long user1, Long user2) {
@@ -927,12 +932,12 @@ public class MatchService {
   }
 
   private List<String> getUserHashtags(User user) {
-    return toHashtagStrings(hashtagRepository.findAllByUser(user));
+    return hashtagRepository.findAllByUser(user)
+        .stream()
+        .map(Hashtag::getHashtag)
+        .toList();
   }
 
-  private List<String> toHashtagStrings(List<Hashtag> hashtags) {
-    return hashtags.stream().map(Hashtag::getHashtag).toList();
-  }
 
   private List<AnsweredSurvey> getSimilarAnswers(AnsweredSurvey todayAnswer, List<Long> excludedUserIds) {
     int surveyNum = todayAnswer.getSurveyNum();

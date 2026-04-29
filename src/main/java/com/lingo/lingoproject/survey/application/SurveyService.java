@@ -15,6 +15,7 @@ import com.lingo.lingoproject.survey.presentation.dto.GetSurveyResponseDto;
 import com.lingo.lingoproject.survey.presentation.dto.GetUserSurveyResponseDto;
 import com.lingo.lingoproject.survey.presentation.dto.UpdateSurveyRequestDto;
 import com.lingo.lingoproject.survey.presentation.dto.UploadSurveyRequestDto;
+import jakarta.transaction.Transactional;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -81,6 +82,7 @@ public class SurveyService {
    */
   public void importSurveysFromExcel(MultipartFile file) {
     List<Survey> surveys = parseExcelToSurveys(file);
+    log.info("survey-size: {}", surveys.size());
     surveyRepository.saveAll(surveys);
   }
 
@@ -122,7 +124,11 @@ public class SurveyService {
    */
   public void upsertSurveyResponses(ApiListResponseDto<UploadSurveyRequestDto> responses, User user) {
     List<AnsweredSurvey> surveyResponses = responses.getList().stream()
-        .map(response -> upsertSingleResponse(user, response))
+        .map(response -> {
+          AnsweredSurvey as = buildSurveyAnswerEntity(user, response);
+          log.info("[UPDATED_AT]: {}", String.valueOf(as.getUpdatedAt()));
+          return as;
+        })
         .toList();
 
     answeredSurveyRepository.saveAll(surveyResponses);
@@ -134,7 +140,7 @@ public class SurveyService {
    * - 누적 응답 수가 임계값 미만이면 순차 설문 제공
    * - 임계값 이상이면 랜덤 설문 제공 (자정까지 캐싱)
    */
-  public List<GetSurveyResponseDto> fetchDailySurveys(User user) {
+  public List<GetSurveyResponseDto> getDailySurveys(User user) {
 
     if (hasCompletedTodaySurveys(user)) {
       return null;
@@ -147,10 +153,10 @@ public class SurveyService {
 
     int answeredSurveyCount = (int) answeredSurveyRepository.countByUser(user);
     if (answeredSurveyCount < SEQUENTIAL_SURVEY_THRESHOLD) {
-      return fetchSequentialDailySurveys(user, answeredSurveyCount);
+      return getSequentialDailySurveys(user, answeredSurveyCount);
     }
 
-    return fetchRandomDailySurveysAndCache(user);
+    return getRandomDailySurveysAndCache(user);
   }
 
   /**
@@ -184,7 +190,7 @@ public class SurveyService {
       sheet.removeRow(sheet.getRow(0)); // 헤더 행 제거
 
       for (Row row : sheet) {
-        String categoryValue = row.getCell(2).getStringCellValue();
+        String categoryValue = row.getCell(4).getStringCellValue();
         if (categoryValue.isEmpty()) break;
         surveys.add(buildSurveyFromRow(row, categoryValue));
       }
@@ -199,12 +205,17 @@ public class SurveyService {
   /** 엑셀 행 데이터를 {@link Survey} 엔티티로 변환한다. */
   private Survey buildSurveyFromRow(Row row, String categoryValue) {
     SurveyCategory category = GenericUtils.validateAndReturnEnumValue(SurveyCategory.values(), categoryValue);
+    String positiveKeyword = row.getCell(10).getStringCellValue().replaceAll(" ", "");
+    String negativeKeyword = row.getCell(9).getStringCellValue().replaceAll(" ", "");
     return Survey.of(
-        (int) row.getCell(0).getNumericCellValue(),
         (int) row.getCell(1).getNumericCellValue(),
+        (int) row.getCell(3).getNumericCellValue(),
         category,
-        row.getCell(3).getStringCellValue(),
-        row.getCell(4).getStringCellValue());
+        row.getCell(5).getStringCellValue(),
+        row.getCell(7).getStringCellValue(),
+        positiveKeyword,
+        negativeKeyword
+    );
   }
 
   /**
@@ -213,7 +224,7 @@ public class SurveyService {
    * <p>이미 응답이 있으면 기존 엔티티의 answer를 수정하고,
    * 없으면 새 {@link AnsweredSurvey} 엔티티를 생성합니다.</p>
    */
-  private AnsweredSurvey upsertSingleResponse(User user, UploadSurveyRequestDto response) {
+  private AnsweredSurvey buildSurveyAnswerEntity(User user, UploadSurveyRequestDto response) {
     if (answeredSurveyRepository.existsByUserAndSurveyNum(user, response.surveyNum())) {
       AnsweredSurvey existing = answeredSurveyRepository.findByUserAndSurveyNum(user, response.surveyNum());
       log.info("step=설문_응답_수정, userId={}, surveyNum={}, before={}, after={}",
@@ -230,12 +241,13 @@ public class SurveyService {
   /** 오늘(자정 이후) 이미 설문에 응답한 사용자인지 확인한다. */
   private boolean hasCompletedTodaySurveys(User user) {
     LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+    if (answeredSurveyRepository.countByUser(user) <= INITIAL_SURVEY_COUNT) return false;
     return answeredSurveyRepository.existsByUserAndUpdatedAtAfter(user, startOfToday);
   }
 
   /** Redis에서 캐싱된 일일 설문을 가져온다. 캐시가 없으면 null을 반환한다. */
   private List<GetSurveyResponseDto> getCachedDailySurveys(Long userId) {
-    if (Boolean.TRUE.equals(redisTemplate.hasKey("dailySurvey::" + userId))) {
+    if (redisTemplate.hasKey("dailySurvey::" + userId)) {
       return redisUtils.getUserDailySurvey(userId.toString());
     }
     return null;
@@ -247,7 +259,7 @@ public class SurveyService {
    * <p>누적 응답 수를 기준으로 다음 5개 설문을 순서대로 제공합니다.
    * 결과는 자정까지 Redis에 캐싱됩니다.</p>
    */
-  private List<GetSurveyResponseDto> fetchSequentialDailySurveys(User user, int answeredSurveyCount) {
+  private List<GetSurveyResponseDto> getSequentialDailySurveys(User user, int answeredSurveyCount) {
     int from = answeredSurveyCount + 1;
     int to = answeredSurveyCount + DAILY_SURVEY_COUNT;
 
@@ -277,7 +289,7 @@ public class SurveyService {
    * <p>전체 설문 중 중복 없이 {@code DAILY_SURVEY_COUNT}개를 무작위 선택합니다.
    * 결과는 자정까지 Redis에 캐싱됩니다.</p>
    */
-  private List<GetSurveyResponseDto> fetchRandomDailySurveysAndCache(User user) {
+  private List<GetSurveyResponseDto> getRandomDailySurveysAndCache(User user) {
     List<GetSurveyResponseDto> surveys = selectRandomDailySurveys();
 
     log.info("step=랜덤_일일설문_조회, userId={}, resultCount={}", user.getId(), surveys.size());
@@ -318,5 +330,11 @@ public class SurveyService {
         "step=일일설문_상세, userId={}, surveyNum={}, confrontSurveyNum={}, purpose={}",
         userId, survey.surveyNum(), survey.confrontSurveyNum(), survey.purpose()
     ));
+  }
+
+  @Transactional
+  public List<GetSurveyResponseDto> resetAndGetInitialSurveys(User user){
+    answeredSurveyRepository.deleteAllByUser(user);
+    return getSequentialDailySurveys(user, 0);
   }
 }

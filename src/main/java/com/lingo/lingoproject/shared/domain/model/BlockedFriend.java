@@ -42,4 +42,11 @@ public class BlockedFriend {
    */
   @Column(length = 13)
   private String phoneNumber;
+
+  public static BlockedFriend of(User user, String phoneNumber){
+    return BlockedFriend.builder()
+        .user(user)
+        .phoneNumber(phoneNumber)
+        .build();
+  }
 }

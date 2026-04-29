@@ -109,7 +109,7 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     }
 
     String destination = accessor.getDestination();
-    Long roomId = chatService.extractRoomIdFromDestination(destination);
+    Long roomId = chatService.extractChatroomIdFromDestination(destination);
 
     // destination에서 roomId를 파싱할 수 없는 경우 (예: /user/queue 구독 등) 통과
     if (roomId == null) {

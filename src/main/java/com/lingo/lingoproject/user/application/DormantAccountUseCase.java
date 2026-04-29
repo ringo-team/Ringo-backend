@@ -5,6 +5,7 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.domain.model.UserAccessLog;
 import com.lingo.lingoproject.shared.infrastructure.persistence.DormantAccountRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserAccessLogRepository;
+import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,12 +22,17 @@ public class DormantAccountUseCase {
   private final DormantAccountRepository dormantAccountRepository;
   private final UserAccessLogRepository userAccessLogRepository;
 
+  @Transactional
   public void updateDormantAccount(User user) {
     if (dormantAccountRepository.existsByUser(user)) {
       dormantAccountRepository.deleteByUser(user);
       return;
     }
     dormantAccountRepository.save(DormantAccount.of(user));
+  }
+
+  public boolean isDormant(User user){
+    return dormantAccountRepository.existsByUser(user);
   }
 
   public void saveUserAccessLog(User user) {

@@ -116,7 +116,7 @@ public class ChatController implements ChatApi {
       }
 
       if (!connectedUserIdList.contains(member.getId())) {
-        fcmNotificationUseCase.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
+        //fcmNotificationUseCase.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
       }
     }
   }

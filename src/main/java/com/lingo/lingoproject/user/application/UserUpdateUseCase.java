@@ -56,6 +56,8 @@ public class UserUpdateUseCase {
     GenericUtils.validateAndSetStringValue(dto.biography(), user::setBiography);
     GenericUtils.validateAndSetStringValue(dto.nickname(), user::setNickname);
 
+    log.info("[BIO] :{}, {}", user.getBiography(), dto.hashtag());
+
     Address activeAddress = dto.activeAddress();
     if (isValidAddress(activeAddress)) {
       user.setActivityLocProvince(activeAddress.province());
@@ -69,6 +71,7 @@ public class UserUpdateUseCase {
           .toList();
       hashtagRepository.saveAll(hashtagEntities);
     }
+
 
     if (dto.mbti() != null) setUserMbti(user, dto.mbti());
     userRepository.save(user);

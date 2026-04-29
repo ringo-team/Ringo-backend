@@ -11,11 +11,13 @@ import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.ScrapPlaceRequestDto;
+import com.lingo.lingoproject.community.presentation.dto.SearchPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
 import com.lingo.lingoproject.shared.domain.model.User;
+import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -179,6 +181,9 @@ public interface CommunityApi {
   @GetMapping(value = "/places/rank")
   ResponseEntity<List<GetPlaceDetailResponseDto>> getRankedPagedPlaces(@AuthenticationPrincipal User user, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
 
+  @GetMapping(value = "/places/{place-id}")
+  ResponseEntity<GetPlaceDetailResponseDto> getDetailPlaceInfo(@AuthenticationPrincipal User user, @PathVariable(value = "place-id") Long placeId);
+
   @PatchMapping(value = "/places/{place-id}")
   ResponseEntity<ResultMessageResponseDto> updatePlaceClickCount(@PathVariable(value = "place-id") Long placeId);
 
@@ -187,4 +192,7 @@ public interface CommunityApi {
 
   @GetMapping(value = "/places/scrap")
   ResponseEntity<List<GetPlaceDetailResponseDto>> getScrappedPlace(@AuthenticationPrincipal User user);
+
+  @GetMapping(value = "places/search")
+  ResponseEntity<ApiListResponseDto<SearchPlaceRequestDto>> searchPlacesByKeywords(@RequestParam String keyword);
 }

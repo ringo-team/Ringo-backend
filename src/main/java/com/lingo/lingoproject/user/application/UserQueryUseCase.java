@@ -2,17 +2,23 @@ package com.lingo.lingoproject.user.application;
 
 import com.lingo.lingoproject.matching.presentation.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.shared.domain.model.Hashtag;
+import com.lingo.lingoproject.shared.domain.model.NotificationOptionOutUser;
+import com.lingo.lingoproject.shared.domain.model.NotificationType;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.NotificationOptionOutUserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import com.lingo.lingoproject.user.presentation.dto.GetUserInfoResponseDto;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,10 +42,10 @@ public class UserQueryUseCase {
   private final RedisUtils redisUtils;
   private final RedisTemplate<String, Object> redisTemplate;
   private final MatchingRepository matchingRepository;
+  private final DormantAccountUseCase dormantAccountUseCase;
+  private final NotificationOptionOutUserRepository notificationOptionOutUserRepository;
 
-  public String findUserLoginId(User user) {
-    boolean isAuthenticated = redisTemplate.hasKey("self-auth::" + user.getId());
-    if (isAuthenticated) return user.getUsername();
+  public String findUserLoginId() {
     throw new RingoException("아이디를 얻을 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
   }
 
@@ -83,13 +89,27 @@ public class UserQueryUseCase {
       throw new RingoException("유저를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
     }
 
-    User findUser = userRepository.findById(findUserId)
-        .orElseThrow(() -> new RingoException("해당하는 유저가 존재하지 않습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+    User findUser = findUserOrThrow(findUserId);
+    List<String> hashtags = getUserHashtags(findUser);
+    boolean isDormant = dormantAccountUseCase.isDormant(findUser);
+    Map<String, Boolean> notificationSettingMap = getNotificationSetting(findUser);
 
-    List<String> hashtags = hashtagRepository.findAllByUser(findUser)
-        .stream().map(Hashtag::getHashtag).toList();
+    return GetUserInfoResponseDto.from(findUser, hashtags, isDormant, notificationSettingMap);
+  }
 
-    return GetUserInfoResponseDto.from(findUser, hashtags);
+  private Map<String, Boolean> getNotificationSetting(User user){
+    Map<String, Boolean> notificationSettingMap = new HashMap<>();
+    List<NotificationType> deactivateNotificationTypeList = notificationOptionOutUserRepository.findAllByUser(user)
+        .stream()
+        .map(NotificationOptionOutUser::getType)
+        .toList();
+    Arrays.stream(NotificationType.values())
+        .forEach(type -> {
+          // true 면 비활성화
+          if(deactivateNotificationTypeList.contains(type)) notificationSettingMap.put(type.toString(), true);
+          else notificationSettingMap.put(type.toString(), false);
+        });
+    return notificationSettingMap;
   }
 
   public List<GetUserInfoResponseDto> getPageableUserInfo(int page, int size) {
@@ -97,6 +117,21 @@ public class UserQueryUseCase {
     Page<User> users = userRepository.findAll(pageable);
     return users.stream()
         .map(GetUserInfoResponseDto::summary)
+        .toList();
+  }
+
+  public User findUserOrThrow(Long userId) {
+    return userRepository.findById(userId)
+        .orElseThrow(() -> new RingoException(
+            "해당 id의 유저를 찾을 수 없습니다.",
+            ErrorCode.NOT_FOUND_USER,
+            HttpStatus.BAD_REQUEST));
+  }
+
+  private List<String> getUserHashtags(User user) {
+    return hashtagRepository.findAllByUser(user)
+        .stream()
+        .map(Hashtag::getHashtag)
         .toList();
   }
 }

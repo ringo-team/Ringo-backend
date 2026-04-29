@@ -123,7 +123,7 @@ public class MatchController implements MatchingApi {
   }
 
 
-  public ResponseEntity<?> hideRecommendationUser(Long recommendedUserId, User user) {
+  public ResponseEntity<ResultMessageResponseDto> hideRecommendationUser(Long recommendedUserId, User user) {
     log.info("step=추천이성_가리기_시작, userId={}, recommendedUserId={}", user.getId(), recommendedUserId);
     matchService.hideRecommendedUser(user, recommendedUserId);
     log.info("step=추천이성_가리기_완료, userId={}, recommendedUserId={}", user.getId(), recommendedUserId);

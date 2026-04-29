@@ -15,4 +15,6 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
   @Modifying
   @Query("update Place p set p.clickCount = p.clickCount + 1 where p.id = :placeId")
   void updatePlaceClickCount(Long clickCount);
+
+  List<Place> findAllByTypeNotNull();
 }

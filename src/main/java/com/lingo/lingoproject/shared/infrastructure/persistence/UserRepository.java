@@ -20,4 +20,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
   List<User> findAllByCreatedAtAfter(LocalDateTime createdAtAfter);
 
   boolean existsByNickname(String nickname);
+
+  Optional<User> findByPhoneNumber(String phoneNumber);
+
+  Optional<User> findByLoginIdAndPhoneNumber(String loginId, String phoneNumber);
 }

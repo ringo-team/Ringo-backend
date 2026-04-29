@@ -9,6 +9,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.DynamicInsert;
@@ -19,6 +20,7 @@ import org.hibernate.annotations.DynamicInsert;
 @AllArgsConstructor
 @NoArgsConstructor
 @DynamicInsert
+@Getter
 public class UserPoint {
 
   public static UserPoint of(User user) {
@@ -35,6 +37,6 @@ public class UserPoint {
   @JoinColumn(name = "user_id")
   private User user;
 
-  @ColumnDefault(value = "0")
-  private Integer point;
+  @Builder.Default
+  private Integer point = 0;
 }

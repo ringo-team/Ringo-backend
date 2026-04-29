@@ -92,7 +92,11 @@ public class FcmNotificationUseCase {
   public List<GetNotificationResponseDto> getNotificationMessage(User user){
     List<com.lingo.lingoproject.shared.domain.model.Notification> notifications = notificationRepository.findAllByUser(user);
     return notifications.stream()
-        .map(n -> new GetNotificationResponseDto(n.getTitle(), n.getMessage()))
+        .map(n -> new GetNotificationResponseDto(
+            n.getTitle(),
+            n.getMessage(),
+            n.getCreatedAt().toString()
+        ))
         .toList();
   }
 }

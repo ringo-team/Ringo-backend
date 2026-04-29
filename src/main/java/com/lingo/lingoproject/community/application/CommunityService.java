@@ -13,30 +13,33 @@ import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostImageResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.SearchPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostImageRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostImageResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
+import com.lingo.lingoproject.shared.domain.elastic.PlaceDocument;
 import com.lingo.lingoproject.shared.domain.elastic.PostDocument;
 import com.lingo.lingoproject.shared.domain.model.Comment;
 import com.lingo.lingoproject.shared.domain.model.CommentLikeUserMapping;
 import com.lingo.lingoproject.shared.domain.model.Place;
+import com.lingo.lingoproject.shared.domain.model.PlaceImage;
 import com.lingo.lingoproject.shared.domain.model.Post;
 import com.lingo.lingoproject.shared.domain.model.PostCategory;
 import com.lingo.lingoproject.shared.domain.model.PostImage;
 import com.lingo.lingoproject.shared.domain.model.PostLikeUserMapping;
 import com.lingo.lingoproject.shared.domain.event.DomainEventPublisher;
-import com.lingo.lingoproject.shared.domain.model.Survey;
-import com.lingo.lingoproject.shared.domain.model.SurveyCategory;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.domain.model.UserScrapPlace;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
+import com.lingo.lingoproject.shared.infrastructure.elastic.PlaceSearchRepository;
 import com.lingo.lingoproject.shared.infrastructure.elastic.PostSearchRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.CommentLikeUserMappingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.CommentRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostLikeUserMappingRepository;
@@ -108,6 +111,8 @@ public class CommunityService {
   private final PostSearchRepository postSearchRepository;
   private final PlaceRepository placeRepository;
   private final UserScrapPlaceRepository userScrapPlaceRepository;
+  private final PlaceSearchRepository placeSearchRepository;
+  private final PlaceImageRepository placeImageRepository;
 
   /**
    * 게시물을 생성한다.
@@ -532,10 +537,28 @@ public class CommunityService {
 
   @Transactional
   public void parseExcelAndPersistEntity(MultipartFile file){
-    placeRepository.saveAll(parseExcelToSurveys(file));
+    List<Place> places = parseExcelToPlaces(file);
+    List<Place> savedPlaces = placeRepository.saveAll(places);
+    for (int i = 0; i < places.size(); i++){
+      List<PlaceImage> images = new ArrayList<>();
+      for (int j = 0; j < places.get(i).getImages().size(); j++){
+         images.add(
+             PlaceImage.builder()
+                 .place(savedPlaces.get(i))
+                 .image(places.get(i).getImages().get(j).getImage())
+                 .build()
+         );
+       }
+      placeImageRepository.saveAll(images);
+    }
+    List<PlaceDocument> placeDocuments = placeRepository.findAll()
+        .stream()
+        .map(Place::createDocument)
+        .toList();
+    placeSearchRepository.saveAll(placeDocuments);
   }
 
-  private List<Place> parseExcelToSurveys(MultipartFile file) {
+  private List<Place> parseExcelToPlaces(MultipartFile file) {
     List<Place> places = new ArrayList<>();
     try (InputStream inputStream = file.getInputStream();
         Workbook workbook = WorkbookFactory.create(inputStream)) {
@@ -544,7 +567,7 @@ public class CommunityService {
       sheet.removeRow(sheet.getRow(0)); // 헤더 행 제거
 
       for (Row row : sheet) {
-        places.add(buildSurveyFromRow(row));
+        places.add(buildPlaceFromRow(row));
       }
     } catch (Exception e) {
       if (e instanceof RingoException re) throw re;
@@ -554,14 +577,29 @@ public class CommunityService {
     return places;
   }
 
-  private Place buildSurveyFromRow(Row row) {
+  private Place buildPlaceFromRow(Row row) {
+    List<PlaceImage> images = List.of(
+        PlaceImage.builder()
+            .image(row.getCell(10).getStringCellValue().strip())
+            .build(),
+        PlaceImage.builder()
+            .image(row.getCell(11).getStringCellValue().strip())
+            .build(),
+        PlaceImage.builder()
+            .image(row.getCell(12).getStringCellValue().strip())
+            .build(),
+        PlaceImage.builder()
+            .image(row.getCell(13).getStringCellValue().strip())
+            .build()
+    );
     return Place.builder()
-        .name(row.getCell(0).getStringCellValue().strip())
-        .category(categoryMap.get(row.getCell(1).getStringCellValue().strip()))
-        .phoneNumber(row.getCell(3).getStringCellValue().strip())
-        .detailAddress(row.getCell(4).getStringCellValue().strip())
-        .description(row.getCell(5).getStringCellValue().strip())
-        .keyword(modifyKeyword(row.getCell(7).getStringCellValue().strip()))
+        .name(row.getCell(1).getStringCellValue().strip())
+        .category(categoryMap.get(row.getCell(3).getStringCellValue().strip()))
+        .phoneNumber(row.getCell(4).getStringCellValue().strip())
+        .detailAddress(row.getCell(2).getStringCellValue().strip())
+        .description(null)
+        .keyword(modifyKeyword(row.getCell(9).getStringCellValue().strip()))
+        .images(images)
         .city("성남시")
         .district("분당구")
         .neighbor("판교동")
@@ -569,13 +607,14 @@ public class CommunityService {
   }
 
   private String modifyKeyword(String value){
-    return String.join(",", value.split("\n"));
+    return String.join(",", value.split(", "));
   }
 
   private static final Map<String, PostCategory> categoryMap = Map.of(
       "카페", PostCategory.CAFE,
       "맛집/술집", PostCategory.RESTAURANT,
-      "놀거리", PostCategory.LEISURE
+      "놀거리", PostCategory.LEISURE,
+      "공연/전시", PostCategory.CONTENT
   );
 
   @Transactional
@@ -603,6 +642,18 @@ public class CommunityService {
     return userScrapPlaces.stream()
         .map(p -> p.createPlaceDetailDto(true))
         .toList();
+  }
 
+  public List<SearchPlaceRequestDto> searchPlaceByKeyword(String keyword){
+    return placeSearchRepository.searchByKeyword(keyword.replaceAll("\\s+", "").strip())
+        .stream()
+        .map(p -> new SearchPlaceRequestDto(p.getName(), p.getId()))
+        .toList();
+  }
+
+  public GetPlaceDetailResponseDto getDetailPlaceInfo(User user, Long placeId){
+    Place place = findPlaceOrThrow(placeId);
+    boolean isScrap = userScrapPlaceRepository.existsByUserAndPlace(user, place);
+    return place.createPlaceDetailDto(isScrap);
   }
 }

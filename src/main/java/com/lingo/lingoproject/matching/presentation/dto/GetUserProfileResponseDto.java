@@ -41,7 +41,7 @@ public class GetUserProfileResponseDto {
   @Schema(description = "이미지 url")
   private String profileUrl;
 
-  @Schema(description = "연결 적합도", example = "75")
+  @Schema(description = "연결 적합도", example = "0.75")
   private Float matchingScore;
 
   @Schema(description = "매칭 id", example = "199")

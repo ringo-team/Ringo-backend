@@ -24,6 +24,7 @@ public record GetSurveyResponseDto(
         .category(survey.getCategory().toString())
         .content(survey.getContent())
         .purpose(survey.getPurpose())
+        .content(survey.getContent())
         .build();
   }
 }

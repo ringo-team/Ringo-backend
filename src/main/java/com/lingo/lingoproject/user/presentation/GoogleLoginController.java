@@ -31,7 +31,6 @@ public class GoogleLoginController {
 
     User user = googleLoginService.saveUserLoginInfo(code);
 
-
     String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);
 

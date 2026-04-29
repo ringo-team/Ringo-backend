@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.shared.domain.model;
 
 import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
+import com.lingo.lingoproject.shared.domain.elastic.PlaceDocument;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -16,6 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -26,12 +28,13 @@ import lombok.extern.slf4j.Slf4j;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Setter
+@Setter @Getter
 public class Place {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
+  @Column(length = 100)
   private String name;
 
   // 카페, 놀거리, 맛집/술집
@@ -82,6 +85,17 @@ public class Place {
         .neighbor(this.neighbor)
         .type(this.type)
         .isScrap(isScrap)
+        .build();
+  }
+
+  public static PlaceDocument createDocument(Place place){
+    String firstImage = place.images != null
+        ? place.images.getFirst().getImage()
+        : null;
+    return PlaceDocument.builder()
+        .id(place.id)
+        .name(place.name)
+        .image(firstImage)
         .build();
   }
 

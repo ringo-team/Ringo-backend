@@ -4,6 +4,7 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
+import java.util.Map;
 import lombok.Builder;
 
 @Builder
@@ -52,11 +53,21 @@ public record GetUserInfoResponseDto(
     @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
     List<String> hashtags,
 
+    @Schema(description = "휴면계정 여부", example = "true")
+    boolean isDormant,
+
+    Map<String, Boolean> notificationSettingMap,
+
     @Schema(description = "결과코드", example = "0000")
     String result
 ) {
 
-  public static GetUserInfoResponseDto from(User user, List<String> hashtags) {
+  public static GetUserInfoResponseDto from(
+      User user,
+      List<String> hashtags,
+      boolean isDormant,
+      Map<String, Boolean> notificationSettingMap
+  ) {
     return GetUserInfoResponseDto.builder()
         .userId(user.getId())
         .nickname(user.getNickname())
@@ -72,6 +83,8 @@ public record GetUserInfoResponseDto(
         .religion(user.getReligion().toString())
         .biography(user.getBiography())
         .hashtags(hashtags)
+        .isDormant(isDormant)
+        .notificationSettingMap(notificationSettingMap)
         .result(ErrorCode.SUCCESS.getCode())
         .build();
   }

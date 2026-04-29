@@ -77,7 +77,7 @@ public class SurveyController implements SurveyApi{
     }
 
     log.info("step=일일_설문_조회_시작, userId={}", userId);
-    List<GetSurveyResponseDto> dailySurveys = surveyService.fetchDailySurveys(user);
+    List<GetSurveyResponseDto> dailySurveys = surveyService.getDailySurveys(user);
     log.info("step=일일_설문_조회_완료, userId={}", userId);
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dailySurveys));
@@ -93,5 +93,11 @@ public class SurveyController implements SurveyApi{
     log.info("step=유저_설문_응답_조회_완료, userId={}", user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), userSurveyResponses));
+  }
+
+  @Override
+  public ResponseEntity<ApiListResponseDto<GetSurveyResponseDto>> resetAndGetInitialSurveys(User user) {
+    List<GetSurveyResponseDto> list = surveyService.resetAndGetInitialSurveys(user);
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), list));
   }
 }

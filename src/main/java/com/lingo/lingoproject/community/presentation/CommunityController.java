@@ -11,6 +11,7 @@ import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.ScrapPlaceRequestDto;
+import com.lingo.lingoproject.community.presentation.dto.SearchPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
@@ -19,6 +20,7 @@ import com.lingo.lingoproject.matching.application.MatchService;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
+import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -177,6 +179,12 @@ public class CommunityController implements CommunityApi {
   }
 
   @Override
+  public ResponseEntity<GetPlaceDetailResponseDto> getDetailPlaceInfo(User user, Long placeId) {
+    GetPlaceDetailResponseDto response = communityService.getDetailPlaceInfo(user, placeId);
+    return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
   public ResponseEntity<ResultMessageResponseDto> updatePlaceClickCount(Long placeId) {
     communityService.updatePlaceClickCount(placeId);
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 업데이트 하였습니다."));
@@ -192,5 +200,15 @@ public class CommunityController implements CommunityApi {
   public ResponseEntity<List<GetPlaceDetailResponseDto>> getScrappedPlace(User user) {
     List<GetPlaceDetailResponseDto> scrappedPlaces = communityService.getScrappedPlace(user);
     return ResponseEntity.status(HttpStatus.OK).body(scrappedPlaces);
+  }
+
+  @Override
+  public ResponseEntity<ApiListResponseDto<SearchPlaceRequestDto>> searchPlacesByKeywords(String keyword) {
+    List<SearchPlaceRequestDto> response = communityService.searchPlaceByKeyword(keyword);
+    return ResponseEntity.status(HttpStatus.OK).body(
+        new ApiListResponseDto<>(
+            ErrorCode.SUCCESS.getCode(),
+            response
+        ));
   }
 }

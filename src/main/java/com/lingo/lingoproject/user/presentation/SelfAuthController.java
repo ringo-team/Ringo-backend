@@ -26,7 +26,7 @@ public class SelfAuthController {
   ) throws Exception{
 
     log.info("step=본인인증_복호화_시작");
-    String decryptedData = selfAuthService.validateIntegrityAndDecryptData(tokenVersionId, encryptedData, integrityValue);
+    String decryptedData = selfAuthService.verifyIntegrityAndDecryptData(tokenVersionId, encryptedData, integrityValue);
     log.info("step=본인인증_복호화_완료");
 
     log.info("step=본인인증_정보_역직렬화_시작");

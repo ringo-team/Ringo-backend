@@ -1,9 +1,11 @@
 package com.lingo.lingoproject.matching.domain.service;
 
 import com.lingo.lingoproject.matching.presentation.dto.SurveyScoreResultInterface;
+import com.lingo.lingoproject.shared.domain.model.SurveyCategory;
 import com.lingo.lingoproject.shared.infrastructure.persistence.AnsweredSurveyRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
  * 두 유저 간 설문 점수를 계산하는 Domain Service.
  * IO(DB 조회)를 포함하지만 순수 점수 계산 로직을 캡슐화한다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SurveyScoreCalculator {
@@ -33,7 +36,10 @@ public class SurveyScoreCalculator {
     List<SurveyScoreResultInterface> list = answeredSurveyRepository.calcSurveyScore(user1Id, user2Id);
     float score = 0;
     for (SurveyScoreResultInterface result : list) {
-      switch (result.getCategory()) {
+      log.info("[MATCHING] {}, {}" , result.getAvgAnswer(), result.getCategory());
+      SurveyCategory category = result.getCategory();
+      if (category == null) continue;
+      switch (category.toString()) {
         case "SPACE"               -> score += result.getAvgAnswer() * SURVEY_SPACE_WEIGHT;
         case "SELF_REPRESENTATION" -> score += result.getAvgAnswer() * SURVEY_SELF_REPRESENTATION_WEIGHT;
         case "SHARING"             -> score += result.getAvgAnswer() * SURVEY_SHARING_WEIGHT;

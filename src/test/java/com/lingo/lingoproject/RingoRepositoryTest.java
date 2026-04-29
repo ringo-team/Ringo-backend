@@ -2,12 +2,16 @@ package com.lingo.lingoproject;
 
 
 import com.lingo.lingoproject.shared.domain.model.FailedFcmMessageLog;
+import com.lingo.lingoproject.shared.domain.model.Place;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
+import com.lingo.lingoproject.shared.infrastructure.elastic.PlaceSearchRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
 import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageService;
 import com.lingo.lingoproject.matching.application.MatchService;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueMessagePayLoad;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueService;
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,10 +32,9 @@ public class RingoRepositoryTest {
   @Autowired
   RedisQueueService redisQueueService;
 
+
   @Test
   public void getSuspendedUserTest(){
-    //List<Long> banIds = matchService.getExcludedUserIdsForRecommendation(5L);
-    //System.out.println("-----밴당한 유저 아이디 : " + banIds);
   }
 
   @Test

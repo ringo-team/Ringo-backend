@@ -7,15 +7,19 @@ import com.lingo.lingoproject.shared.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.shared.security.dto.RegenerateTokenResponseDto;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import com.lingo.lingoproject.user.application.AuthTokenUseCase;
+import com.lingo.lingoproject.user.application.BlockedFriendUseCase;
 import com.lingo.lingoproject.user.application.DormantAccountUseCase;
 import com.lingo.lingoproject.user.application.MembershipUseCase;
 import com.lingo.lingoproject.user.application.SignupUseCase;
 import com.lingo.lingoproject.user.application.UserDeleteUseCase;
+import com.lingo.lingoproject.user.application.UserPointUseCase;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import com.lingo.lingoproject.user.application.UserUpdateUseCase;
+import com.lingo.lingoproject.user.presentation.dto.BlockFriendRequestDto;
 import com.lingo.lingoproject.user.presentation.dto.GetFriendInvitationCodeResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.GetUserInfoResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.GetUserLoginIdResponseDto;
+import com.lingo.lingoproject.user.presentation.dto.GetUserPointResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.LoginInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.ResetPasswordRequestDto;
 import com.lingo.lingoproject.user.presentation.dto.SaveMembershipRequestDto;
@@ -46,6 +50,8 @@ public class UserController implements UserApi {
   private final UserDeleteUseCase userDeleteUseCase;
   private final DormantAccountUseCase dormantAccountUseCase;
   private final MembershipUseCase membershipUseCase;
+  private final BlockedFriendUseCase blockedFriendUseCase;
+  private final UserPointUseCase userPointUseCase;
 
   public ResponseEntity<LoginResponseDto> login(
       LoginInfoDto loginInfoDto,
@@ -137,10 +143,8 @@ public class UserController implements UserApi {
   }
 
   @Override
-  public ResponseEntity<GetUserLoginIdResponseDto> findUserLoginId(User user) {
-    log.info("userId={}, step=유저_ID찾기_시작, status=SUCCESS", user.getId());
-    String loginId = userQueryUseCase.findUserLoginId(user);
-    log.info("userId={}, step=유저_ID찾기_완료, status=SUCCESS", user.getId());
+  public ResponseEntity<GetUserLoginIdResponseDto> findUserLoginId() {
+    String loginId = userQueryUseCase.findUserLoginId();
 
     return ResponseEntity.status(HttpStatus.OK).body(new GetUserLoginIdResponseDto(loginId));
   }
@@ -209,6 +213,19 @@ public class UserController implements UserApi {
 
     return ResponseEntity.status(HttpStatus.OK)
         .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "유저 접속 정보가 저장되었습니다."));
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> saveBlockedFriend(User user, BlockFriendRequestDto dto) {
+    blockedFriendUseCase.blockFriend(user, dto.phoneNumbers());
+    return ResponseEntity.status(HttpStatus.OK)
+        .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "친구 차단이 성공적으로 이루어졌습니다."));
+  }
+
+  @Override
+  public ResponseEntity<GetUserPointResponseDto> getUserPoints(User user) {
+    GetUserPointResponseDto response = userPointUseCase.getUserPoints(user);
+    return ResponseEntity.status(HttpStatus.OK).body(response);
   }
 
   @Override

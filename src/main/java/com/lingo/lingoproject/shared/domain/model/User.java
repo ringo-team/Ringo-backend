@@ -306,7 +306,7 @@ public class User extends Timestamp implements UserDetails {
 
     try {
       this.mobileCarrier = dto.getMobileCarrier();
-      this.phoneNumber = dto.getPhoneNumber();
+      this.phoneNumber = dto.getPhoneNumber().replaceAll("[^0-9]", "");
       this.name = dto.getName();
       this.nationalInfo = Nation.valueOf(dto.getNationalInfo());
       this.birthday = (LocalDate) DateTimeFormatter.ofPattern("yyyyMMdd").parse(dto.getBirthday());

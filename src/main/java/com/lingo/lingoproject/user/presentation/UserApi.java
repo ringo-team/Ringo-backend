@@ -1,6 +1,8 @@
 package com.lingo.lingoproject.user.presentation;
 
 import com.lingo.lingoproject.shared.domain.model.User;
+import com.lingo.lingoproject.user.presentation.dto.BlockFriendRequestDto;
+import com.lingo.lingoproject.user.presentation.dto.GetUserPointResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.LoginInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupResponseDto;
@@ -147,7 +149,7 @@ public interface UserApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @GetMapping("/users/find-id")
-  ResponseEntity<GetUserLoginIdResponseDto> findUserLoginId(@AuthenticationPrincipal User user);
+  ResponseEntity<GetUserLoginIdResponseDto> findUserLoginId();
 
   @Operation(summary = "유저 password 재설정", description = "본인인증 성공한 유저 password 재설정")
   @ApiResponses(value = {
@@ -210,6 +212,13 @@ public interface UserApi {
   })
   @PostMapping("/users/access")
   ResponseEntity<ResultMessageResponseDto> saveUserAccessLog(@AuthenticationPrincipal User user);
+
+  @PostMapping("/users/block")
+  ResponseEntity<ResultMessageResponseDto> saveBlockedFriend(@AuthenticationPrincipal User user, @RequestBody BlockFriendRequestDto dto);
+
+  @GetMapping("/users/point")
+  ResponseEntity<GetUserPointResponseDto> getUserPoints(@AuthenticationPrincipal User user);
+
 
   @Operation(summary = "멤버십을 구독합니다.")
   @ApiResponses(value = {

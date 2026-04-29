@@ -1,9 +1,11 @@
 package com.lingo.lingoproject.user.presentation.dto;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record UpdateUserInfoRequestDto(
 
     @Schema(description = "활동지")

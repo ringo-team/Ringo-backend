@@ -14,4 +14,5 @@ public interface UserPointRepository extends JpaRepository<UserPoint, Long> {
   @Query("update UserPoint p set p.point = p.point + :point where p.user = :user")
   void updateUserPoint(int point, User user);
 
+  UserPoint findByUser(User user);
 }

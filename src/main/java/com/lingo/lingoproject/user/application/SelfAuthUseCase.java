@@ -6,6 +6,8 @@ import com.lingo.lingoproject.user.presentation.dto.auth.CryptoTokenInfo;
 import com.lingo.lingoproject.user.presentation.dto.auth.DecryptKeyObject;
 import com.lingo.lingoproject.user.presentation.dto.auth.GetAccessTokenResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.auth.GetCryptoTokenRequestDto;
+import com.lingo.lingoproject.user.presentation.dto.auth.GetCryptoTokenRequestDto.DataBody;
+import com.lingo.lingoproject.user.presentation.dto.auth.GetCryptoTokenRequestDto.DataHeader;
 import com.lingo.lingoproject.user.presentation.dto.auth.GetCryptoTokenResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.auth.PlainRequestData;
 import com.lingo.lingoproject.user.presentation.dto.auth.AuthWindowRequestDto;
@@ -33,6 +35,8 @@ import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -113,46 +117,66 @@ public class SelfAuthUseCase {
     return response.getDataBody().accessToken();
   }
 
+  private GetCryptoTokenRequestDto buildCryptoTokenRequestDto(BaseTokenInfo info){
+
+    return GetCryptoTokenRequestDto.builder()
+        .dataHeader(DataHeader.builder().lang("ko").build())
+        .dataBody(DataBody.builder()
+            .requestDateTime(info.getRequestDateTime())
+            .requestNum(info.getRequestNum())
+            .encryptMode("1")
+            .build())
+        .build();
+  }
+
+  private BaseTokenInfo createBaseTokenInfo(String accessToken){
+    long timestamp = System.currentTimeMillis()/1000;
+
+    String auth = "bearer " + Base64.getEncoder().encodeToString((accessToken +":" + timestamp + ":" + clientId).getBytes());
+    String requestDateTime = new SimpleDateFormat("yyyyMMddHHmmss").format(timestamp);
+    String requestNum = UUID.randomUUID().toString();
+
+    return new BaseTokenInfo(auth, requestDateTime, requestNum);
+  }
+
+  @Getter
+  @AllArgsConstructor
+  public static class BaseTokenInfo{
+    private String auth;
+    private String requestDateTime;
+    private String requestNum;
+  }
+
   /**
    * access token으로 메세지를 암호화 및 복호화하는데 필요한 토큰을 얻는다.
    */
   public CryptoTokenInfo getCryptoTokenInfo(String accessToken) throws NoSuchAlgorithmException {
 
+    BaseTokenInfo baseTokenInfo = createBaseTokenInfo(accessToken);
+
+    GetCryptoTokenRequestDto request = buildCryptoTokenRequestDto(baseTokenInfo);
+
+    GetCryptoTokenResponseDto response = requestCryptoToken(request, baseTokenInfo.auth);
+    validateResponse(response);
+
+    String siteCode = response.getDataBody().siteCode();
+    String tokenVersionId = response.getDataBody().tokenVersionId();
+    String tokenValue = response.getDataBody().tokenVal();
+
+    String token = baseTokenInfo.getRequestDateTime().trim() + baseTokenInfo.getRequestNum().trim() + tokenValue.trim();
+    String hashedToken = hashCryptoToken(token);
+
+    return CryptoTokenInfo.of(siteCode, tokenVersionId, hashedToken);
+  }
+
+  private GetCryptoTokenResponseDto requestCryptoToken(GetCryptoTokenRequestDto request, String auth){
+
     String uriPath = "digital/niceid/api/v1.0/common/crypto/token";
 
-    long timestamp = System.currentTimeMillis()/1000;
-    String auth = "bearer " + Base64.getEncoder().encodeToString((accessToken +":" + timestamp + ":" + clientId).getBytes());
-
-    String cryptoTokenInfoCreateRequestTransactionId = UUID.randomUUID().toString();
-
-    SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
-    String cryptoTokenInfoCreateRequestDateTime = sdf.format(timestamp);
-
-    /*
-     *  Authorization : bearer + Base64(accessToken:timestamp:clientId)
-     *  ProductId
-     *  {
-     *    dataHeader: {
-     *         CNTY_CD : ko
-     *    },
-     *    dataBody: {
-     *         req_dtim : dateTime (yyyyMMddHHmmss),
-     *         req_no : trId,
-     *         enc_mode : 1
-     *    }
-     *  }
-     */
-    GetCryptoTokenRequestDto request = GetCryptoTokenRequestDto.of(
-        "ko", cryptoTokenInfoCreateRequestDateTime, cryptoTokenInfoCreateRequestTransactionId, "1");
-
-    /*
-     *  암호화 토큰 요청
-     */
-    GetCryptoTokenResponseDto response;
     WebClient webClient = WebClient.create();
     try{
       log.info("step=암호화_토큰_요청_시작, uri={}", uriPath);
-      response = webClient
+      return webClient
           .post()
           .uri(selfAuthApiUrl + uriPath)
           .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -168,32 +192,25 @@ public class SelfAuthUseCase {
       log.error("step=암호화_토큰_요청_실패, uri={}", uriPath, e);
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  private String hashCryptoToken(String token) throws NoSuchAlgorithmException{
+    MessageDigest hashFunction = MessageDigest.getInstance("SHA-256");
+    hashFunction.update(token.getBytes());
+    byte[] cryptoTokenByHashing = hashFunction.digest();
+    return Base64.getEncoder().encodeToString(cryptoTokenByHashing);
+  }
+
+  private void validateResponse(GetCryptoTokenResponseDto response){
     if(response == null
         || !response.getDataHeader().resultCd().equals("1200")
         || !response.getDataBody().responseCD().equals("P000")
         || response.getDataBody().responseMsg().startsWith("EAPI")
         || !response.getDataBody().resultCd().equals("0000")
     ){
-      if (response != null) log.error("step=암호화_토큰_응답_오류, uri={}, resultCd={}", uriPath, response.getDataHeader().resultCd());
+      if (response != null) log.error("step=암호화_토큰_응답_오류, resultCd={}", response.getDataHeader().resultCd());
       throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    /*
-     *  응답으로부터 토큰을 생성
-     */
-    String siteCode = response.getDataBody().siteCode();
-    String responseCryptoTokenVersionId = response.getDataBody().tokenVersionId();
-    String responseCryptoTokenValue = response.getDataBody().tokenVal();
-
-
-    String token = cryptoTokenInfoCreateRequestDateTime.trim() +
-        cryptoTokenInfoCreateRequestTransactionId.trim() +
-        responseCryptoTokenValue.trim();
-    MessageDigest hashFunction = MessageDigest.getInstance("SHA-256");
-    hashFunction.update(token.getBytes());
-    byte[] cryptoTokenByHashing = hashFunction.digest();
-    String base64EncodedCryptoToken = Base64.getEncoder().encodeToString(cryptoTokenByHashing);
-
-    return CryptoTokenInfo.of(siteCode, responseCryptoTokenVersionId, base64EncodedCryptoToken);
   }
 
 
@@ -203,26 +220,22 @@ public class SelfAuthUseCase {
    *  - enc_data = encrypt( sitecode, requestno, returnurl, authtype, methodtype )
    *  - integrity_value
    */
-  public AuthWindowRequestDto getAuthWindowRequestData (Long userId)
+  public AuthWindowRequestDto getAuthWindowRequestData (String userIdentity)
       throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, JsonProcessingException, IllegalBlockSizeException, BadPaddingException {
 
     CryptoTokenInfo tokenInfo = getCryptoTokenInfo(getAccessToken());
     String token = tokenInfo.getToken();
 
-    /*
-     *  요청데이터(plainRequestData)를 암호화 및 복호화하기 위한 키 생성
-     *  이전에 생성했던 암호화 토큰으로 키를 생성한다.
-     */
     String encryptionKey = token.substring(0, 16);
-    String initialValueForEncryption = token.substring(token.length() - 16);
-    String hmacKeyForIntegrityCheck  = token.substring(0, 32);
+    String initialValue = token.substring(token.length() - 16);
+    String integrityKey  = token.substring(0, 32);
 
     /*
      * 나중에 복호화할 때 쓰기 위해
      * redis에 key 정보를 보관해놓는다.
      * 대칭키 암호화 방식을 사용하기 때문에 암호화 키가 복호화할 때 사용된다.
      */
-    DecryptKeyObject object = DecryptKeyObject.of(encryptionKey, initialValueForEncryption, hmacKeyForIntegrityCheck);
+    DecryptKeyObject object = DecryptKeyObject.of(encryptionKey, initialValue, integrityKey);
     redisTemplate.opsForValue().set(tokenInfo.getTokenVersionId(), object, 30, TimeUnit.MINUTES);
 
     /*
@@ -233,94 +246,149 @@ public class SelfAuthUseCase {
      *  - authtype : 인증수단인데 핸드폰(M)으로 고정
      *  - methodtype : GET 고정
      */
-    PlainRequestData plainRequestData = null;
-    if(tokenInfo.getSiteCode() != null) {
-      plainRequestData = PlainRequestData.of(userId.toString(), returnUrl, tokenInfo.getSiteCode(), "M", "GET");
-    }
-    String dataStringValue = objectMapper.writeValueAsString(plainRequestData);
 
-    /*
-     * plainRequestData를 암호화하는 로직이다.
-     * plainRequestData -> base64EncodedAndEncryptedRequestData
-     */
-    SecretKeySpec secretKeyForEncryption = new SecretKeySpec(encryptionKey.getBytes(StandardCharsets.UTF_8), "AES");
-    Cipher encryptFunction = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    encryptFunction.init(Cipher.ENCRYPT_MODE, secretKeyForEncryption, new IvParameterSpec(initialValueForEncryption.getBytes(StandardCharsets.UTF_8)));
-    byte[] encryptedRequestByte = encryptFunction.doFinal(dataStringValue.trim().getBytes(StandardCharsets.UTF_8));
-    String base64EncodedAndEncryptedRequestData = Base64.getEncoder().encodeToString(encryptedRequestByte);
+    String plainData = getPlainDataStringValue(tokenInfo, userIdentity);
 
-    /*
-     * 암호화 후 무결성을 확인하기 위해 integrityValue를 추가적으로 생성하여 전달한다.
-     */
-    Mac hashFunction = Mac.getInstance("HmacSHA256");
-    SecretKeySpec secretKeyForHashing = new SecretKeySpec(hmacKeyForIntegrityCheck.getBytes(), "HmacSHA256");
-    hashFunction.init(secretKeyForHashing);
-    byte[] integrityByte = hashFunction.doFinal(encryptedRequestByte);
-    String integrityValue = Base64.getEncoder().encodeToString(integrityByte);
+    String encryptedData = encryptDataAndBase64Encoding(plainData, encryptionKey, initialValue);
+    String integrityValue = buildIntegrityValue(encryptedData, integrityKey);
 
-    return AuthWindowRequestDto.of("m", tokenInfo.getTokenVersionId(), base64EncodedAndEncryptedRequestData, integrityValue);
+    return AuthWindowRequestDto.of("m", tokenInfo.getTokenVersionId(), encryptedData, integrityValue);
   }
 
+  private String encryptDataAndBase64Encoding(String plainData, String encryptionKey, String initalValue)
+   throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    SecretKeySpec secretKeyForEncryption = new SecretKeySpec(encryptionKey.getBytes(StandardCharsets.UTF_8), "AES");
+    Cipher encryptFunction = Cipher.getInstance("AES/CBC/PKCS5Padding");
+    encryptFunction.init(Cipher.ENCRYPT_MODE, secretKeyForEncryption, new IvParameterSpec(initalValue.getBytes(StandardCharsets.UTF_8)));
+    byte[] encryptedRequestByte = encryptFunction.doFinal(plainData.trim().getBytes(StandardCharsets.UTF_8));
+    return Base64.getEncoder().encodeToString(encryptedRequestByte);
+  }
+
+  private String buildIntegrityValue(String encryptedData, String integrityKey)
+  throws NoSuchAlgorithmException, InvalidKeyException {
+    Mac hashFunction = Mac.getInstance("HmacSHA256");
+    SecretKeySpec secretKeyForHashing = new SecretKeySpec(integrityKey.getBytes(), "HmacSHA256");
+    hashFunction.init(secretKeyForHashing);
+    byte[] integrityByte = hashFunction.doFinal(encryptedData.getBytes());
+    return Base64.getEncoder().encodeToString(integrityByte);
+  }
+
+  private String getPlainDataStringValue(CryptoTokenInfo tokenInfo, String userIdentity)
+      throws JsonProcessingException {
+    PlainRequestData plainRequestData = null;
+    if(tokenInfo.getSiteCode() != null) {
+      plainRequestData = PlainRequestData.of(
+          userIdentity != null ? userIdentity : "FIND-ID",
+          returnUrl,
+          tokenInfo.getSiteCode(),
+          "M",
+          "GET"
+      );
+      return objectMapper.writeValueAsString(plainRequestData);
+    }
+    throw new RingoException("토큰에 site_code가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+  }
   /**
    * 데이터의 무결성을 확인하고 데이터를 복호화한다.
    */
-  public String validateIntegrityAndDecryptData(String tokenVersionId, String encryptedData, String originalIntegrityValue)
+  public String verifyIntegrityAndDecryptData(String tokenVersionId, String encryptedData, String originalIntegrityValue)
       throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException {
 
     DecryptKeyObject object = redisUtils.getDecryptKeyObject(tokenVersionId);
+
     String decryptionKey = object.getDecryptionKey();
     String initialValueForDecryption = object.getInitialValueForDecryption();
     String hmacKeyForIntegrityCheck = object.getHmacKeyForIntegrityCheck();
 
-    /* encryptedData로부터 integrityValue를 생성 */
-    Mac hashFunction = Mac.getInstance("HmacSHA256");
-    SecretKeySpec secretKeyForHashing = new SecretKeySpec(hmacKeyForIntegrityCheck.getBytes(), "HmacSHA256");
-    hashFunction.init(secretKeyForHashing);
-    byte[] integrityByte = hashFunction.doFinal(encryptedData.getBytes());
-    String integrityValue = Base64.getEncoder().encodeToString(integrityByte);
-
     /* pass 서버로부터 받은 originalIntegrityValue와 방금 생성한 integrityValue가 동일한지 확인 */
-    if(!integrityValue.equals(originalIntegrityValue)){
+    if(!verifyIntegrity(encryptedData, hmacKeyForIntegrityCheck, originalIntegrityValue)){
       log.error("step=본인인증_무결성_검증_실패");
       throw new RingoException("잘못된 암호문이 도달했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     /* 데이터를 복호화하여 리턴함 */
-    SecretKeySpec secretKeyForDecryption = new SecretKeySpec(decryptionKey.getBytes(), "AES");
-    Cipher decryptFunction = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    decryptFunction.init(Cipher.DECRYPT_MODE, secretKeyForDecryption, new IvParameterSpec(initialValueForDecryption.getBytes()));
-    String decryptedData = new String(decryptFunction.doFinal(Base64.getDecoder().decode(encryptedData)), "EUC-KR");
-    return decryptedData;
+    return decryptData(encryptedData, decryptionKey, initialValueForDecryption);
   }
 
-  public void deserializeAndSaveUserInfo(String data){
-    UserSelfAuthInfo userSelfAuthInfo = null;
+  private boolean verifyIntegrity(String encryptedData, String hmacKey, String originalIntegrityValue) throws NoSuchAlgorithmException, InvalidKeyException{
+    Mac hashFunction = Mac.getInstance("HmacSHA256");
+    SecretKeySpec secretKeyForHashing = new SecretKeySpec(hmacKey.getBytes(), "HmacSHA256");
+    hashFunction.init(secretKeyForHashing);
+    byte[] integrityByte = hashFunction.doFinal(encryptedData.getBytes());
+    String integrityValue = Base64.getEncoder().encodeToString(integrityByte);
+
+    /* pass 서버로부터 받은 originalIntegrityValue와 방금 생성한 integrityValue가 동일한지 확인 */
+    return integrityValue.equals(originalIntegrityValue);
+  }
+
+  private String decryptData(String encryptedData, String key, String initialValue)
+      throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException{
+    SecretKeySpec secretKeyForDecryption = new SecretKeySpec(key.getBytes(), "AES");
+    Cipher decryptFunction = Cipher.getInstance("AES/CBC/PKCS5Padding");
+    decryptFunction.init(Cipher.DECRYPT_MODE, secretKeyForDecryption, new IvParameterSpec(initialValue.getBytes()));
+    return new String(decryptFunction.doFinal(Base64.getDecoder().decode(encryptedData)), "EUC-KR");
+  }
+
+  private UserSelfAuthInfo deserializeUserData(String data){
     try {
-      userSelfAuthInfo = objectMapper.readValue(data, UserSelfAuthInfo.class);
+      return objectMapper.readValue(data, UserSelfAuthInfo.class);
     } catch (Exception e) {
       log.error("step=본인인증_정보_역직렬화_실패", e);
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(
+          e.getMessage(),
+          ErrorCode.INTERNAL_SERVER_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
+  }
+
+  public void deserializeAndSaveUserInfo(String data) {
+    UserSelfAuthInfo userSelfAuthInfo = deserializeUserData(data);
 
     /* 유저를 찾아서 유저 정보를 저장함*/
-    User user = userRepository.findById(Long.parseLong(userSelfAuthInfo.getUserId()))
-        .orElseThrow(() -> new RingoException("유저 인증 정보 저장 중 유저를 찾을 수 없습니다.",
-            ErrorCode.NOT_FOUND_USER, HttpStatus.NOT_FOUND));
+    User user = findUserByIdOrThrow(Long.parseLong(userSelfAuthInfo.getUserIdentity()));
 
-    if (userSelfAuthInfo.getGender().equals("1")) {
-      userSelfAuthInfo.setGender("MALE");
-    }else{
-      userSelfAuthInfo.setGender("FEMALE");
+    switch (userSelfAuthInfo.getGender()) {
+      case "0" -> userSelfAuthInfo.setGender("FEMALE");
+      case "1" -> userSelfAuthInfo.setGender("MALE");
+      default -> throw new RingoException("잘못된 pass 응답", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    if (userSelfAuthInfo.getNationalInfo().equals("0")){
-      userSelfAuthInfo.setNationalInfo("DOMESTIC");
-    }else{
-      userSelfAuthInfo.setNationalInfo("FOREIGN");
-    }
+    switch (userSelfAuthInfo.getNationalInfo()) {
+      case "0" ->  userSelfAuthInfo.setNationalInfo("DOMESTIC");
+      case "1" ->  userSelfAuthInfo.setNationalInfo("FOREIGN");
+      default -> throw new RingoException("잘못된 pass 응답", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+  }
 
     user.setUserSelfAuthInfo(userSelfAuthInfo);
     userRepository.save(user);
+  }
 
-    redisTemplate.opsForValue().set("self-auth::" + user.getId(),true, 30, TimeUnit.MINUTES);
+  private User findUserByIdOrThrow(Long userId){
+    return userRepository.findById(userId).orElseThrow(() ->
+            new RingoException(
+            "유저 인증 정보 저장 중 유저를 찾을 수 없습니다.",
+            ErrorCode.NOT_FOUND_USER,
+            HttpStatus.NOT_FOUND)
+        );
+  }
+
+  private User findUserByPhoneNumberOrThrow(String phoneNumber){
+    phoneNumber = phoneNumber.replaceAll("[^0-9]", "");
+    return userRepository.findByPhoneNumber(phoneNumber).orElseThrow(() ->
+        new RingoException(
+            "해당 번호로 가입된 적이 없습니다.",
+            ErrorCode.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
+        ));
+  }
+
+  private User findUserByLoginIdAndPhoneNumberOrThrow(String loginId, String phoneNumber){
+    phoneNumber = phoneNumber.replaceAll("[^0-9]", "");
+    return userRepository.findByLoginIdAndPhoneNumber(loginId, phoneNumber).orElseThrow(() ->
+        new RingoException(
+            "해당 아이디의 비밀번호를 찾을 수 없습니다.",
+            ErrorCode.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
+        ));
   }
 }

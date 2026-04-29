@@ -11,7 +11,7 @@ import lombok.Setter;
 public class UserSelfAuthInfo {
 
   @JsonProperty("requestno")
-  private String userId;
+  private String userIdentity;
 
   @JsonProperty("mobileco")
   private String mobileCarrier;
@@ -28,4 +28,5 @@ public class UserSelfAuthInfo {
   private String birthday;
 
   private String gender;
+
 }

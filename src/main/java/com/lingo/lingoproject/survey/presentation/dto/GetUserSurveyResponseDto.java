@@ -16,11 +16,20 @@ public class GetUserSurveyResponseDto {
   Integer answer;
   @Schema(description = "유저 id", example = "4")
   Long userId;
+  @Schema(description = "설문 내용", example = ",,,,")
+  String content;
 
-  public GetUserSurveyResponseDto(Integer surveyNum, String surveyContent, Integer answer, Long userId) {
+  public GetUserSurveyResponseDto(
+      Integer surveyNum,
+      String surveyContent,
+      Integer answer,
+      Long userId,
+      String content
+  ) {
     this.surveyNum = surveyNum;
     this.surveyContent = surveyContent;
     this.answer = answer;
     this.userId = userId;
+    this.content = content;
   }
 }
