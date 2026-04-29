@@ -47,3 +47,4 @@ docker-compose.yml
 
 ### Kubernetes ###
 k8s/secrets.yml
+**.json

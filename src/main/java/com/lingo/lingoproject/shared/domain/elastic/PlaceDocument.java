@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Mapping;
 import org.springframework.data.elasticsearch.annotations.Setting;
@@ -13,7 +14,7 @@ import org.springframework.data.elasticsearch.annotations.Setting;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Getter
+@Getter @Setter
 @Setting(settingPath = "/elasticsearch/settings.json")
 @Mapping(mappingPath = "/elasticsearch/place-mapping.json")
 public class PlaceDocument {
@@ -22,4 +23,5 @@ public class PlaceDocument {
 
   private String name;
   private String image;
+  private String keyword;
 }

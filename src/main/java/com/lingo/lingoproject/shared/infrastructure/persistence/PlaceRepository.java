@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.shared.infrastructure.persistence;
 
 import com.lingo.lingoproject.shared.domain.model.Place;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -17,4 +18,6 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
   void updatePlaceClickCount(Long clickCount);
 
   List<Place> findAllByTypeNotNull();
+
+  List<Place> findAllByIdIn(Collection<Long> ids);
 }

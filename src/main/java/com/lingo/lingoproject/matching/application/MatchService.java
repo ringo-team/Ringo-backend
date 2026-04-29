@@ -7,10 +7,9 @@ import com.lingo.lingoproject.matching.domain.event.MatchingRequestedEvent;
 import com.lingo.lingoproject.matching.domain.service.SurveyScoreCalculator;
 import com.lingo.lingoproject.matching.domain.service.MatchingValidationService;
 import com.lingo.lingoproject.matching.domain.service.RecommendationDomainService;
+import com.lingo.lingoproject.shared.domain.elastic.PlaceDocument;
 import com.lingo.lingoproject.shared.domain.event.DomainEventPublisher;
 import com.lingo.lingoproject.shared.domain.model.AnsweredSurvey;
-import com.lingo.lingoproject.shared.domain.model.BlockedUser;
-import com.lingo.lingoproject.shared.domain.model.DormantAccount;
 import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Hashtag;
 import com.lingo.lingoproject.shared.domain.model.Keyword;
@@ -26,6 +25,7 @@ import com.lingo.lingoproject.shared.domain.model.UserActivityLog;
 import com.lingo.lingoproject.shared.domain.model.UserMatchingLog;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
+import com.lingo.lingoproject.shared.infrastructure.elastic.PlaceSearchRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.KeywordRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserScrapPlaceRepository;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
@@ -56,7 +56,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -67,6 +66,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -120,6 +120,7 @@ public class MatchService {
   private static final String CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX = "recommend::";
   private static final List<Integer> PLACE_SELECTION_COUNT = List.of(7, 4, 3, 2, 1);
   private static final List<Integer> POSITIVE_ANSWER_LIST = List.of(3, 4, 5);
+  private final PlaceSearchRepository placeSearchRepository;
 
   // ============================================================
   // 매칭 요청 / 응답
@@ -234,7 +235,7 @@ public class MatchService {
 
   /** 보낸 매칭 요청 프로필 목록 */
   public List<GetUserProfileResponseDto> getSentMatchingProfiles(User requestUser) {
-    List<Long> matchingIds = extractMatchingIds(requestUser, matchingRepository::findAllByRequestUser);
+    List<Long> matchingIds = matchingRepository.findMatchingIdsByRequestUserExcludingPreRequested(requestUser);
 
     List<GetUserProfileResponseDto> profiles =
         profileRepository.getRequestedUserProfilesByMatchingIds(matchingIds);
@@ -245,7 +246,7 @@ public class MatchService {
 
   /** 받은 매칭 요청 프로필 목록 */
   public List<GetUserProfileResponseDto> getReceivedMatchingProfiles(User requestedUser) {
-    List<Long> matchingIds = extractMatchingIds(requestedUser, matchingRepository::findAllByRequestedUser);
+    List<Long> matchingIds = matchingRepository.findMatchingIdsByRequestedUserExcludingPreRequested(requestedUser);
 
     List<GetUserProfileResponseDto> profiles =
         profileRepository.getRequestUserProfilesByMatchingIds(matchingIds);
@@ -282,13 +283,6 @@ public class MatchService {
             HttpStatus.BAD_REQUEST));
   }
 
-  private List<Long> extractMatchingIds(User user, Function<User, List<Matching>> function) {
-    return function.apply(user)
-        .stream()
-        .filter(matching -> !matching.getMatchingStatus().equals(MatchingStatus.PRE_REQUESTED))
-        .map(Matching::getId)
-        .toList();
-  }
 
   // ============================================================
   // 추천 이성
@@ -432,19 +426,38 @@ public class MatchService {
     return activeUserIds;
   }
 
-  private List<GetUserProfileResponseDto> getUserProfilesByIds(User user, List<Long> selectedIds) {
-    return userRepository.findAllByIdIn(selectedIds)
-        .stream()
-        .map(recommended -> buildUserProfileDto(user, recommended))
+  private List<GetUserProfileResponseDto> getUserProfilesByIds(User requestUser, List<Long> selectedIds) {
+    List<User> users = userRepository.findAllByIdIn(selectedIds);
+    Map<Long, List<String>> hashtagsMap = batchGetHashtagsByUsers(users);
+    Set<Long> scrappedUserIds = scrappedUserRepository.findAllByUser(requestUser).stream()
+        .map(s -> s.getScrappedUser().getId())
+        .collect(Collectors.toSet());
+
+    return users.stream()
+        .map(recommended -> {
+          Profile profile = recommended.getProfile();
+          float surveyScore = surveyScoreCalculator.calculate(requestUser.getId(), recommended.getId());
+          int isVerify = FaceVerify.PASS == profile.getFaceVerify() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG;
+          List<String> hashtags = hashtagsMap.getOrDefault(recommended.getId(), List.of());
+          boolean isScrap = scrappedUserIds.contains(recommended.getId());
+
+          GetUserProfileResponseDto dto = GetUserProfileResponseDto.of(
+              recommended, surveyScore, hashtags, isVerify, EXPOSE_PROFILE_FLAG, requestUser.getMbti(), isScrap
+          );
+          log.info("step=추천이성_프로필_빌드, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
+              dto.getUserId(), dto.getAge(), dto.getGender(), dto.getNickname(),
+              dto.getMatchingScore(), dto.getHashtags(), dto.getVerify(),
+              dto.getDaysFromLastAccess(), dto.getMbti());
+          return dto;
+        })
         .toList();
   }
 
   private List<Long> selectCandidatesByScore(List<UserScoreEntry> candidates) {
     return candidates.stream()
         .map(entry -> {
-          User user = findUserOrThrow(entry.userId());
-          double finalScore = recommendationDomainService.calculateFinalMatchingScore(user, entry.score());
-          return Map.entry(entry.userId(), finalScore);
+          double finalScore = recommendationDomainService.calculateFinalMatchingScore(entry.user(), entry.score());
+          return Map.entry(entry.user().getId(), finalScore);
         })
         .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
         .map(Map.Entry::getKey)
@@ -456,10 +469,9 @@ public class MatchService {
     return userRepository.findAllByIdIn(activeUserIds)
         .stream()
         .filter(u -> u.getStatus() == SignupStatus.COMPLETED)
-        .map(User::getId)
-        .map(id -> new UserScoreEntry(id, surveyScoreCalculator.calculate(userId, id)))
+        .map(u -> new UserScoreEntry(u, surveyScoreCalculator.calculate(userId, u.getId())))
         .filter(entry -> entry.score() >= SURVEY_SCORE_THRESHOLD)
-        .sorted((entry1, entry2) -> (int) (entry2.score() - entry1.score()))
+        .sorted((entry1, entry2) -> Float.compare(entry2.score(), entry1.score()))
         .limit(MAX_MATCHING_POOL_SIZE)
         .toList();
   }
@@ -533,19 +545,11 @@ public class MatchService {
   }
 
   private List<Long> getUsersIRequested(User user) {
-    return matchingRepository.findAllByRequestUser(user)
-        .stream()
-        .map(Matching::getRequestedUser)
-        .map(User::getId)
-        .toList();
+    return matchingRepository.findRequestedUserIdsByRequestUser(user);
   }
 
   private List<Long> getUserWhoRequestedMe(User user) {
-    return matchingRepository.findAllByRequestedUser(user)
-        .stream()
-        .map(Matching::getRequestUser)
-        .map(User::getId)
-        .toList();
+    return matchingRepository.findRequestUserIdsByRequestedUser(user);
   }
 
   private List<Long> getSuspendedUserIds() {
@@ -557,18 +561,11 @@ public class MatchService {
   }
 
   private List<Long> getBlockedUserIds() {
-    return blockedUserRepository.findAll()
-        .stream()
-        .map(BlockedUser::getBlockedUserId)
-        .toList();
+    return blockedUserRepository.findAllBlockedUserIds();
   }
 
   private List<Long> getDormantUserIds() {
-    return dormantAccountRepository.findAll()
-        .stream()
-        .map(DormantAccount::getUser)
-        .map(User::getId)
-        .toList();
+    return dormantAccountRepository.findAllDormantUserIds();
   }
 
   // ============================================================
@@ -578,10 +575,15 @@ public class MatchService {
   /** 동일 설문 응답 기반 매칭 이유를 최대 5개 반환한다. */
   @Transactional
   public List<String> getMatchReasons(Long user1, Long user2) {
-    return findSortedRelatedAnswerPairs(user1, user2)
-        .stream()
+    List<SortedAnswerPairWithWeight> pairs = findSortedRelatedAnswerPairs(user1, user2);
+    List<Long> surveyIds = pairs.stream().map(SortedAnswerPairWithWeight::getSurveyId).distinct().toList();
+    Map<Long, Survey> surveyMap = surveyRepository.findAllById(surveyIds).stream()
+        .collect(Collectors.toMap(Survey::getId, Function.identity()));
+
+    return pairs.stream()
+        .filter(pair -> surveyMap.containsKey(pair.getSurveyId()))
         .map(pair -> {
-          Survey survey = findSurveyByIdOrThrow(pair.getSurveyId());
+          Survey survey = surveyMap.get(pair.getSurveyId());
           return POSITIVE_ANSWER_LIST.contains(pair.getAnswer())
               ? survey.getMatchedReasonForHigherAnswer()
               : survey.getMatchedReasonForLowerAnswer();
@@ -615,7 +617,7 @@ public class MatchService {
   public List<GetPlaceDetailResponseDto> getRandomlySelectedPlaces(User user) {
     List<Place> places = placeRepository.findAllByTypeNotNull();
     Collections.shuffle(places);
-    return buildPlaceDetailInfo(places.subList(0, 50), user);
+    return buildPlaceDetailInfo(places.subList(0, Math.min(places.size(), 50)), user);
   }
 
   public List<GetPlaceDetailResponseDto> getRankedPagedPlaces(
@@ -623,38 +625,39 @@ public class MatchService {
       int page,
       int size
   ) {
-    List<Place> places = placeRepository.findAll();
-
     // 추후 click count로 정렬
-    List<Place> slicedPlaces = new ArrayList<>();
-    if (page * size < places.size()) {
-      slicedPlaces = places.subList(page * size, Math.min((page + 1) * size, places.size()));
-    }
-    return buildPlaceDetailInfo(slicedPlaces, user);
+    List<Place> places = placeRepository.findAll(PageRequest.of(page, size)).getContent();
+    return buildPlaceDetailInfo(places, user);
   }
 
   /** 두 유저의 공통 설문에서 추천 장소 키워드를 최대 5개 반환한다. */
   public List<String> getMatchedKeywords(Long user1, Long user2) {
     List<Integer> positiveAnswers = List.of(3, 4, 5);
+    List<SortedAnswerPairWithWeight> pairs = findSortedRelatedAnswerPairs(user1, user2);
 
-    return findSortedRelatedAnswerPairs(user1, user2)
-        .stream()
+    List<Long> surveyIds = pairs.stream().map(SortedAnswerPairWithWeight::getSurveyId).distinct().toList();
+    Map<Long, Survey> surveyMap = surveyRepository.findAllById(surveyIds).stream()
+        .collect(Collectors.toMap(Survey::getId, Function.identity()));
+
+    Map<String, Long> keywordWeights = pairs.stream()
+        .filter(pair -> surveyMap.containsKey(pair.getSurveyId()))
         .flatMap(pair -> {
-          Survey survey = findSurveyByIdOrThrow(pair.getSurveyId());
+          Survey survey = surveyMap.get(pair.getSurveyId());
           String keyword = positiveAnswers.contains(pair.getAnswer())
               ? survey.getKeywordForHigherAnswer().strip()
               : survey.getKeywordForLowerAnswer().strip();
           return tokenizeKeywords(keyword).stream()
-              .map(s -> Map.entry(s, pair.getOrderWeight()));
+              .map(s -> Map.entry(s, (long) pair.getOrderWeight()));
         })
-        .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)))
-        .entrySet()
-        .stream()
-        .map(entry -> {
-          int score = keywordRepository.findByKeyword(entry.getKey()).getScore();
-          return Map.entry(entry.getKey(), score * entry.getValue());
-        })
-        .sorted((entry1, entry2) -> Math.toIntExact(entry2.getValue() - entry1.getValue()))
+        .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)));
+
+    Map<String, Integer> keywordScoreMap = keywordRepository.findAllByKeywordIn(keywordWeights.keySet()).stream()
+        .collect(Collectors.toMap(Keyword::getKeyword, Keyword::getScore));
+
+    return keywordWeights.entrySet().stream()
+        .filter(e -> keywordScoreMap.containsKey(e.getKey()))
+        .map(entry -> Map.entry(entry.getKey(), keywordScoreMap.get(entry.getKey()) * entry.getValue()))
+        .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
         .map(Map.Entry::getKey)
         .limit(5)
         .toList();
@@ -662,49 +665,52 @@ public class MatchService {
 
   /** 개인 설문 응답 점수 기반 추천 장소 키워드를 반환한다. */
   public List<String> getIndividualSurveyBasedKeywords(User user) {
-    return answeredSurveyRepository.findAllByUser(user)
-        .stream()
-        .map(answeredSurvey -> Map.entry(
-            answeredSurvey,
-            recommendationDomainService.calculateAnswerScore(answeredSurvey.getAnswer())
-        ))
-        .flatMap(entry -> {
-          Survey survey = surveyRepository.findBySurveyNum(entry.getKey().getSurveyNum());
-          String keyword = POSITIVE_ANSWER_LIST.contains(entry.getKey().getAnswer())
+    List<AnsweredSurvey> answeredSurveys = answeredSurveyRepository.findAllByUser(user);
+
+    List<Integer> surveyNums = answeredSurveys.stream().map(AnsweredSurvey::getSurveyNum).distinct().toList();
+    Map<Integer, Survey> surveyMap = surveyRepository.findAllBySurveyNumIn(surveyNums).stream()
+        .collect(Collectors.toMap(Survey::getSurveyNum, Function.identity()));
+
+    Map<String, Long> keywordWeights = answeredSurveys.stream()
+        .filter(answeredSurvey -> surveyMap.containsKey(answeredSurvey.getSurveyNum()))
+        .flatMap(answeredSurvey -> {
+          Survey survey = surveyMap.get(answeredSurvey.getSurveyNum());
+          long answerScore = recommendationDomainService.calculateAnswerScore(answeredSurvey.getAnswer());
+          String keyword = POSITIVE_ANSWER_LIST.contains(answeredSurvey.getAnswer())
               ? survey.getKeywordForHigherAnswer()
               : survey.getKeywordForLowerAnswer();
           return tokenizeKeywords(keyword).stream()
-              .map(key -> Map.entry(key, entry.getValue()));
+              .map(key -> Map.entry(key, answerScore));
         })
-        .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)))
-        .entrySet()
-        .stream()
-        .map(entry -> {
-          Keyword keyword = keywordRepository.findByKeyword(entry.getKey());
-          if (keyword == null) return null;
-          int score = keyword.getScore();
-          return Map.entry(entry.getKey(), score * entry.getValue());
-        })
-        .filter(Objects::nonNull)
-        .sorted((entry1, entry2) -> Math.toIntExact(entry2.getValue() - entry1.getValue()))
+        .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)));
+
+    Map<String, Integer> keywordScoreMap = keywordRepository.findAllByKeywordIn(keywordWeights.keySet()).stream()
+        .collect(Collectors.toMap(Keyword::getKeyword, Keyword::getScore));
+
+    return keywordWeights.entrySet().stream()
+        .filter(e -> keywordScoreMap.containsKey(e.getKey()))
+        .map(entry -> Map.entry(entry.getKey(), (long) keywordScoreMap.get(entry.getKey()) * entry.getValue()))
+        .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
         .map(Map.Entry::getKey)
         .limit(5)
         .toList();
   }
 
   public List<GetPlaceDetailResponseDto> buildPlaceDetailInfo(List<Place> places, User user) {
+    Set<Long> scrappedPlaceIds = userScrapPlaceRepository.findAllByUser(user).stream()
+        .map(scrap -> scrap.getPlace().getId())
+        .collect(Collectors.toSet());
     return places.stream()
-        .map(place -> {
-          boolean isScrap = userScrapPlaceRepository.existsByUserAndPlace(user, place);
-          return place.createPlaceDetailDto(isScrap);
-        })
+        .map(place -> place.createPlaceDetailDto(scrappedPlaceIds.contains(place.getId())))
         .toList();
   }
 
   private List<Place> selectPlacesByKeywords(List<String> keywords) {
     List<Place> result = new ArrayList<>();
     for (int index = 0; index < keywords.size(); index++) {
-      List<Place> places = placeRepository.findAllByKeywordContainingIgnoreCase(keywords.get(index));
+      List<Long> placeIds = placeSearchRepository.findAllByKeywordContaining(keywords.get(index))
+          .stream().map(PlaceDocument::getId).toList();
+      List<Place> places = placeRepository.findAllByIdIn(placeIds);
       int max = Math.min(PLACE_SELECTION_COUNT.get(index), places.size());
       Collections.shuffle(places);
       result.addAll(places.subList(0, max));
@@ -734,14 +740,6 @@ public class MatchService {
           return new SortedAnswerPairWithWeight(pair.getAnswer(), pair.getConfrontAnswer(), pair.getSurveyId(), weight);
         })
         .toList();
-  }
-
-  private Survey findSurveyByIdOrThrow(Long surveyId) {
-    return surveyRepository.findById(surveyId)
-        .orElseThrow(() -> new RingoException(
-            "적절하지 않은 설문아이디입니다.",
-            ErrorCode.INTERNAL_SERVER_ERROR,
-            HttpStatus.INTERNAL_SERVER_ERROR));
   }
 
   // ============================================================
@@ -844,10 +842,14 @@ public class MatchService {
 
   /** 프로필 목록에 해시태그·나이 등 추가 사용자 정보를 채워넣는다. */
   private void enrichProfilesWithUserInfo(List<GetUserProfileResponseDto> profiles) {
-    profiles.forEach(profile -> {
-      User user = findUserOrThrow(profile.getUserId());
+    List<Long> userIds = profiles.stream().map(GetUserProfileResponseDto::getUserId).toList();
+    Map<Long, User> userMap = userRepository.findAllByIdIn(userIds).stream()
+        .collect(Collectors.toMap(User::getId, Function.identity()));
+    Map<Long, List<String>> hashtagsMap = batchGetHashtagsByUsers(new ArrayList<>(userMap.values()));
 
-      profile.setHashtags(getUserHashtags(user));
+    profiles.forEach(profile -> {
+      User user = userMap.get(profile.getUserId());
+      profile.setHashtags(hashtagsMap.getOrDefault(user.getId(), List.of()));
       profile.setAge(LocalDate.now().getYear() - user.getBirthday().getYear());
 
       log.info("step=매칭_프로필_조회, userId={}, age={}, gender={}, nickname={}, matchingScore={}, matchingStatus={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
@@ -858,12 +860,19 @@ public class MatchService {
     });
   }
 
+  private Map<Long, List<String>> batchGetHashtagsByUsers(List<User> users) {
+    return hashtagRepository.findAllByUserIn(users).stream()
+        .collect(Collectors.groupingBy(
+            h -> h.getUser().getId(),
+            Collectors.mapping(Hashtag::getHashtag, Collectors.toList())
+        ));
+  }
+
   private void updateIsScrapFlag(User user, List<GetUserProfileResponseDto> profiles, String keyPrefix) {
-    for (GetUserProfileResponseDto profile : profiles) {
-      User scrappedUser = findUserOrThrow(profile.getUserId());
-      boolean isScrap = scrappedUserRepository.existsByUserAndScrappedUser(user, scrappedUser);
-      profile.setScrap(isScrap);
-    }
+    Set<Long> scrappedUserIds = scrappedUserRepository.findAllByUser(user).stream()
+        .map(s -> s.getScrappedUser().getId())
+        .collect(Collectors.toSet());
+    profiles.forEach(profile -> profile.setScrap(scrappedUserIds.contains(profile.getUserId())));
     redisUtils.cacheUntilMidnight(
         keyPrefix + user.getId(),
         new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), profiles)
@@ -967,5 +976,5 @@ public class MatchService {
     private final int orderWeight;
   }
 
-  private record UserScoreEntry(Long userId, float score) {}
+  private record UserScoreEntry(User user, float score) {}
 }

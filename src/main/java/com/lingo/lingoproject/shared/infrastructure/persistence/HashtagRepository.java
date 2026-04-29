@@ -9,5 +9,7 @@ public interface HashtagRepository extends JpaRepository<Hashtag, Long> {
 
   List<Hashtag> findAllByUser(User user);
 
+  List<Hashtag> findAllByUserIn(List<User> users);
+
   void deleteAllByUser(User user);
 }

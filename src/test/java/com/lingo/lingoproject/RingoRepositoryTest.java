@@ -1,6 +1,7 @@
 package com.lingo.lingoproject;
 
 
+import com.lingo.lingoproject.shared.domain.elastic.PlaceDocument;
 import com.lingo.lingoproject.shared.domain.model.FailedFcmMessageLog;
 import com.lingo.lingoproject.shared.domain.model.Place;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
@@ -12,6 +13,11 @@ import com.lingo.lingoproject.matching.application.MatchService;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueMessagePayLoad;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueService;
 import jakarta.transaction.Transactional;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,10 +37,25 @@ public class RingoRepositoryTest {
 
   @Autowired
   RedisQueueService redisQueueService;
+  @Autowired
+  private PlaceRepository placeRepository;
+  @Autowired
+  private PlaceSearchRepository placeSearchRepository;
 
 
   @Test
   public void getSuspendedUserTest(){
+    Map<Long, Place> places = placeRepository.findAll()
+        .stream()
+        .collect(Collectors.toMap(Place::getId, Function.identity()));
+    Iterable<PlaceDocument> documents = placeSearchRepository.findAll();
+    documents.forEach(d -> {
+      String keyword = places.get(d.getId()) != null ?
+          places.get(d.getId()).getKeyword() : null;
+      if (keyword == null) return;
+      d.setKeyword(keyword);
+    });
+    placeSearchRepository.saveAll(documents);
   }
 
   @Test
