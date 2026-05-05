@@ -1,7 +1,6 @@
 package com.lingo.lingoproject.notification.application;
 
 import com.lingo.lingoproject.matching.domain.event.MatchingRequestedEvent;
-import com.lingo.lingoproject.shared.domain.model.NotificationType;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -30,7 +29,7 @@ public class MatchingRequestedEventHandler {
     log.info("MatchingRequestedEvent 수신: matchingId={}, requestUser={}, requestedUser={}",
         event.getMatchingId(), event.getRequestUserId(), event.getRequestedUserId());
     User requestedUser = userRepository.findById(event.getRequestedUserId())
-        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.NOT_FOUND));
+        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
     //fcmNotificationUseCase.sendFcmNotification(requestedUser, "누군가 매칭 요청을 했어요!", null, NotificationType.MATCHING_REQUEST);
   }
 }

@@ -64,7 +64,7 @@ public record SignupUserInfoDto(
 
     @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
     @Size(max = 5)
-    List<String> hashtags,
+    List<String> hashtag,
 
     @Schema(description = "mbti", example = "ENFP")
     String mbti

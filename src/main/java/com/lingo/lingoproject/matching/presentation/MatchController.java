@@ -33,7 +33,7 @@ public class MatchController implements MatchingApi {
     Long requestUserId = matchingRequestDto.requestId();
     if (!requestUserId.equals(user.getId())) {
       log.error("step=잘못된_유저_요청, authUserId={}, userId={}, status=FAILED", user.getId(), requestUserId);
-      throw new RingoException("매칭 요청자는 본인이어야 합니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+      throw new RingoException("매칭 요청자는 본인이어야 합니다.", ErrorCode.NO_AUTH);
     }
 
     log.info("step=매칭_요청_시작, requestId={}, requestedId={}", matchingRequestDto.requestId(), matchingRequestDto.requestedId());
@@ -56,13 +56,13 @@ public class MatchController implements MatchingApi {
   public ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> getMatchRequestsByDirection(Long userId, String direction, User user) {
     if (!userId.equals(user.getId())) {
       log.error("step=잘못된_유저_요청, authUserId={}, userId={}, status=FAILED", user.getId(), userId);
-      throw new RingoException("본인의 매칭 정보만 확인할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("본인의 매칭 정보만 확인할 수 있습니다.", ErrorCode.NO_AUTH);
     }
     log.info("step=매칭_요청_확인_시작, userId={}, direction={}", userId, direction);
     List<GetUserProfileResponseDto> responseDtoList = switch (direction) {
       case "SENT" -> matchService.getSentMatchingProfiles(user);
       case "RECEIVED" -> matchService.getReceivedMatchingProfiles(user);
-      default -> throw new RingoException("적절하지 않은 direction이 입력되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+      default -> throw new RingoException("적절하지 않은 direction이 입력되었습니다.", ErrorCode.BAD_PARAMETER);
     };
     log.info("step=매칭_요청_확인_완료, userId={}, direction={}", userId, direction);
 
@@ -74,7 +74,7 @@ public class MatchController implements MatchingApi {
   public ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> recommendByCumulativeSurveys(Long userId, User user) {
     if (!userId.equals(user.getId())) {
       log.error("step=잘못된_유저_요청, authUserId={}, userId={}, status=FAILED", user.getId(), userId);
-      throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+      throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", ErrorCode.NO_AUTH);
     }
     log.info("step=이성_추천_시작, userId={}", userId);
     List<GetUserProfileResponseDto> rtnList = matchService.getCumulativeSurveyBasedRecommendationProfiles(user);
@@ -86,7 +86,7 @@ public class MatchController implements MatchingApi {
   public ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> recommendByDailySurvey(Long userId, User user) {
     if (!userId.equals(user.getId())) {
       log.error("step=잘못된_유저_요청, authUserId={}, userId={}, status=FAILED", user.getId(), userId);
-      throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+      throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", ErrorCode.NO_AUTH);
     }
     log.info("step=설문_기반_이성_추천_시작, userId={}", user.getId());
     List<GetUserProfileResponseDto> rtnList = matchService.getDailySurveyBasedRecommendationProfiles(user);
@@ -143,13 +143,19 @@ public class MatchController implements MatchingApi {
   @Override
   public ResponseEntity<ApiListResponseDto<GetScrappedUserResponseDto>> getScrappedUser(Long userId, User user) {
     if (!userId.equals(user.getId())) {
-      throw new RingoException("자신이 스크랩한 유저만 확인할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+      throw new RingoException("자신이 스크랩한 유저만 확인할 수 있습니다.", ErrorCode.NO_AUTH);
     }
     log.info("step=스크랩된_유저_조회_시작, userId={}", user.getId());
     List<GetScrappedUserResponseDto> result = matchService.getScrappedUsers(user);
     log.info("step=스크랩된_유저_조회_완료, userId={}", user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result));
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> updateProfileClickCount(User user) {
+    matchService.updateProfileClickCount(user);
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 프로필 click-count를 업데이트 하였습니다."));
   }
 
 }

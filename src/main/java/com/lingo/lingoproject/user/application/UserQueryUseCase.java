@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.user.application;
 
 import com.lingo.lingoproject.matching.presentation.dto.GetUserProfileResponseDto;
+import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Hashtag;
 import com.lingo.lingoproject.shared.domain.model.NotificationOptionOutUser;
 import com.lingo.lingoproject.shared.domain.model.NotificationType;
@@ -46,7 +47,7 @@ public class UserQueryUseCase {
   private final NotificationOptionOutUserRepository notificationOptionOutUserRepository;
 
   public String findUserLoginId() {
-    throw new RingoException("아이디를 얻을 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    throw new RingoException("아이디를 얻을 권한이 없습니다.", ErrorCode.NO_AUTH);
   }
 
   private List<Long> getCumulativeCachedUserIds(User user){
@@ -86,15 +87,16 @@ public class UserQueryUseCase {
     boolean hasCommunityPass = redisTemplate.hasKey("membership::" + user.getId());
 
     if (!(userIdList.contains(findUserId) || findUserId.equals(user.getId()) || hasCommunityPass)) {
-      throw new RingoException("유저를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("유저를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
 
     User findUser = findUserOrThrow(findUserId);
     List<String> hashtags = getUserHashtags(findUser);
     boolean isDormant = dormantAccountUseCase.isDormant(findUser);
     Map<String, Boolean> notificationSettingMap = getNotificationSetting(findUser);
-
-    return GetUserInfoResponseDto.from(findUser, hashtags, isDormant, notificationSettingMap);
+    boolean isFaceVerify = findUser.getProfile().getFaceVerify() == FaceVerify.PASS;
+    log.info("[FACE]: {}", isFaceVerify);
+    return GetUserInfoResponseDto.from(findUser, hashtags, isDormant, isFaceVerify, notificationSettingMap);
   }
 
   private Map<String, Boolean> getNotificationSetting(User user){
@@ -124,8 +126,7 @@ public class UserQueryUseCase {
     return userRepository.findById(userId)
         .orElseThrow(() -> new RingoException(
             "해당 id의 유저를 찾을 수 없습니다.",
-            ErrorCode.NOT_FOUND_USER,
-            HttpStatus.BAD_REQUEST));
+            ErrorCode.USER_NOT_FOUND));
   }
 
   private List<String> getUserHashtags(User user) {

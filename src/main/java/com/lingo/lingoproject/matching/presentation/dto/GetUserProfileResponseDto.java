@@ -6,6 +6,7 @@ import com.lingo.lingoproject.shared.domain.model.MatchingStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
+import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -71,9 +72,21 @@ public class GetUserProfileResponseDto {
   @Schema(description = "스크랩 여부", example = "true")
   private boolean isScrap;
 
+  @Override
+  public int hashCode(){
+    return Objects.hash(userId);
+  }
 
-  public static GetUserProfileResponseDto of(User recommendedUser, float matchingScore,
-      List<String> hashtags, int verify, int hide, String mbti, boolean isScrap) {
+
+  public static GetUserProfileResponseDto of(
+      User recommendedUser,
+      float matchingScore,
+      List<String> hashtags,
+      int verify,
+      int hide,
+      String mbti,
+      boolean isScrap
+  ) {
     return GetUserProfileResponseDto.builder()
         .userId(recommendedUser.getId())
         .age(java.time.LocalDate.now().getYear() - recommendedUser.getBirthday().getYear())
@@ -84,6 +97,7 @@ public class GetUserProfileResponseDto {
         .hashtags(hashtags)
         .hide(hide)
         .verify(verify)
+        .isScrap(isScrap)
         .mbti(mbti)
         .build();
   }

@@ -2,8 +2,13 @@ package com.lingo.lingoproject.matching.domain.service;
 
 import com.lingo.lingoproject.matching.presentation.dto.SurveyScoreResultInterface;
 import com.lingo.lingoproject.shared.domain.model.SurveyCategory;
+import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.infrastructure.persistence.AnsweredSurveyRepository;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,16 +41,32 @@ public class SurveyScoreCalculator {
     List<SurveyScoreResultInterface> list = answeredSurveyRepository.calcSurveyScore(user1Id, user2Id);
     float score = 0;
     for (SurveyScoreResultInterface result : list) {
-      log.info("[MATCHING] {}, {}" , result.getAvgAnswer(), result.getCategory());
-      SurveyCategory category = result.getCategory();
-      if (category == null) continue;
-      switch (category.toString()) {
-        case "SPACE"               -> score += result.getAvgAnswer() * SURVEY_SPACE_WEIGHT;
-        case "SELF_REPRESENTATION" -> score += result.getAvgAnswer() * SURVEY_SELF_REPRESENTATION_WEIGHT;
-        case "SHARING"             -> score += result.getAvgAnswer() * SURVEY_SHARING_WEIGHT;
-        case "CONTENT"             -> score += result.getAvgAnswer() * SURVEY_CONTENT_WEIGHT;
-      }
+      score += calculateByCategory(result);
     }
     return score;
+  }
+
+  private float calculateByCategory(SurveyScoreResultInterface result){
+    float score = 0;
+
+    SurveyCategory category = result.getCategory();
+    if (category == null) return 0;
+    switch (category.toString()) {
+      case "SPACE"               -> score += result.getAvgAnswer() * SURVEY_SPACE_WEIGHT;
+      case "SELF_REPRESENTATION" -> score += result.getAvgAnswer() * SURVEY_SELF_REPRESENTATION_WEIGHT;
+      case "SHARING"             -> score += result.getAvgAnswer() * SURVEY_SHARING_WEIGHT;
+      case "CONTENT"             -> score += result.getAvgAnswer() * SURVEY_CONTENT_WEIGHT;
+    }
+    return score;
+  }
+
+  public Map<Long, Float> batchCalculate(Long userId, List<Long> selectedUserIds){
+    List<SurveyScoreResultInterface> list = answeredSurveyRepository.batchCalcSurveyScore(userId, selectedUserIds);
+    return list.stream()
+        .collect(Collectors.toMap(
+            SurveyScoreResultInterface::getUserId,
+            this::calculateByCategory,
+            Float::sum
+        ));
   }
 }

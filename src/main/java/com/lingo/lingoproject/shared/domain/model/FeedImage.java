@@ -21,7 +21,7 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class FeedImage {
+public class FeedImage implements Image{
 
   public static FeedImage of(User user, String imageUrl, String description) {
     return FeedImage.builder()
@@ -43,4 +43,9 @@ public class FeedImage {
 
   @Lob
   public String description;
+
+  @Override
+  public User getUser(){
+    return user;
+  }
 }

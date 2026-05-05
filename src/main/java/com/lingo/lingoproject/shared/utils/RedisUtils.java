@@ -8,6 +8,7 @@ import com.lingo.lingoproject.survey.presentation.dto.GetSurveyResponseDto;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,7 +62,7 @@ public class RedisUtils {
     } catch (Exception e) {
       log.error("본인인증 api에서 복호화 정보를 역질렬화하던 중 오류가 발생하였습니다.");
       log.error("key: {}", key, e);
-      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -82,7 +83,7 @@ public class RedisUtils {
 
     } catch (Exception e) {
       log.error("추천 유저 캐시 역직렬화 실패. key: {}", key, e);
-      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -101,7 +102,7 @@ public class RedisUtils {
 
     } catch (Exception e) {
       log.error("일일 설문 추천 캐시 역직렬화 실패. key: {}", key, e);
-      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -120,7 +121,7 @@ public class RedisUtils {
 
     }catch (Exception e){
       log.error("일일 설문 캐시 역직렬화 실패. key: {}", key, e);
-      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("cast 도중에 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -137,9 +138,9 @@ public class RedisUtils {
   public void cacheUntilMidnight(String key, Object value) {
 
     // 다음 날 00:00:00을 Instant로 변환
-    Instant expireAt = LocalDate.now()
+    Instant expireAt = LocalDate.now(ZoneId.of("Asia/Seoul"))
         .plusDays(1)
-        .atStartOfDay(ZoneId.systemDefault())
+        .atStartOfDay(ZoneId.of("Asia/Seoul"))
         .toInstant();
 
     log.info("{} 값 caching 유지 기간: {} 까지", value, expireAt);

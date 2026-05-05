@@ -34,10 +34,10 @@ public class CommunityDomainService {
    * @throws RingoException 소유자가 아닌 경우
    */
   public void validatePostOwnership(Post post, User user) {
-    if (!post.getAuthor().getId().equals(user.getId())) {
+    if (!post.hasUserOwnership(user)) {
       log.warn("step=게시물_권한없음, postId={}, requestUserId={}, authorId={}",
           post.getId(), user.getId(), post.getAuthor().getId());
-      throw new RingoException("게시자만 게시물을 처리할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("게시자만 게시물을 처리할 수 있습니다.", ErrorCode.NO_AUTH);
     }
   }
 
@@ -47,10 +47,10 @@ public class CommunityDomainService {
    * @throws RingoException 소유자가 아닌 경우
    */
   public void validateCommentOwnership(Comment comment, User user) {
-    if (!comment.getUser().getId().equals(user.getId())) {
+    if (!comment.hasUserOwnership(user) ) {
       log.warn("step=댓글_권한없음, commentId={}, requestUserId={}, ownerId={}",
           comment.getId(), user.getId(), comment.getUser().getId());
-      throw new RingoException("댓글을 처리할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("댓글을 처리할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
   }
 }

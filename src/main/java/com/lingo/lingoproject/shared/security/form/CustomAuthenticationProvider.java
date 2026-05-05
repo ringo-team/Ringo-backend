@@ -21,7 +21,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
   public Authentication authenticate(Authentication authentication) throws AuthenticationException {
     UserDetails user = customUserDetailService.loadUserByUsername(authentication.getName());
     if(!passwordEncoder.matches(authentication.getCredentials().toString(), user.getPassword())){
-      throw new RingoException("패스워드가 옳지 않습니다.", ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN);
+      throw new RingoException("패스워드가 옳지 않습니다.", ErrorCode.FORBIDDEN);
     }
     return  new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities());
   }

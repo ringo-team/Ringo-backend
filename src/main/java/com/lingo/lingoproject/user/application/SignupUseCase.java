@@ -16,7 +16,6 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepositor
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserPointRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
-import com.lingo.lingoproject.user.presentation.dto.LoginInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupUserInfoDto;
 import jakarta.transaction.Transactional;
@@ -75,7 +74,7 @@ public class SignupUseCase {
   @Transactional
   public void saveUserInfo(SignupUserInfoDto dto) {
     User user = userRepository.findById(dto.id())
-        .orElseThrow(() -> new RingoException("해당 회원을 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 회원을 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
 
     validateSignupUserAndDto(user, dto);
     user.setUserInfo(dto);
@@ -89,10 +88,10 @@ public class SignupUseCase {
         return;
       } catch (DataIntegrityViolationException e) {
         log.error("step=회원가입_데이터_무결성_위반, userId={}", user.getId(), e);
-        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
       } catch (Exception e) {
         log.error("step=회원가입_오류_발생, userId={}", user.getId(), e);
-        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
       }
     }
 
@@ -104,10 +103,10 @@ public class SignupUseCase {
       fcmTokenRepository.save(FcmToken.of(user));
     } catch (DataIntegrityViolationException e) {
       log.error("step=회원가입_데이터_무결성_위반, userId={}", user.getId(), e);
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     } catch (Exception e) {
       log.error("step=회원가입_오류_발생, userId={}", user.getId(), e);
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -124,13 +123,13 @@ public class SignupUseCase {
 
     if (alreadyRewarded || exceededAttempts) {
       throw new RingoException(
-          "이미 완료한 이벤트거나 입력횟수를 초과하였습니다.", ErrorCode.DUPLICATED, HttpStatus.BAD_REQUEST);
+          "이미 완료한 이벤트거나 입력횟수를 초과하였습니다.", ErrorCode.PROFILE_DUPLICATED);
     }
 
     Optional<User> host = userRepository.findByFriendInvitationCode(code);
     if (host.isEmpty()) {
       friendInvitationLogRepository.save(FriendInvitationLog.of(null, user.getId(), false));
-      throw new RingoException("친구초대코드를 잘못 입력하였습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+      throw new RingoException("친구초대코드를 잘못 입력하였습니다.", ErrorCode.BAD_REQUEST);
     }
 
     friendInvitationLogRepository.save(FriendInvitationLog.of(host.get().getId(), user.getId(), true));
@@ -145,34 +144,34 @@ public class SignupUseCase {
   private void validateLoginDto(SignupInfoDto dto) {
     if (!dto.loginId().matches("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]+$")) {
       log.warn("회원가입 로그인 요청값: {}", dto.loginId());
-      throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.NOT_ACCEPTABLE);
+      throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER);
     }
     if (!dto.password().matches("^(?=.*[A-Za-z])(?=.*\\d).{8,}$")) {
-      throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.NOT_ACCEPTABLE);
+      throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER);
     }
     if (userRepository.existsByLoginId(dto.loginId())) {
-      throw new RingoException("중복된 로그인 아이디 입니다.", ErrorCode.DUPLICATED, HttpStatus.NOT_ACCEPTABLE);
+      throw new RingoException("중복된 로그인 아이디 입니다.", ErrorCode.PROFILE_DUPLICATED);
     }
   }
 
   private void validateSignupUserAndDto(User user, SignupUserInfoDto dto) {
     if (LocalDate.parse(dto.birthday()).getYear() + 19 > LocalDate.now().getYear()) {
-      throw new RingoException("미성년자는 회원가입이 불가합니다.", ErrorCode.NOT_ADULT, HttpStatus.FORBIDDEN);
+      throw new RingoException("미성년자는 회원가입이 불가합니다.", ErrorCode.NOT_ADULT);
     }
     GenericUtils.validateAndReturnEnumValue(Smoking.values(), dto.isSmoking());
     GenericUtils.validateAndReturnEnumValue(Drinking.values(), dto.isDrinking());
     GenericUtils.validateAndReturnEnumValue(Religion.values(), dto.religion());
     if (!MBTI_TYPE_LIST.contains(dto.mbti().toUpperCase())) {
-      throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+      throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER);
     }
     if (!(dto.gender().equalsIgnoreCase("MALE") || dto.gender().equalsIgnoreCase("FEMALE"))) {
-      throw new RingoException("성별 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+      throw new RingoException("성별 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER);
     }
   }
 
   private List<Hashtag> buildHashtags(SignupUserInfoDto dto, User user) {
     List<Hashtag> hashtags = new ArrayList<>();
-    for (String tag : dto.hashtags()) {
+    for (String tag : dto.hashtag()) {
       hashtags.add(Hashtag.of(user, tag));
     }
     return hashtags;

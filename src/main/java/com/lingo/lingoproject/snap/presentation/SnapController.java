@@ -1,8 +1,8 @@
 package com.lingo.lingoproject.snap.presentation;
 import com.lingo.lingoproject.snap.application.SnapService;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
-import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageService;
-import com.lingo.lingoproject.shared.presentation.dto.image.GetImageUrlResponseDto;
+import com.lingo.lingoproject.image.application.S3ImageStorageService;
+import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.snap.presentation.dto.ApplySnapShootingRequestDto;
 import com.lingo.lingoproject.snap.presentation.dto.GetPhotographerInfosResponseDto;
 import com.lingo.lingoproject.snap.presentation.dto.UpdatePhotographerExampleImagesInfoRequestDto;
@@ -52,7 +52,7 @@ public class SnapController {
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("스냅 촬영 신청에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("스냅 촬영 신청에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -74,7 +74,7 @@ public class SnapController {
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("작가 정보를 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("작가 정보를 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -101,7 +101,7 @@ public class SnapController {
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("작가 예시 사진 업로드에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("작가 예시 사진 업로드에 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -122,7 +122,7 @@ public class SnapController {
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("작가 예시사진 정보를 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("작가 예시사진 정보를 저장하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -143,7 +143,7 @@ public class SnapController {
       if (e instanceof RingoException re) {
         throw re;
       }
-      throw new RingoException("작가 정보를 조회하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("작가 정보를 조회하는데 실패했습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 }

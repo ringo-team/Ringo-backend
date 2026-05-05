@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.shared.presentation.dto.image;
+package com.lingo.lingoproject.image.dto;
 
 import java.util.List;
 import lombok.Data;

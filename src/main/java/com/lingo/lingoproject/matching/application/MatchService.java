@@ -56,6 +56,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -67,7 +68,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
@@ -109,7 +110,6 @@ public class MatchService {
   private static final int MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE = 4;
   private static final int MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE = 4;
   private static final float SURVEY_SCORE_THRESHOLD = 0;
-  private static final int MAX_MATCHING_POOL_SIZE = 30;
   private static final int ACTIVE_DAY_DURATION = 14;
   private static final int HIDE_PROFILE_FLAG = 1;
   private static final int EXPOSE_PROFILE_FLAG = 0;
@@ -176,8 +176,7 @@ public class MatchService {
       case "REJECTED" -> rejectMatching(matching);
       default -> throw new RingoException(
           "decision 값이 적절하지 않습니다.",
-          ErrorCode.BAD_PARAMETER,
-          HttpStatus.BAD_REQUEST);
+          ErrorCode.BAD_PARAMETER);
     }
 
     UserMatchingLog matchingLog = matching.createRespondLog(user);
@@ -188,6 +187,26 @@ public class MatchService {
 
     userMatchingLogRepository.save(matchingLog);
     matchingRepository.save(matching);
+  }
+
+  private void acceptMatching(Matching matching) {
+    matching.accept();
+    matchingRepository.save(matching);
+    eventPublisher.publish(new MatchingAcceptedEvent(
+        matching.getId(),
+        matching.getRequestUser().getId(),
+        matching.getRequestedUser().getId()
+    ));
+  }
+
+  private void rejectMatching(Matching matching) {
+    matching.reject();
+    matchingRepository.save(matching);
+    eventPublisher.publish(new MatchingRejectedEvent(
+        matching.getId(),
+        matching.getRequestUser().getId(),
+        matching.getRequestedUser().getId()
+    ));
   }
 
   /** 요청자·수락자 본인만 삭제할 수 있다. */
@@ -255,38 +274,12 @@ public class MatchService {
     return profiles;
   }
 
-  private void acceptMatching(Matching matching) {
-    matching.accept();
-    matchingRepository.save(matching);
-    eventPublisher.publish(new MatchingAcceptedEvent(
-        matching.getId(),
-        matching.getRequestUser().getId(),
-        matching.getRequestedUser().getId()
-    ));
-  }
-
-  private void rejectMatching(Matching matching) {
-    matching.reject();
-    matchingRepository.save(matching);
-    eventPublisher.publish(new MatchingRejectedEvent(
-        matching.getId(),
-        matching.getRequestUser().getId(),
-        matching.getRequestedUser().getId()
-    ));
-  }
-
   private Matching findMatchingOrThrow(Long matchingId) {
     return matchingRepository.findById(matchingId)
         .orElseThrow(() -> new RingoException(
             "적절하지 않은 매칭 id 입니다.",
-            ErrorCode.NOT_FOUND,
-            HttpStatus.BAD_REQUEST));
+            ErrorCode.NOT_FOUND));
   }
-
-
-  // ============================================================
-  // 추천 이성
-  // ============================================================
 
   /** 누적 설문 점수 기반 추천 이성 목록을 반환한다. 자정까지 Redis에 캐싱된다. */
   @Transactional
@@ -299,8 +292,28 @@ public class MatchService {
       return cached;
     }
 
+    List<GetUserProfileResponseDto> result = getFirstUserCumulativeProfile(user);
+
+    redisUtils.cacheUntilMidnight(
+        CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
+        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
+    );
+
+    return result;
+  }
+
+  @Scheduled(cron = "0 40 23 * * * ")
+  public void cacheCumulativeProfile(){
+    List<User> users = userRepository.findAll();
+    users.forEach(this::cacheEachCumulativeProfile);
+  }
+
+  @Transactional
+  void cacheEachCumulativeProfile(User user){
+    Long userId = user.getId();
+
     List<Long> activeUserIds = getActiveUserIds(user);
-    List<UserScoreEntry> candidates = getUserAboveSurveyScore(userId, activeUserIds);
+    Map<Long, Float> candidates = getUserAboveSurveyScore(userId, activeUserIds);
     List<Long> selectedIds = selectCandidatesByScore(candidates);
     log.info("step=누적설문_추천_대상_선정, selectedIds={}", selectedIds);
 
@@ -310,18 +323,53 @@ public class MatchService {
         CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
         new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
     );
-    return result;
+  }
+
+  List<GetUserProfileResponseDto> getFirstUserCumulativeProfile(User user){
+
+    List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
+
+    List<Long> userIds = userRepository.findByUserIdNotInExcludedUserIds(excludedUserIds);
+    List<Long> randomlySelectedUserIds = recommendationDomainService.selectRandomCandidates(userIds, 5);
+
+    return userRepository.findAllByIdIn(randomlySelectedUserIds)
+        .stream()
+        .map(u -> buildUserProfileDto(user, u))
+        .toList();
+
   }
 
   /** 오늘 답변한 설문 기반 추천 이성을 반환한다. 오늘 답변이 없으면 null. */
   public List<GetUserProfileResponseDto> getDailySurveyBasedRecommendationProfiles(User user) {
-    Long userId = user.getId();
 
     List<GetUserProfileResponseDto> cached = getDailyCachedProfile(user);
     if (cached != null && cached.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) {
       return cached;
     }
 
+    return cacheEachDailyProfile(user);
+  }
+
+  @Scheduled(cron = "0 50 23 * * *")
+  public void cacheDailyProfile(){
+    List<User> users = userRepository.findAll();
+    users.forEach(this::cacheEachDailyProfile);
+  }
+
+  List<GetUserProfileResponseDto> cacheEachDailyProfile(User user){
+    List<GetUserProfileResponseDto> result = getEachDailyProfile(user);
+
+    if (result == null) return null;
+
+    redisUtils.cacheUntilMidnight(
+        DAILY_RECOMMENDATION_REDIS_KEY_PREFIX + user.getId(),
+        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
+    );
+
+    return result;
+  }
+
+  private List<GetUserProfileResponseDto> getEachDailyProfile(User user){
     List<AnsweredSurvey> todayAnswers = getTodayAnsweredSurveys(user);
     if (todayAnswers.isEmpty()) {
       log.info("step=금일_설문_응답_부재, todayAnswersSize=0");
@@ -333,15 +381,44 @@ public class MatchService {
     List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
     log.info("step=일일설문_추천_제외유저_조회, excludedUserCount={}", excludedUserIds.size());
 
-    List<GetUserProfileResponseDto> result = getSimilarAnsweredUserProfiles(
+    return getSimilarAnsweredUserProfiles(
         user, todayAnswers, excludedUserIds
     );
+  }
 
-    redisUtils.cacheUntilMidnight(
-        DAILY_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
-        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
+  private List<GetUserProfileResponseDto> getSimilarAnsweredUserProfiles(
+      User user,
+      List<AnsweredSurvey> todayAnswers,
+      List<Long> excludedUserIds
+  ) {
+    Set<GetUserProfileResponseDto> result = new HashSet<>();
+    for (AnsweredSurvey todayAnswer : todayAnswers) {
+      if (result.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) break;
+
+      User recommendedUser = getRandomlySimilarAnsweredUser(todayAnswer, excludedUserIds);
+      if (recommendedUser == null) continue;
+
+      result.add(buildUserProfileDto(user, recommendedUser));
+    }
+    return new ArrayList<>(result);
+  }
+
+  private User getRandomlySimilarAnsweredUser(AnsweredSurvey todayAnswer, List<Long> excludedUserIds) {
+    List<AnsweredSurvey> similarAnswers = getSimilarAnswers(todayAnswer, excludedUserIds);
+
+    if (similarAnswers.isEmpty()) return null;
+
+    int index = ThreadLocalRandom.current().nextInt(similarAnswers.size());
+    User recommendedUser = similarAnswers.get(index).getUser();
+
+    logDailySurveyBasedRecommendationLogic(
+        todayAnswer,
+        similarAnswers.get(index),
+        todayAnswer.getUser(),
+        recommendedUser
     );
-    return result;
+
+    return recommendedUser;
   }
 
   /** 누적·일일 추천 캐시 양쪽에서 해당 유저의 hide 플래그를 1로 설정한다. */
@@ -394,6 +471,7 @@ public class MatchService {
     List<Long> suspendedUserIds = getSuspendedUserIds();
     List<Long> usersWhoRequestedMe = getUserWhoRequestedMe(user);
     List<Long> usersIRequested = getUsersIRequested(user);
+    List<Long> signupIncompleteUserIds = getSignupIncompleteUsersIds();
 
     Set<Long> excluded = new HashSet<>();
     excluded.add(userId);
@@ -403,9 +481,17 @@ public class MatchService {
     excluded.addAll(suspendedUserIds);
     excluded.addAll(usersWhoRequestedMe);
     excluded.addAll(usersIRequested);
+    excluded.addAll(signupIncompleteUserIds);
 
     log.info("step=추천_제외_유저_수집, excludedUserIds={}", excluded);
     return new ArrayList<>(excluded);
+  }
+
+  private List<Long> getSignupIncompleteUsersIds(){
+    return userRepository.findAllByStatusNot(SignupStatus.COMPLETED)
+        .stream()
+        .map(User::getId)
+        .toList();
   }
 
   @Transactional
@@ -432,19 +518,27 @@ public class MatchService {
     Set<Long> scrappedUserIds = scrappedUserRepository.findAllByUser(requestUser).stream()
         .map(s -> s.getScrappedUser().getId())
         .collect(Collectors.toSet());
+    Map<Long, Float> surveyScoreMap = surveyScoreCalculator.batchCalculate(requestUser.getId(), selectedIds);
 
     return users.stream()
         .map(recommended -> {
           Profile profile = recommended.getProfile();
-          float surveyScore = surveyScoreCalculator.calculate(requestUser.getId(), recommended.getId());
+
+          float surveyScore = surveyScoreMap.get(recommended.getId());
           int isVerify = FaceVerify.PASS == profile.getFaceVerify() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG;
           List<String> hashtags = hashtagsMap.getOrDefault(recommended.getId(), List.of());
           boolean isScrap = scrappedUserIds.contains(recommended.getId());
 
           GetUserProfileResponseDto dto = GetUserProfileResponseDto.of(
-              recommended, surveyScore, hashtags, isVerify, EXPOSE_PROFILE_FLAG, requestUser.getMbti(), isScrap
+              recommended,
+              surveyScore,
+              hashtags,
+              isVerify,
+              EXPOSE_PROFILE_FLAG,
+              requestUser.getMbti(),
+              isScrap
           );
-          log.info("step=추천이성_프로필_빌드, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
+          log.info("step=추천이성_프로필_빌드, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, hashtag={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
               dto.getUserId(), dto.getAge(), dto.getGender(), dto.getNickname(),
               dto.getMatchingScore(), dto.getHashtags(), dto.getVerify(),
               dto.getDaysFromLastAccess(), dto.getMbti());
@@ -453,62 +547,25 @@ public class MatchService {
         .toList();
   }
 
-  private List<Long> selectCandidatesByScore(List<UserScoreEntry> candidates) {
-    return candidates.stream()
-        .map(entry -> {
-          double finalScore = recommendationDomainService.calculateFinalMatchingScore(entry.user(), entry.score());
-          return Map.entry(entry.user().getId(), finalScore);
-        })
+  private List<Long> selectCandidatesByScore(Map<Long, Float> scoreMap) {
+    Map<Long, Double> finalScoreMap = recommendationDomainService.calculateFinalMatchingScore(scoreMap);
+    return finalScoreMap
+        .entrySet()
+        .stream()
         .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
         .map(Map.Entry::getKey)
         .limit(MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE)
         .toList();
   }
 
-  private List<UserScoreEntry> getUserAboveSurveyScore(Long userId, List<Long> activeUserIds) {
-    return userRepository.findAllByIdIn(activeUserIds)
+  private Map<Long, Float> getUserAboveSurveyScore(Long userId, List<Long> activeUserIds) {
+    return surveyScoreCalculator.batchCalculate(userId, activeUserIds)
+        .entrySet()
         .stream()
-        .filter(u -> u.getStatus() == SignupStatus.COMPLETED)
-        .map(u -> new UserScoreEntry(u, surveyScoreCalculator.calculate(userId, u.getId())))
-        .filter(entry -> entry.score() >= SURVEY_SCORE_THRESHOLD)
-        .sorted((entry1, entry2) -> Float.compare(entry2.score(), entry1.score()))
-        .limit(MAX_MATCHING_POOL_SIZE)
-        .toList();
-  }
-
-  private List<GetUserProfileResponseDto> getSimilarAnsweredUserProfiles(
-      User user,
-      List<AnsweredSurvey> todayAnswers,
-      List<Long> excludedUserIds
-  ) {
-    List<GetUserProfileResponseDto> result = new ArrayList<>();
-    for (AnsweredSurvey todayAnswer : todayAnswers) {
-      if (result.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) break;
-
-      User recommendedUser = getRandomlySimilarAnsweredUser(todayAnswer, excludedUserIds);
-      if (recommendedUser == null) continue;
-
-      result.add(buildUserProfileDto(user, recommendedUser));
-    }
-    return result;
-  }
-
-  private User getRandomlySimilarAnsweredUser(AnsweredSurvey todayAnswer, List<Long> excludedUserIds) {
-    List<AnsweredSurvey> similarAnswers = getSimilarAnswers(todayAnswer, excludedUserIds);
-
-    if (similarAnswers.isEmpty()) return null;
-
-    int index = ThreadLocalRandom.current().nextInt(similarAnswers.size());
-    User recommendedUser = similarAnswers.get(index).getUser();
-
-    logDailySurveyBasedRecommendationLogic(
-        todayAnswer,
-        similarAnswers.get(index),
-        todayAnswer.getUser(),
-        recommendedUser
-    );
-
-    return recommendedUser;
+        .filter(entry -> entry.getValue() >= SURVEY_SCORE_THRESHOLD)
+        .sorted((entry1, entry2) -> Float.compare(entry2.getValue(), entry1.getValue()))
+        .limit(100)
+        .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
   }
 
   private List<GetUserProfileResponseDto> getCumulativeCachedProfile(User user) {
@@ -605,19 +662,56 @@ public class MatchService {
     return buildPlaceDetailInfo(places, user);
   }
 
+  private List<GetPlaceDetailResponseDto> getCachedUserPlaces(String key, Long userId){
+    if(redisTemplate.hasKey(key + userId)){
+      return ((ApiListResponseDto<GetPlaceDetailResponseDto>) redisTemplate.opsForValue().get(key + userId)).getList();
+    }
+    return null;
+  }
+
+  private void cacheUserPlace(String key, Long userId, List<GetPlaceDetailResponseDto> list){
+    redisUtils.cacheUntilMidnight(key+ userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), list));
+  }
+
+  @Scheduled(cron = "0 30 23 * * *")
+  public void cacheIndividualUserPlaces(){
+    userRepository.findAll()
+        .forEach(this::buildPlaceDtoAndCache);
+  }
+
   public List<GetPlaceDetailResponseDto> getIndividualUserPlaces(User user) {
+    String key = "individual-place::";
+    List<GetPlaceDetailResponseDto> cached = getCachedUserPlaces(key, user.getId());
+    if (cached != null) return cached;
+
+    List<Place> places = placeRepository.getPlaceOrderByClickCountLimitFive();
+    List<GetPlaceDetailResponseDto> result = buildPlaceDetailInfo(places, user);
+
+    cacheUserPlace(key, user.getId(), result);
+    return result;
+  }
+
+  private void buildPlaceDtoAndCache(User user){
+    String key = "individual-place::";
     List<String> keywords = getIndividualSurveyBasedKeywords(user);
 
     List<Place> places = selectPlacesByKeywords(keywords);
     if (places.size() < 4) places = dealWithHasFewKeywords();
 
-    return buildPlaceDetailInfo(places, user);
+    List<GetPlaceDetailResponseDto> result = buildPlaceDetailInfo(places, user);
+    cacheUserPlace(key, user.getId(), result);
   }
 
   public List<GetPlaceDetailResponseDto> getRandomlySelectedPlaces(User user) {
+    String key= "random-place::";
+    List<GetPlaceDetailResponseDto> cached = getCachedUserPlaces(key, user.getId());
+    if (cached != null) return cached;
+
     List<Place> places = placeRepository.findAllByTypeNotNull();
     Collections.shuffle(places);
-    return buildPlaceDetailInfo(places.subList(0, Math.min(places.size(), 50)), user);
+    List<GetPlaceDetailResponseDto> result = buildPlaceDetailInfo(places.subList(0, Math.min(places.size(), 50)), user);
+    cacheUserPlace(key, user.getId(), result);
+    return result;
   }
 
   public List<GetPlaceDetailResponseDto> getRankedPagedPlaces(
@@ -639,7 +733,7 @@ public class MatchService {
     Map<Long, Survey> surveyMap = surveyRepository.findAllById(surveyIds).stream()
         .collect(Collectors.toMap(Survey::getId, Function.identity()));
 
-    Map<String, Long> keywordWeights = pairs.stream()
+    Map<String, Long> keywordWeightMap = pairs.stream()
         .filter(pair -> surveyMap.containsKey(pair.getSurveyId()))
         .flatMap(pair -> {
           Survey survey = surveyMap.get(pair.getSurveyId());
@@ -651,10 +745,10 @@ public class MatchService {
         })
         .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)));
 
-    Map<String, Integer> keywordScoreMap = keywordRepository.findAllByKeywordIn(keywordWeights.keySet()).stream()
+    Map<String, Integer> keywordScoreMap = keywordRepository.findAllByKeywordIn(keywordWeightMap.keySet()).stream()
         .collect(Collectors.toMap(Keyword::getKeyword, Keyword::getScore));
 
-    return keywordWeights.entrySet().stream()
+    return keywordWeightMap.entrySet().stream()
         .filter(e -> keywordScoreMap.containsKey(e.getKey()))
         .map(entry -> Map.entry(entry.getKey(), keywordScoreMap.get(entry.getKey()) * entry.getValue()))
         .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
@@ -809,8 +903,7 @@ public class MatchService {
     return userRepository.findById(userId)
         .orElseThrow(() -> new RingoException(
             "유저를 찾을 수 없습니다.",
-            ErrorCode.NOT_FOUND_USER,
-            HttpStatus.BAD_REQUEST));
+            ErrorCode.USER_NOT_FOUND));
   }
 
   /** 매칭 점수·해시태그·인증 여부 등을 포함한 프로필 DTO를 생성한다. */
@@ -832,7 +925,7 @@ public class MatchService {
         isScrap
     );
 
-    log.info("step=추천이성_프로필_빌드, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
+    log.info("step=추천이성_프로필_빌드, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, hashtag={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
         dto.getUserId(), dto.getAge(), dto.getGender(), dto.getNickname(),
         dto.getMatchingScore(), dto.getHashtags(), dto.getVerify(),
         dto.getDaysFromLastAccess(), dto.getMbti());
@@ -852,7 +945,7 @@ public class MatchService {
       profile.setHashtags(hashtagsMap.getOrDefault(user.getId(), List.of()));
       profile.setAge(LocalDate.now().getYear() - user.getBirthday().getYear());
 
-      log.info("step=매칭_프로필_조회, userId={}, age={}, gender={}, nickname={}, matchingScore={}, matchingStatus={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
+      log.info("step=매칭_프로필_조회, userId={}, age={}, gender={}, nickname={}, matchingScore={}, matchingStatus={}, hashtag={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
           profile.getUserId(), profile.getAge(), profile.getGender(),
           profile.getNickname(), profile.getMatchingScore(), profile.getMatchingStatus(),
           profile.getHashtags(), profile.getVerify(), profile.getDaysFromLastAccess(),
@@ -933,7 +1026,7 @@ public class MatchService {
 
   private void logCachedProfiles(User user, List<GetUserProfileResponseDto> profiles) {
     profiles.forEach(profile -> log.info(
-        "step=일일설문_추천_캐시_조회, requestUserId={}, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, matchingStatus={}, hashtags={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
+        "step=일일설문_추천_캐시_조회, requestUserId={}, recommendedUserId={}, age={}, gender={}, nickname={}, matchingScore={}, matchingStatus={}, hashtag={}, faceVerified={}, daysFromLastAccess={}, mbti={}",
         user.getId(), profile.getUserId(), profile.getAge(), profile.getGender(),
         profile.getNickname(), profile.getMatchingScore(), profile.getMatchingStatus(),
         profile.getHashtags(), profile.getVerify(), profile.getDaysFromLastAccess(), profile.getMbti()
@@ -976,5 +1069,10 @@ public class MatchService {
     private final int orderWeight;
   }
 
-  private record UserScoreEntry(User user, float score) {}
+  public record UserScoreEntry(Long userId, float score) {}
+
+  @Transactional
+  public void updateProfileClickCount(User user){
+    profileRepository.updateProfileClickCount(user.getProfile().getId());
+  }
 }

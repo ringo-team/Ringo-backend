@@ -80,7 +80,7 @@ public class SecurityConfig {
    */
   private final String[] whiteList = {
       "/signup/**", "/users/access", "/health",
-      "/swagger-ui/**", "v3/api-docs/**",
+      "/swagger-ui/**", "/v3/api-docs/**",
       "/ws", "/stomp/**", "/stomp-test.html",
       "/actuator/**",
       "/profiles", "/feeds"

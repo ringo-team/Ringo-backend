@@ -8,16 +8,11 @@ import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.elastic.PlaceSearchRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
-import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageService;
+import com.lingo.lingoproject.image.application.S3ImageStorageService;
 import com.lingo.lingoproject.matching.application.MatchService;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueMessagePayLoad;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueService;
-import jakarta.transaction.Transactional;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,17 +40,11 @@ public class RingoRepositoryTest {
 
   @Test
   public void getSuspendedUserTest(){
-    Map<Long, Place> places = placeRepository.findAll()
+    List<PlaceDocument> placeDocuments = placeRepository.findAll()
         .stream()
-        .collect(Collectors.toMap(Place::getId, Function.identity()));
-    Iterable<PlaceDocument> documents = placeSearchRepository.findAll();
-    documents.forEach(d -> {
-      String keyword = places.get(d.getId()) != null ?
-          places.get(d.getId()).getKeyword() : null;
-      if (keyword == null) return;
-      d.setKeyword(keyword);
-    });
-    placeSearchRepository.saveAll(documents);
+        .map(Place::createDocument)
+        .toList();
+    placeSearchRepository.saveAll(placeDocuments);
   }
 
   @Test
@@ -67,7 +56,7 @@ public class RingoRepositoryTest {
   @Test
   public void pushEntityToRedisQueue(){
     RedisQueueMessagePayLoad payload = FailedFcmMessageLog.of(
-        new RingoException("에러", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR),
+        new RingoException("에러", ErrorCode.INTERNAL_SERVER_ERROR),
         "token",
         "title",
         "message"

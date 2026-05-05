@@ -9,13 +9,14 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface PlaceRepository extends JpaRepository<Place, Long> {
 
-  List<Place> findAllByKeywordContainingIgnoreCase(String keyword);
-
   List<Place> findAllByType(String type);
 
   @Modifying
   @Query("update Place p set p.clickCount = p.clickCount + 1 where p.id = :placeId")
-  void updatePlaceClickCount(Long clickCount);
+  void updatePlaceClickCount(Long placeId);
+
+  @Query("select p from Place p order by p.clickCount limit 5")
+  List<Place> getPlaceOrderByClickCountLimitFive();
 
   List<Place> findAllByTypeNotNull();
 

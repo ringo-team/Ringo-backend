@@ -1,16 +1,24 @@
 package com.lingo.lingoproject.matching.domain.service;
 
+import com.lingo.lingoproject.matching.application.MatchService;
+import com.lingo.lingoproject.matching.application.MatchService.UserScoreEntry;
 import com.lingo.lingoproject.shared.domain.model.Profile;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.domain.model.UserActivityLog;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserActivityLogRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -32,13 +40,15 @@ public class RecommendationDomainService {
   private final ProfileRepository profileRepository;
   private final UserActivityLogRepository userActivityLogRepository;
   private final RedisTemplate<String, Object> redisTemplate;
+  private final UserRepository userRepository;
 
   public RecommendationDomainService(ProfileRepository profileRepository,
       UserActivityLogRepository userActivityLogRepository,
-      RedisTemplate<String, Object> redisTemplate) {
+      RedisTemplate<String, Object> redisTemplate, UserRepository userRepository) {
     this.profileRepository = profileRepository;
     this.userActivityLogRepository = userActivityLogRepository;
     this.redisTemplate = redisTemplate;
+    this.userRepository = userRepository;
   }
 
   /**
@@ -72,23 +82,36 @@ public class RecommendationDomainService {
    *   <li>신규 가입 부스트 (10%): 로지스틱 감쇠 (중심 30일, 2주 이내 ≈ 만점)</li>
    * </ul>
    */
-  public double calculateFinalMatchingScore(User user, float surveyScore) {
-    Profile profile = user.getProfile();
-    double ctr = computeCTR(profile);
+  public Map<Long, Double> calculateFinalMatchingScore(Map<Long, Float> scoreMap) {
+    List<Profile> profiles = profileRepository.findProfileByUserIdIn(scoreMap.keySet());
+    Map<Long, Profile> profileMap = profiles.stream()
+        .collect(Collectors.toMap(e -> e.getUser().getId(), Function.identity()));
+    Map<Long, User> userMap = profiles.stream().map(Profile::getUser)
+        .collect(Collectors.toMap(User::getId, Function.identity()));
+    Map<Long, Double> profileCTRMap = profiles.stream()
+        .collect(Collectors.toMap(e -> e.getUser().getId(), this::computeCTR));
+
 
     // findAll()을 한 번만 호출해 CTR·노출 분포를 공유한다
     List<Profile> allProfiles = profileRepository.findAll();
-    List<Double> allCTRs = allProfiles.stream()
-        .map(p -> (double) p.getClickCount() / (p.getImpressionCount() + 1))
-        .toList();
+    List<Double> allCTRs = allProfiles.stream().map(this::computeCTR).toList();
 
-    double weightedSurveyScore = surveyScore * SURVEY_SCORE_RATIO;
-    double attractionScore     = ATTRACTION_SCORE_RATIO * ctrPercentileRank(ctr, allCTRs);
-    double activityScore       = ACTIVITY_SCORE_RATIO * normalizeActivityTime(getActivityTime(user));
-    double exposureBalanceScore = EXPOSURE_BALANCE_SCORE_RATIO * impressionInverseRank(profile.getImpressionCount(), allProfiles);
-    double recentSignupScore   = RECENT_SIGNUP_SCORE_RATIO * calcRecentSignupBoost(user.getCreatedAt());
+    return scoreMap.keySet().stream()
+        .map(userId -> {
+          if (userMap.get(userId) == null) return null;
+          if (profileMap.get(userId) == null) return null;
 
-    return weightedSurveyScore + attractionScore + activityScore + exposureBalanceScore + recentSignupScore;
+          double weightedSurveyScore = scoreMap.getOrDefault(userId, 0f) * SURVEY_SCORE_RATIO;
+          double attractionScore = ATTRACTION_SCORE_RATIO * ctrPercentileRank(profileCTRMap.getOrDefault(userId, 0.0), allCTRs);
+          double activityScore = ACTIVITY_SCORE_RATIO * normalizeActivityTime(getActivityTime(userMap.get(userId)));
+          double exposureBalanceScore = EXPOSURE_BALANCE_SCORE_RATIO * impressionInverseRank(profileMap.get(userId).getImpressionCount(), allProfiles);
+          double recentSignupScore = RECENT_SIGNUP_SCORE_RATIO * calcRecentSignupBoost(userMap.get(userId).getCreatedAt());
+
+          double score = weightedSurveyScore + attractionScore + activityScore + exposureBalanceScore + recentSignupScore;
+          return Map.entry(userId, score);
+        })
+        .filter(Objects::nonNull)
+        .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
   }
 
   /**

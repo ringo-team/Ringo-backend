@@ -79,7 +79,7 @@ public class CustomAuthenticationFilter extends AuthenticationFilter {
         info = objectMapper.readValue(requestBody, LoginInfoDto.class);
       } catch (Exception e) {
         log.error("step=로그인_요청_역직렬화_실패, uri={}", request.getRequestURI(), e);
-        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
       }
 
       // 아이디&비밀번호 인증: CustomAuthenticationProvider에서 UserDetails 조회 후 BCrypt 비밀번호 검증

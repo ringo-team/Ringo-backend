@@ -56,7 +56,7 @@ public class SnapService {
   public void applySnapShooting(ApplySnapShootingRequestDto dto){
 
     User photographer = userRepository.findById(dto.photographerId())
-        .orElseThrow(() -> new RingoException("해당 촬영 기사가 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 촬영 기사가 없습니다.", ErrorCode.NOT_FOUND));
 
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -78,7 +78,7 @@ public class SnapService {
   public void savePhotographerInfo(SavePhotographerInfoRequestDto dto, Long photographerId){
 
     User photographer = userRepository.findById(photographerId)
-        .orElseThrow(() -> new RingoException("해당 촬영 기사가 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 촬영 기사가 없습니다.", ErrorCode.NOT_FOUND));
 
     photographerInfoRepository.save(PhotographerInfo.of(photographer, dto.content(), dto.instagramId(), dto.chatIntro()));
   }
@@ -94,7 +94,7 @@ public class SnapService {
    */
   public void updatePhotographerExampleImagesInfo(UpdatePhotographerExampleImagesInfoRequestDto dto){
     PhotographerImage image = photographerImageRepository.findById(dto.imageId())
-        .orElseThrow(() -> new RingoException("해당 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND));
 
     image.setSnapLocation(dto.snapLocation());
 
@@ -106,7 +106,7 @@ public class SnapService {
       }
     }catch (Exception e){
       log.error("스냅 촬영일 파싱 실패. imageId: {}, snapDate: {}", dto.imageId(), dto.snapDate(), e);
-      throw new RingoException("시간을 파싱하던 중 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("시간을 파싱하던 중 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
     photographerImageRepository.save(image);

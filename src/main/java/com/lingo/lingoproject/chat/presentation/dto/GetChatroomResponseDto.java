@@ -1,7 +1,11 @@
 package com.lingo.lingoproject.chat.presentation.dto;
 
+import com.lingo.lingoproject.chat.application.ChatroomSummaryProjection;
 import com.lingo.lingoproject.shared.domain.model.Chatroom;
+import com.lingo.lingoproject.shared.domain.model.Profile;
+import com.lingo.lingoproject.shared.domain.model.User;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.Optional;
 import lombok.Builder;
 
 @Builder
@@ -22,15 +26,14 @@ public record GetChatroomResponseDto(
     String lastSendDateTime
 ) {
 
-  public static GetChatroomResponseDto of(Chatroom chatroom, String opponentNickname,
-      String opponentProfileUrl, String lastChatMessage, int unreadCount, String lastSentAt) {
+  public static GetChatroomResponseDto of(Chatroom chatroom, User opponent, ChatroomSummaryProjection summary) {
     return GetChatroomResponseDto.builder()
         .chatroomId(chatroom.getId())
-        .chatOpponent(opponentNickname)
-        .chatOpponentProfileUrl(opponentProfileUrl)
-        .lastChatMessage(lastChatMessage)
-        .numberOfNotReadMessages(unreadCount)
-        .lastSendDateTime(lastSentAt)
+        .chatOpponent(Optional.ofNullable(opponent).map(User::getNickname).orElse(null))
+        .chatOpponentProfileUrl(Optional.ofNullable(opponent).map(User::getProfile).map(Profile::getImageUrl).orElse(null))
+        .lastChatMessage(summary.getLastMessage().getContent())
+        .numberOfNotReadMessages(summary.getUnreadCount())
+        .lastSendDateTime(summary.getLastMessage().getCreatedAt().toString())
         .chatroomSize(2)
         .build();
   }

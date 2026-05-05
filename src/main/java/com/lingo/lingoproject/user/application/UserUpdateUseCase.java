@@ -78,9 +78,9 @@ public class UserUpdateUseCase {
   }
 
   public void resetPassword(String newPassword, User user) {
-    boolean isAuthenticated = Boolean.TRUE.equals(redisTemplate.hasKey("self-auth::" + user.getId()));
+    boolean isAuthenticated = redisTemplate.hasKey("self-auth::" + user.getId());
     if (!isAuthenticated) {
-      throw new RingoException("비밀번호를 재설정할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("비밀번호를 재설정할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
     user.setPassword(passwordEncoder.encode(newPassword));
     userRepository.save(user);
@@ -101,7 +101,7 @@ public class UserUpdateUseCase {
 
   private void setUserMbti(User user, String mbti) {
     if (!MBTI_TYPE_LIST.contains(mbti.toUpperCase())) {
-      throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+      throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER);
     }
     user.setMbti(mbti.toUpperCase());
   }

@@ -18,7 +18,7 @@ public class GenericUtils {
       }
     }
     log.error("step=ENUM_값_매핑_실패, enumList={}, value={}", Arrays.toString(array), value);
-    throw new RingoException("적절하지 않은 값이 요청되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+    throw new RingoException("적절하지 않은 값이 요청되었습니다.", ErrorCode.BAD_PARAMETER);
   }
 
   public static <E> void validateAndSetEnum(

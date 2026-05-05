@@ -80,7 +80,7 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     if (token == null || !token.startsWith("Bearer ")) {
       // 토큰이 없는 경우: 이미 CONNECT 단계에서 Principal이 설정된 경우 재사용
       if (accessor.getUser() != null) user = chatService.findUserByLoginIdOrThrow(accessor.getUser().getName());
-      else throw new RingoException("토큰이 없습니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN);
+      else throw new RingoException("토큰이 없습니다.", ErrorCode.TOKEN_INVALID);
     }
     else {
       // "Bearer " 접두사(7자) 제거 후 JWT 파싱

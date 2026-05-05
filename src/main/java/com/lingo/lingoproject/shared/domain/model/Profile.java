@@ -32,7 +32,7 @@ import org.hibernate.annotations.DynamicInsert;
     }
 )
 @DynamicInsert
-public class Profile extends Timestamp {
+public class Profile extends Timestamp implements Image{
 
   public static Profile of(User user, String imageUrl) {
     return Profile.builder()
@@ -62,5 +62,10 @@ public class Profile extends Timestamp {
   @Enumerated(EnumType.STRING)
   @ColumnDefault("'PENDING'")
   @Builder.Default
-  private FaceVerify faceVerify = com.lingo.lingoproject.shared.domain.model.FaceVerify.PENDING;
+  private FaceVerify faceVerify = FaceVerify.PENDING;
+
+  @Override
+  public User getUser(){
+    return user;
+  }
 }

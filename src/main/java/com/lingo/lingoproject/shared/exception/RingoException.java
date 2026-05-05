@@ -8,7 +8,7 @@ import org.springframework.http.HttpStatus;
  *
  * <h2>사용 방법</h2>
  * <pre>
- * throw new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.NOT_FOUND);
+ * throw new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER);
  * </pre>
  *
  * <h2>예외 처리 흐름</h2>
@@ -29,21 +29,17 @@ import org.springframework.http.HttpStatus;
 public class RingoException extends RuntimeException{
 
   /** HTTP 응답 상태 코드. */
-  private HttpStatus status;
-
-  /** 애플리케이션 레벨 에러 코드 (클라이언트가 에러 종류를 구분하는 데 사용). */
   private ErrorCode errorCode;
+
 
   /**
    * 표준 비즈니스 예외 생성자.
    *
    * @param message   사람이 읽을 수 있는 에러 메시지
    * @param errorCode 클라이언트용 에러 코드 (예: ErrorCode.NOT_FOUND_USER)
-   * @param status    HTTP 상태 코드 (예: HttpStatus.NOT_FOUND)
    */
-  public RingoException(String message, ErrorCode errorCode, HttpStatus status){
+  public RingoException(String message, ErrorCode errorCode){
     super(message);
-    this.status = status;
     this.errorCode = errorCode;
   }
 
@@ -55,5 +51,17 @@ public class RingoException extends RuntimeException{
    */
   public RingoException(String message, Throwable cause){
     super(message, cause);
+  }
+
+  public HttpStatus getHttpStatus() {
+    if (errorCode == null) return HttpStatus.INTERNAL_SERVER_ERROR;
+    return switch (errorCode) {
+      case BAD_REQUEST, BAD_PARAMETER, NOT_FOUND, ADMIN_NOT_FOUND,
+           USER_NOT_FOUND, PROFILE_DUPLICATED, INADEQUATE, FACE_NOT_FOUND, OVERFLOW -> HttpStatus.BAD_REQUEST;
+      case FORBIDDEN, BLOCKED, BEFORE_SIGNUP, LOGOUT, NO_AUTH,
+           NOT_ADULT, TOKEN_INVALID, TOKEN_EXPIRED -> HttpStatus.FORBIDDEN;
+      case UNMODERATE -> HttpStatus.NOT_ACCEPTABLE;
+      default -> HttpStatus.INTERNAL_SERVER_ERROR;
+    };
   }
 }

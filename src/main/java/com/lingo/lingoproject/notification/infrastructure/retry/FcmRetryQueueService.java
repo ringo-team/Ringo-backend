@@ -56,7 +56,7 @@ public class FcmRetryQueueService extends RedisQueueService{
           super.deadLetterFcmMessageRepository.save(letter);
           discordService.sendMessageToDiscordChannel("데드레터 큐에 fcm 엔티티가 쌓였습니다.");
           throw new RingoException("데드레터큐에 fcm 엔티티가 쌓였습니다.",
-              ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+              ErrorCode.INTERNAL_SERVER_ERROR);
         }
         log.setRetryCount(log.getRetryCount() + 1);
         pushToQueue("FCM", log);

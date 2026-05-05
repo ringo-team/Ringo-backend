@@ -86,7 +86,7 @@ public class JwtUtil {
       case TokenType.ACCESS -> Long.parseLong(accessTokenExpiration);
       case TokenType.REFRESH -> Long.parseLong(refreshTokenExpiration);
       default -> throw new RingoException(
-          "토큰 타입은 access, refresh 둘 중 하나입니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+          "토큰 타입은 access, refresh 둘 중 하나입니다.", ErrorCode.BAD_PARAMETER);
     };
     return Jwts.builder()
         .id(UUID.randomUUID().toString())   // jti: 로그아웃 블랙리스트 식별자
@@ -125,10 +125,10 @@ public class JwtUtil {
           .getPayload();
     } catch (ExpiredJwtException e){
       log.error("유효기간이 지난 토큰입니다", e);
-      throw new RingoException("유효기간이 지난 토큰입니다.", ErrorCode.TOKEN_EXPIRED, HttpStatus.UNAUTHORIZED);
+      throw new RingoException("유효기간이 지난 토큰입니다.", ErrorCode.TOKEN_EXPIRED);
     } catch (Exception e){
       log.error("토큰이 유효하지 않습니다.", e);
-      throw new RingoException("토큰이 유효하지 않습니다.", ErrorCode.TOKEN_INVALID, HttpStatus.BAD_REQUEST);
+      throw new RingoException("토큰이 유효하지 않습니다.", ErrorCode.TOKEN_INVALID);
     }
   }
 

@@ -35,7 +35,7 @@ public class SurveyController implements SurveyApi{
 
   public ResponseEntity<ResultMessageResponseDto> updateSurvey(UpdateSurveyRequestDto dto, Long surveyId, User user){
     if(!user.getRole().equals(Role.ADMIN)){
-      throw new RingoException("관리자만 설문지를 수정할 수 있습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("관리자만 설문지를 수정할 수 있습니다.", ErrorCode.NO_AUTH);
     }
     log.info("step=설문지_수정_시작, userId={}, surveyId={}", user.getId(), surveyId);
     surveyService.updateSurvey(dto, surveyId);
@@ -58,7 +58,7 @@ public class SurveyController implements SurveyApi{
       Long userId,
       User user){
     if (!user.getId().equals(userId)){
-      throw new RingoException("설문에 응답할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("설문에 응답할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
 
     log.info("step=설문_응답_저장_시작, userId={}", user.getId());
@@ -73,7 +73,7 @@ public class SurveyController implements SurveyApi{
       Long userId, User user
   ){
     if (!user.getId().equals(userId)){
-      throw new RingoException("일일 설문 조회할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("일일 설문 조회할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
 
     log.info("step=일일_설문_조회_시작, userId={}", userId);
@@ -85,7 +85,7 @@ public class SurveyController implements SurveyApi{
 
   public ResponseEntity<ApiListResponseDto<GetUserSurveyResponseDto>> getUserSurveyResponses(Long userId, User user){
     if (!(userId.equals(user.getId()) || user.getRole().equals(Role.ADMIN))) {
-      throw new RingoException("설문 응답 결과를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.BAD_REQUEST);
+      throw new RingoException("설문 응답 결과를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
 
     log.info("step=유저_설문_응답_조회_시작, userId={}", user.getId());

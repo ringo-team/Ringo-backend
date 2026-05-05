@@ -20,10 +20,10 @@ public class ExceptionHandlerFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
     }catch (RingoException e){
       log.error("step=필터_예외, uri={}, method={}, message={}", request.getRequestURI(), request.getMethod(), e.getMessage(), e);
-      response.setStatus(e.getStatus().value());
+      response.setStatus(e.getHttpStatus().value());
       response.setContentType("application/json; charset=UTF-8");
       response.getWriter().write(
-          ErrorResponse.of(LocalDateTime.now().toString(), e.getStatus().value(), e.getMessage())
+          ErrorResponse.of(LocalDateTime.now().toString(), e.getHttpStatus().value(), e.getMessage())
               .convertToJson()
       );
     }

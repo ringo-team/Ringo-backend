@@ -55,10 +55,10 @@ public class GetChatMessageResponseDto {
 
   String place;
 
-  public static GetChatMessageResponseDto from(Long chatroomId, Message m) {
+  public static GetChatMessageResponseDto from(Message m) {
     return GetChatMessageResponseDto.builder()
         .id(m.getId())
-        .chatroomId(chatroomId)
+        .chatroomId(m.getChatroomId())
         .senderId(m.getSenderId())
         .content(m.getContent())
         .createdAt(m.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))

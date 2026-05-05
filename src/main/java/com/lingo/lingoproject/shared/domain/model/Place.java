@@ -69,9 +69,9 @@ public class Place {
   private long clickCount = 0L;
 
   public GetPlaceDetailResponseDto createPlaceDetailDto(boolean isScrap){
-    List<String> keywords = keyword != null ? Arrays.stream(this.keyword.split(",")).toList() : null;
+    List<String> keywords = keyword != null ?
+        Arrays.stream(this.keyword.split(",")).toList() : null;
     List<String> profileUrls = convertPlaceImagesToUrlList(this.images);
-    if (!profileUrls.isEmpty()) log.info("profile url");
     return GetPlaceDetailResponseDto.builder()
         .id(this.id)
         .placeName(this.name)
@@ -84,18 +84,16 @@ public class Place {
         .district(this.district)
         .neighbor(this.neighbor)
         .type(this.type)
+        .detailAddress(this.detailAddress)
         .isScrap(isScrap)
         .build();
   }
 
   public static PlaceDocument createDocument(Place place){
-    String firstImage = place.images != null
-        ? place.images.getFirst().getImage()
-        : null;
     return PlaceDocument.builder()
         .id(place.id)
         .name(place.name)
-        .image(firstImage)
+        .keyword(place.getKeyword())
         .build();
   }
 

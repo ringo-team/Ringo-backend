@@ -65,10 +65,10 @@ public class GoogleLoginUseCase {
           .timeout(Duration.ofSeconds(5))
           .block();
     }catch (Exception e){
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
     if (response == null){
-      throw new RingoException("Invalid Google Access Token", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("Invalid Google Access Token", ErrorCode.INTERNAL_SERVER_ERROR);
     }
     return response.accessToken();
   }
@@ -101,10 +101,10 @@ public class GoogleLoginUseCase {
           .timeout(Duration.ofSeconds(5))
           .block();
     }catch (Exception e){
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
     if(response == null){
-      throw new RingoException("Google user info response is null", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("Google user info response is null", ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
     // 3

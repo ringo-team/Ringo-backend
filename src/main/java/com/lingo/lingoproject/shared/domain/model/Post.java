@@ -51,6 +51,10 @@ public class Post extends Timestamp {
     if (postCategory != null) this.setCategory(postCategory);
   }
 
+  public boolean hasUserOwnership(User user){
+    return this.author.getId().equals(user.getId());
+  }
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

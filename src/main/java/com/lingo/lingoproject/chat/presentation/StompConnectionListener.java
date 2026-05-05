@@ -50,7 +50,7 @@ public class StompConnectionListener {
       if (e instanceof RingoException re){
         throw re;
       }
-      throw new RingoException("웹소켓 연결 상태를 레디스에 저장하던 중 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("웹소켓 연결 상태를 레디스에 저장하던 중 오류가 발생하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -75,7 +75,7 @@ public class StompConnectionListener {
       Set<String> keyset = redisTemplate.keys("connect::" + user.getId() + "*");
       if (keyset.isEmpty()){
         log.info("redis key cannot found");
-        throw new RingoException("redis key cannot found", ErrorCode.NOT_FOUND, HttpStatus.INTERNAL_SERVER_ERROR);
+        throw new RingoException("redis key cannot found", ErrorCode.INTERNAL_SERVER_ERROR);
       }
       for (String key : keyset) {
         log.info("step=WebSocket_연결_키_삭제, key={}", key);
@@ -88,7 +88,7 @@ public class StompConnectionListener {
         throw re;
       }
       throw new RingoException("웹소켓 연결을 끊고 레디스에 연결 정보를 삭제하던 중 오류가 발생하였습니다.",
-          ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+          ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 }

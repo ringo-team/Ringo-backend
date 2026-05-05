@@ -44,10 +44,9 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostLikeUserMappingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.SubCommentRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserScrapPlaceRepository;
-import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageService;
+import com.lingo.lingoproject.image.application.S3ImageStorageService;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
 import jakarta.transaction.Transactional;
 import java.io.InputStream;
@@ -99,13 +98,11 @@ import org.springframework.web.multipart.MultipartFile;
 public class CommunityService {
 
   private final PostRepository postRepository;
-  private final UserRepository userRepository;
   private final CommentRepository commentRepository;
   private final S3ImageStorageService imageService;
   private final PostImageRepository postImageRepository;
   private final PostLikeUserMappingRepository postLikeUserMappingRepository;
   private final CommentLikeUserMappingRepository commentLikeUserMappingRepository;
-  private final SubCommentRepository subCommentRepository;
   private final CommunityDomainService communityDomainService;
   private final DomainEventPublisher eventPublisher;
   private final PostSearchRepository postSearchRepository;
@@ -113,6 +110,7 @@ public class CommunityService {
   private final UserScrapPlaceRepository userScrapPlaceRepository;
   private final PlaceSearchRepository placeSearchRepository;
   private final PlaceImageRepository placeImageRepository;
+  private final CommunityUploadTransactionService communityUploadTransactionService;
 
   /**
    * 게시물을 생성한다.
@@ -125,21 +123,37 @@ public class CommunityService {
    * @return 저장된 게시물 ID, 업로드된 이미지 목록, 처리 결과 코드
    * @throws RingoException 작성자 또는 추천 장소가 존재하지 않는 경우
    */
-  @Transactional
-  public SavePostResponseDto createPost(SavePostRequestDto dto, List<MultipartFile> images) {
+  public SavePostResponseDto createPost(SavePostRequestDto dto, List<MultipartFile> images, User user) {
     log.info("step=게시물_작성_시작, userId={}, topic={}", dto.userId(), dto.category());
 
-    User author = findUserOrThrow(dto.userId());
-    PostCategory postCategory = GenericUtils.validateAndReturnEnumValue(PostCategory.values(), dto.category());
+    List<String> imageUrls = uploadImages(images);
 
-    Post savedPost = postRepository.save(Post.of(author, dto.title(), dto.content(), postCategory));
+    try {
+      return communityUploadTransactionService.savePostAndImages(dto, user, imageUrls);
+    } catch (Exception e) {
+      imageUrls.forEach(imageService::deleteS3Object);
+      throw new RingoException("게시물 저장에 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
+    }
+  }
 
-    log.info("step=게시물_저장_완료, postId={}, userId={}, imageCount={}", savedPost.getId(), dto.userId(), images == null ? 0 : images.size());
+  private List<String> uploadImages(List<MultipartFile> images){
+    List<String> imageUrls = new ArrayList<>();
+    try{
+      images.forEach(
+          i -> {
+            String imageUrl = imageService.uploadImageToS3(i, "/post");
+            imageUrls.add(imageUrl);
+          }
+      );
+    } catch (Exception e) {
+      imageUrls.forEach(imageService::deleteS3Object);
+      throw new RingoException("게시물 이미지 업로드에 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
+    }
+    return imageUrls;
+  }
 
-    eventPublisher.publish(new PostCreatedEvent(savedPost));
-
-    List<SavePostImageResponseDto> savedPostImages = uploadAndSavePostImages(images, savedPost);
-    return new SavePostResponseDto(savedPost.getId(), savedPostImages, ErrorCode.SUCCESS.getCode());
+  public void deleteImages(List<String> images){
+    images.forEach(imageService::deleteS3Object);
   }
 
   /**
@@ -154,24 +168,29 @@ public class CommunityService {
    * @return 업데이트된 이미지 목록 + 처리 결과 코드
    * @throws RingoException 게시물이 존재하지 않거나 소유자가 아닌 경우
    */
-  @Transactional
   public UpdatePostResponseDto updatePost(Long postId, UpdatePostRequestDto dto, User user) {
     Post post = findPostOrThrow(postId);
     communityDomainService.validatePostOwnership(post, user);
+
     post.updatePost(dto);
 
-    List<UpdatePostImageResponseDto> updatedImages = updatePostImageAndGetResponseDto(dto.imagelist());
-
-    postRepository.save(post);
-    log.info("step=게시물_수정_완료, postId={}, userId={}", postId, user.getId());
-
-    return new UpdatePostResponseDto(updatedImages, ErrorCode.SUCCESS.getCode());
-  }
-
-  private List<UpdatePostImageResponseDto> updatePostImageAndGetResponseDto(List<UpdatePostImageRequestDto> imagelist){
-    return imagelist.stream()
-        .map(this::replacePostImage)
+    List<Long> imageIds = dto.imagelist()
+        .stream()
+        .map(UpdatePostImageRequestDto::imageId)
         .toList();
+    List<String> imageUrls = postImageRepository
+        .findAllByIdIn(imageIds)
+        .stream()
+        .map(PostImage::getImageUrl)
+        .toList();
+    deleteImages(imageUrls);
+    uploadImages(dto.imagelist().stream().map(UpdatePostImageRequestDto::imageFile).toList());
+
+    return communityUploadTransactionService.updatePostAndImages(
+        post,
+        imageUrls,
+        user
+    );
   }
 
   /**
@@ -189,17 +208,14 @@ public class CommunityService {
     Post post = findPostOrThrow(postId);
     communityDomainService.validatePostOwnership(post, user);
 
-    deleteAllPostImages(post);
-    deleteAllPostComments(post);
-    deleteAllPostLike(post);
-    postRepository.delete(post);
+    postImageRepository.findAllByPost(post)
+        .stream()
+        .map(PostImage::getImageUrl)
+        .forEach(imageService::deleteS3Object);
+
+    communityUploadTransactionService.deletePost(post);
 
     log.info("step=게시물_삭제_완료, postId={}, userId={}", postId, user.getId());
-  }
-
-  @Transactional
-  void deleteAllPostLike(Post post){
-    postLikeUserMappingRepository.deleteAllByPost(post);
   }
 
   /**
@@ -365,7 +381,7 @@ public class CommunityService {
 
   private void validateCreateSubComment(Comment comment){
     if (comment.hasParent()){
-      throw new RingoException("대댓글에 댓글을 달 수 없습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+      throw new RingoException("대댓글에 댓글을 달 수 없습니다.", ErrorCode.BAD_REQUEST);
     }
   }
 
@@ -442,7 +458,7 @@ public class CommunityService {
   @Transactional
   public void toggleCommentLike(Long commentId, User user) {
     Comment comment = commentRepository.findById(commentId)
-        .orElseThrow(() -> new RingoException("댓글 좋아요 처리 중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("댓글 좋아요 처리 중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND));
     CommentLikeUserMapping mapping = commentLikeUserMappingRepository.findByCommentAndUser(comment, user);
 
     if (mapping != null && comment.getLikeCount() > 0) {
@@ -457,68 +473,14 @@ public class CommunityService {
 
   // ─── private helpers ───────────────────────────────────────────────────────
 
-  private User findUserOrThrow(Long userId) {
-    return userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("게시물을 포스팅하던 도중 유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
-  }
-
   private Comment findCommentOrThrow(Long commentId){
     return commentRepository.findById(commentId)
-        .orElseThrow(() -> new RingoException("대댓글을 생성하던 도중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("대댓글을 생성하던 도중 댓글을 찾을 수 없습니다.", ErrorCode.NOT_FOUND));
   }
 
   private Post findPostOrThrow(Long postId) {
     return postRepository.findById(postId)
-        .orElseThrow(() -> new RingoException("게시물을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-  }
-
-  /** 이미지 목록을 S3에 업로드하고 {@link PostImage} 엔티티로 저장한다. 부적절한 콘텐츠는 건너뜀. */
-  @Transactional
-  List<SavePostImageResponseDto> uploadAndSavePostImages(List<MultipartFile> images, Post post) {
-    List<SavePostImageResponseDto> savedPostImages = new ArrayList<>();
-    if (images == null) return savedPostImages;
-    images.forEach(image -> {
-      if (!imageService.containsInappropriateContent(image)) {
-        String imageUrl = imageService.uploadImageToS3(image, "post");
-        PostImage postImage = postImageRepository.save(PostImage.of(post, imageUrl));
-        savedPostImages.add(new SavePostImageResponseDto(postImage.getId(), imageUrl));
-      }
-    });
-    return savedPostImages;
-  }
-
-  /** 기존 S3 이미지를 삭제하고 새 이미지를 업로드하여 {@link PostImage} URL을 교체한다. */
-  @Transactional
-  UpdatePostImageResponseDto replacePostImage(UpdatePostImageRequestDto imageDto) {
-    PostImage postImage = postImageRepository.findById(imageDto.imageId())
-        .orElseThrow(() -> new RingoException("게시물 업데이트 중 해당 이미지를 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
-
-    String oldImageKey = imageService.extractS3ObjectKey(postImage.getImageUrl());
-    imageService.deleteS3Object(oldImageKey);
-
-    String newImageUrl = imageService.uploadImageToS3(imageDto.imageFile(), "post");
-    postImage.setImageUrl(newImageUrl);
-    postImageRepository.save(postImage);
-
-    return new UpdatePostImageResponseDto(postImage.getId(), newImageUrl);
-  }
-
-  /** 게시물에 연결된 모든 이미지를 S3와 DB에서 삭제한다. */
-  @Transactional
-  void deleteAllPostImages(Post post) {
-    postImageRepository.findAllByPost(post).forEach(postImage -> {
-      String imageKey = imageService.extractS3ObjectKey(postImage.getImageUrl());
-      imageService.deleteS3Object(imageKey);
-      postImageRepository.delete(postImage);
-    });
-  }
-
-  /** 게시물에 달린 모든 댓글과 대댓글을 삭제한다. */
-  @Transactional
-  void deleteAllPostComments(Post post) {
-    List<Comment> comments = commentRepository.findAllByPost(post);
-    commentLikeUserMappingRepository.deleteAllByCommentIn(comments);
-    commentRepository.deleteAllByPost(post);
+        .orElseThrow(() -> new RingoException("게시물을 찾을 수 없습니다.", ErrorCode.NOT_FOUND));
   }
 
   /** 게시물 엔티티와 이미지 DTO 목록으로 응답 DTO를 생성한다. */
@@ -572,7 +534,7 @@ public class CommunityService {
     } catch (Exception e) {
       if (e instanceof RingoException re) throw re;
       log.error("step=설문_엑셀_파싱_실패, filename={}", file.getOriginalFilename(), e);
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
     return places;
   }
@@ -624,7 +586,7 @@ public class CommunityService {
 
   private Place findPlaceOrThrow(Long placeId){
     return placeRepository.findById(placeId)
-        .orElseThrow(() -> new RingoException("장소 id를 찾을 수 없습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("장소 id를 찾을 수 없습니다.", ErrorCode.BAD_REQUEST));
   }
 
   @Transactional
@@ -656,4 +618,5 @@ public class CommunityService {
     boolean isScrap = userScrapPlaceRepository.existsByUserAndPlace(user, place);
     return place.createPlaceDetailDto(isScrap);
   }
+
 }

@@ -103,15 +103,15 @@ public class SelfAuthUseCase {
           .block();
     } catch (Exception e) {
       log.error("step=액세스_토큰_요청_실패, uri={}", uriPath, e);
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
     if (response == null) {
       log.error("step=액세스_토큰_응답_null, uri={}", uriPath);
-      throw new RingoException("본인인증 api response의 값이 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("본인인증 api response의 값이 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
     else if(!response.getDataHeader().resultCd().equals("1200")){
       log.error("step=액세스_토큰_응답_오류, uri={}, resultCd={}", uriPath, response.getDataHeader().resultCd());
-      throw new RingoException("본인인증 api의 응답값에서 정상 토큰을 얻지 못하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("본인인증 api의 응답값에서 정상 토큰을 얻지 못하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
     return response.getDataBody().accessToken();
@@ -190,7 +190,7 @@ public class SelfAuthUseCase {
 
     }catch (Exception e){
       log.error("step=암호화_토큰_요청_실패, uri={}", uriPath, e);
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -209,7 +209,7 @@ public class SelfAuthUseCase {
         || !response.getDataBody().resultCd().equals("0000")
     ){
       if (response != null) log.error("step=암호화_토큰_응답_오류, resultCd={}", response.getDataHeader().resultCd());
-      throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("본인인증 api response에서 null 또는 오류 메세지를 받았습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -286,7 +286,7 @@ public class SelfAuthUseCase {
       );
       return objectMapper.writeValueAsString(plainRequestData);
     }
-    throw new RingoException("토큰에 site_code가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    throw new RingoException("토큰에 site_code가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
   }
   /**
    * 데이터의 무결성을 확인하고 데이터를 복호화한다.
@@ -303,7 +303,7 @@ public class SelfAuthUseCase {
     /* pass 서버로부터 받은 originalIntegrityValue와 방금 생성한 integrityValue가 동일한지 확인 */
     if(!verifyIntegrity(encryptedData, hmacKeyForIntegrityCheck, originalIntegrityValue)){
       log.error("step=본인인증_무결성_검증_실패");
-      throw new RingoException("잘못된 암호문이 도달했습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("잘못된 암호문이 도달했습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
     /* 데이터를 복호화하여 리턴함 */
@@ -336,8 +336,7 @@ public class SelfAuthUseCase {
       log.error("step=본인인증_정보_역직렬화_실패", e);
       throw new RingoException(
           e.getMessage(),
-          ErrorCode.INTERNAL_SERVER_ERROR,
-          HttpStatus.INTERNAL_SERVER_ERROR
+          ErrorCode.INTERNAL_SERVER_ERROR
       );
     }
   }
@@ -351,12 +350,12 @@ public class SelfAuthUseCase {
     switch (userSelfAuthInfo.getGender()) {
       case "0" -> userSelfAuthInfo.setGender("FEMALE");
       case "1" -> userSelfAuthInfo.setGender("MALE");
-      default -> throw new RingoException("잘못된 pass 응답", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      default -> throw new RingoException("잘못된 pass 응답", ErrorCode.INTERNAL_SERVER_ERROR);
     }
     switch (userSelfAuthInfo.getNationalInfo()) {
       case "0" ->  userSelfAuthInfo.setNationalInfo("DOMESTIC");
       case "1" ->  userSelfAuthInfo.setNationalInfo("FOREIGN");
-      default -> throw new RingoException("잘못된 pass 응답", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      default -> throw new RingoException("잘못된 pass 응답", ErrorCode.INTERNAL_SERVER_ERROR);
   }
 
     user.setUserSelfAuthInfo(userSelfAuthInfo);
@@ -367,8 +366,7 @@ public class SelfAuthUseCase {
     return userRepository.findById(userId).orElseThrow(() ->
             new RingoException(
             "유저 인증 정보 저장 중 유저를 찾을 수 없습니다.",
-            ErrorCode.NOT_FOUND_USER,
-            HttpStatus.NOT_FOUND)
+            ErrorCode.USER_NOT_FOUND)
         );
   }
 
@@ -377,8 +375,7 @@ public class SelfAuthUseCase {
     return userRepository.findByPhoneNumber(phoneNumber).orElseThrow(() ->
         new RingoException(
             "해당 번호로 가입된 적이 없습니다.",
-            ErrorCode.BAD_REQUEST,
-            HttpStatus.BAD_REQUEST
+            ErrorCode.BAD_REQUEST
         ));
   }
 
@@ -387,8 +384,7 @@ public class SelfAuthUseCase {
     return userRepository.findByLoginIdAndPhoneNumber(loginId, phoneNumber).orElseThrow(() ->
         new RingoException(
             "해당 아이디의 비밀번호를 찾을 수 없습니다.",
-            ErrorCode.BAD_REQUEST,
-            HttpStatus.BAD_REQUEST
+            ErrorCode.BAD_REQUEST
         ));
   }
 }

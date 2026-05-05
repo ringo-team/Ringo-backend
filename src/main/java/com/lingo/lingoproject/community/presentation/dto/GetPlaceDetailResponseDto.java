@@ -15,6 +15,7 @@ public record GetPlaceDetailResponseDto(
     String city,
     String district,
     String neighbor,
+    String detailAddress,
     String type,
     boolean isScrap
 ) {

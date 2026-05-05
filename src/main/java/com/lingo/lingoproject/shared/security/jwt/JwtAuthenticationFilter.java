@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -76,29 +75,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       // 서명 검증 및 claims 파싱 (만료/위변조 시 RingoException 발생)
       Claims claims = jwtUtil.getClaims(accessToken);
       User user = userRepository.findByLoginId(claims.getSubject())
-          .orElseThrow(() -> new RingoException("유효하지 않은 토큰입니다.", ErrorCode.TOKEN_INVALID, HttpStatus.FORBIDDEN));
+          .orElseThrow(() -> new RingoException("유효하지 않은 토큰입니다.", ErrorCode.TOKEN_INVALID));
 
       // 로그아웃한 유저가 기존 토큰으로 접근하려고 할때 접근을 차단함
       // 로그아웃 시 해당 토큰의 jti를 Redis에 등록 (TTL = 토큰 잔여 만료 시간)
       if(redisTemplate.hasKey("logoutUser::" + claims.getId())){
-        throw new RingoException("유효하지 않은 토큰 입니다.", ErrorCode.LOGOUT, HttpStatus.FORBIDDEN);
+        throw new RingoException("유효하지 않은 토큰 입니다.", ErrorCode.LOGOUT);
       }
 
       // 계정 정지된 사람일 경우 접근을 차단함
       // ReportService.suspendUser()에서 "suspension::{userId}" 키를 TTL과 함께 Redis에 등록
       if (redisTemplate.hasKey("suspension::" + user.getId())){
-        throw new RingoException("계정이 정지된 유저입니다.", ErrorCode.BLOCKED, HttpStatus.FORBIDDEN);
+        throw new RingoException("계정이 정지된 유저입니다.", ErrorCode.BLOCKED);
       }
 
       // 영구 정지된 사람인 경우 접근을 차단함 (DB 조회)
       if (blockedUserRepository.existsByBlockedUserId(user.getId())) {
-        throw new RingoException("영구정지된 유저입니다.", ErrorCode.BLOCKED, HttpStatus.FORBIDDEN);
+        throw new RingoException("영구정지된 유저입니다.", ErrorCode.BLOCKED);
       }
 
       // 회원가입을 마치치 않은 회원의 경우 접근을 차단함
       // /signup/** 경로와 공개 조회 엔드포인트는 예외적으로 허용
       if(!user.getStatus().equals(SignupStatus.COMPLETED)){
-        throw new RingoException("회원가입을 마치고 요청 주시길 바랍니다.", ErrorCode.BEFORE_SIGNUP ,HttpStatus.FORBIDDEN);
+        throw new RingoException("회원가입을 마치고 요청 주시길 바랍니다.", ErrorCode.BEFORE_SIGNUP );
       }
 
       log.info("userId={}, endpoint={}, step=api_요청", user.getId(), request.getRequestURI());

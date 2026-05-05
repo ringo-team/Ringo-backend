@@ -21,7 +21,6 @@ import com.lingo.lingoproject.shared.utils.GenericUtils;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -39,7 +38,7 @@ public class FcmNotificationUseCase {
 
   public void refreshFcmToken(SaveFcmTokenRequestDto dto, User user){
     FcmToken fcmToken = fcmTokenRepository.findByUser(user)
-        .orElseThrow(() -> new RingoException("유저의 fcm 토큰 엔티티를 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+        .orElseThrow(() -> new RingoException("유저의 fcm 토큰 엔티티를 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR));
     fcmToken.setToken(dto.token());
     fcmTokenRepository.save(fcmToken);
   }
@@ -47,12 +46,14 @@ public class FcmNotificationUseCase {
   public void sendFcmNotification(User receiver, String title, String body, NotificationType type) {
 
     log.info("fcm message sending start");
-    notificationRepository.save(com.lingo.lingoproject.shared.domain.model.Notification.of(receiver, type, title, body));
+    if (!type.equals(NotificationType.MESSAGE)){
+      notificationRepository.save(com.lingo.lingoproject.shared.domain.model.Notification.of(receiver, type, title, body));
+    }
 
     if(notificationOptionOutUserRepository.existsByUserAndType(receiver, type)) return;
 
     FcmToken token = fcmTokenRepository.findByUser(receiver)
-        .orElseThrow(() -> new RingoException("fcm 토큰을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
+        .orElseThrow(() -> new RingoException("fcm 토큰을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR));
     Message message = Message.builder()
         .setToken(token.getToken())
         .setNotification(
@@ -70,7 +71,7 @@ public class FcmNotificationUseCase {
       FailedFcmMessageLog log = FailedFcmMessageLog.of(e, token.getToken(), title, body);
       failedFcmMessageLogRepository.save(log);
       fcmRetryQueueService.pushToQueue("FCM", log);
-      throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("fcm 메세지를 보내는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 

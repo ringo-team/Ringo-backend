@@ -76,7 +76,7 @@ public class RedisExpireListener implements MessageListener {
       Long userId = Long.parseLong(parts[1]);
 
       User user = userRepository.findById(userId).orElseThrow(
-          () -> new RingoException("찾을 수 없는 유저", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST)
+          () -> new RingoException("찾을 수 없는 유저", ErrorCode.NOT_FOUND)
       );
 
       // 활동 시작 시간: 키 생성 시 함께 저장한 LocalDateTime

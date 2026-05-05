@@ -184,7 +184,7 @@ public interface CommunityApi {
   @GetMapping(value = "/places/{place-id}")
   ResponseEntity<GetPlaceDetailResponseDto> getDetailPlaceInfo(@AuthenticationPrincipal User user, @PathVariable(value = "place-id") Long placeId);
 
-  @PatchMapping(value = "/places/{place-id}")
+  @PatchMapping(value = "/places/{place-id}/click")
   ResponseEntity<ResultMessageResponseDto> updatePlaceClickCount(@PathVariable(value = "place-id") Long placeId);
 
   @PostMapping(value = "/places/scrap")
@@ -193,6 +193,7 @@ public interface CommunityApi {
   @GetMapping(value = "/places/scrap")
   ResponseEntity<List<GetPlaceDetailResponseDto>> getScrappedPlace(@AuthenticationPrincipal User user);
 
-  @GetMapping(value = "places/search")
+  @GetMapping(value = "/places/search")
   ResponseEntity<ApiListResponseDto<SearchPlaceRequestDto>> searchPlacesByKeywords(@RequestParam String keyword);
+
 }

@@ -60,7 +60,7 @@ public class NotificationController {
       @AuthenticationPrincipal User user
   ){
     if(!dto.userId().equals(user.getId())){
-      throw new RingoException("토큰을 refresh할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("토큰을 refresh할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
 
     log.info("step=FCM_토큰_리프레시_시작, userId={}", user.getId());
@@ -133,7 +133,7 @@ public class NotificationController {
       @AuthenticationPrincipal User user
   ){
     if (!userId.equals(user.getId())){
-      throw new RingoException("조회 권한이 없는 유저입니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("조회 권한이 없는 유저입니다.", ErrorCode.NO_AUTH);
     }
 
     log.info("step=알림_조회_시작, userId={}", user.getId());

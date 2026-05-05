@@ -6,7 +6,7 @@ import java.util.List;
 import lombok.Builder;
 
 @Builder
-public record GetChatroomMemberInfoResponseDto(
+public record ChatOpponentInfoDto(
     @Schema(description = "유저 id", example = "35")
     Long userId,
     @Schema(description = "프로필 url")
@@ -17,17 +17,17 @@ public record GetChatroomMemberInfoResponseDto(
     List<String> hashtag
 ) {
 
-  public static GetChatroomMemberInfoResponseDto from(User opponent, List<String> hashtags) {
-    return GetChatroomMemberInfoResponseDto.builder()
+  public static ChatOpponentInfoDto from(User opponent) {
+    return ChatOpponentInfoDto.builder()
         .profileUrl(opponent.getProfile().getImageUrl())
         .userId(opponent.getId())
         .nickname(opponent.getNickname())
-        .hashtag(hashtags)
+        .hashtag(opponent.getUserHashtags())
         .build();
   }
 
-  public static GetChatroomMemberInfoResponseDto withdrawn() {
-    return GetChatroomMemberInfoResponseDto.builder()
+  public static ChatOpponentInfoDto withdrawn() {
+    return ChatOpponentInfoDto.builder()
         .profileUrl(null)
         .userId(null)
         .nickname("알 수 없음")

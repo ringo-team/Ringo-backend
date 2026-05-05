@@ -49,7 +49,7 @@ public class ReportRepositoryImpl implements ReportRepositoryCustom {
         builder.and(report.createdAt.loe(finishedAt));
       }catch (Exception e){
         log.error("신고 조회 기간 파싱 실패. startedAt: {}, finishedAt: {}", dto.startedAt(), dto.finishedAt(), e);
-        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
       }
     }
 

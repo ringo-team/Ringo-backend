@@ -13,7 +13,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingReposito
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserPointRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.WithdrawerRepository;
-import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageService;
+import com.lingo.lingoproject.image.application.S3ImageStorageService;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -49,7 +49,7 @@ public class UserDeleteUseCase {
       answeredSurveyRepository.deleteAllByUser(user);
       blockedFriendRepository.deleteByUser(user);
       dormantAccountRepository.deleteByUser(user);
-      imageService.deleteProfileImageByUser(user);
+      imageService.deleteProfileImage(user);
       imageService.deleteAllFeedImagesByUser(user);
       matchingRepository.deleteAllByRequestedUser(user);
       matchingRepository.deleteAllByRequestUser(user);
@@ -60,7 +60,7 @@ public class UserDeleteUseCase {
     } catch (Exception e) {
       log.error("유저 데이터 삭제 실패. userId: {}, reason: {}", user.getId(), reason, e);
       throw new RingoException("유저 정보를 삭제하는데 실패하였습니다." + e.getMessage(),
-          ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+          ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 }

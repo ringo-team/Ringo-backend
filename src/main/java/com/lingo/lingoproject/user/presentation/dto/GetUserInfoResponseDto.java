@@ -53,6 +53,9 @@ public record GetUserInfoResponseDto(
     @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
     List<String> hashtags,
 
+    @Schema(description = "얼굴 인증 여부", example = "true")
+    boolean isFaceVerify,
+
     @Schema(description = "휴면계정 여부", example = "true")
     boolean isDormant,
 
@@ -66,6 +69,7 @@ public record GetUserInfoResponseDto(
       User user,
       List<String> hashtags,
       boolean isDormant,
+      boolean isFaceVerify,
       Map<String, Boolean> notificationSettingMap
   ) {
     return GetUserInfoResponseDto.builder()
@@ -84,6 +88,7 @@ public record GetUserInfoResponseDto(
         .biography(user.getBiography())
         .hashtags(hashtags)
         .isDormant(isDormant)
+        .isFaceVerify(isFaceVerify)
         .notificationSettingMap(notificationSettingMap)
         .result(ErrorCode.SUCCESS.getCode())
         .build();

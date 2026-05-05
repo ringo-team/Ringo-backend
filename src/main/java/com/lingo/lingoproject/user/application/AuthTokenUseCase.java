@@ -46,20 +46,20 @@ public class AuthTokenUseCase {
     String token = redisToken != null ? redisToken.toString() : null;
 
     if (token == null)
-      throw new RingoException("로그인하지 않은 유저입니다.", ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN);
+      throw new RingoException("로그인하지 않은 유저입니다.", ErrorCode.FORBIDDEN);
 
     log.info("redisRefreshToken: {}, requestRefreshToken: {}", token, refreshToken);
 
     if (token.equals(refreshToken)) {
       return generateTokenAndSaveRefreshTokenInRedis(claims.getSubject());
     }
-    throw new RingoException("유효하지 않은 토큰입니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+    throw new RingoException("유효하지 않은 토큰입니다.", ErrorCode.NO_AUTH);
   }
 
   public void logout(HttpServletRequest request) {
     String accessToken = request.getHeader(AUTHORIZATION_HEADER_KEY);
     if (!accessToken.startsWith(ACCESS_TOKEN_PREFIX))
-      throw new RingoException("토큰이 형식이 잘못되었습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST);
+      throw new RingoException("토큰이 형식이 잘못되었습니다.", ErrorCode.BAD_REQUEST);
 
     accessToken = accessToken.substring(7);
     Claims claims = jwtUtil.getClaims(accessToken);
@@ -70,7 +70,7 @@ public class AuthTokenUseCase {
 
   private RegenerateTokenResponseDto generateTokenAndSaveRefreshTokenInRedis(String loginId) {
     User user = userRepository.findByLoginId(loginId)
-        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.BAD_REQUEST));
     String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
     redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refresh, 30, TimeUnit.DAYS);

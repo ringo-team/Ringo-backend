@@ -98,7 +98,7 @@ public class UserController implements UserApi {
 
     if (isDuplicated) {
       return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
-          .body(new ResultMessageResponseDto(ErrorCode.DUPLICATED.getCode(), "중복된 아이디입니다."));
+          .body(new ResultMessageResponseDto(ErrorCode.PROFILE_DUPLICATED.getCode(), "중복된 아이디입니다."));
     }
     return ResponseEntity.status(HttpStatus.OK)
         .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "사용가능한 아이디 입니다."));
@@ -111,7 +111,7 @@ public class UserController implements UserApi {
 
     if (isDuplicated) {
       return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
-          .body(new ResultMessageResponseDto(ErrorCode.DUPLICATED.getCode(), "중복된 닉네임입니다."));
+          .body(new ResultMessageResponseDto(ErrorCode.PROFILE_DUPLICATED.getCode(), "중복된 닉네임입니다."));
     }
     return ResponseEntity.status(HttpStatus.OK)
         .body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "사용가능한 닉네임입니다."));
@@ -132,7 +132,7 @@ public class UserController implements UserApi {
       User user
   ) {
     if (!user.getId().equals(userId)) {
-      throw new RingoException("유저를 탈퇴할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("유저를 탈퇴할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
     log.info("userId={}, step=회원탈퇴_시작, status=SUCCESS", userId);
     userDeleteUseCase.deleteUser(user, reason, feedback);

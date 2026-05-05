@@ -20,6 +20,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.text.DateFormat;
@@ -233,6 +234,13 @@ public class User extends Timestamp implements UserDetails {
 
   private boolean isMarketingReceptionConsent;
 
+  @OneToMany(mappedBy = "user")
+  private List<Hashtag> hashtags;
+
+  public List<String> getUserHashtags(){
+    return hashtags.stream().map(Hashtag::getHashtag).toList();
+  }
+
   /**
    * 일반 회원가입용 정적 팩토리 메서드.
    * 로그인 ID와 BCrypt 인코딩된 비밀번호만 가지고 유저를 생성합니다.
@@ -312,7 +320,7 @@ public class User extends Timestamp implements UserDetails {
       this.birthday = (LocalDate) DateTimeFormatter.ofPattern("yyyyMMdd").parse(dto.getBirthday());
       this.gender = Gender.valueOf(dto.getGender());
     } catch (Exception e) {
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 }

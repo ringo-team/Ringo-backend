@@ -97,7 +97,7 @@ public class SurveyService {
    */
   public void updateSurvey(UpdateSurveyRequestDto dto, Long surveyId) {
     Survey survey = surveyRepository.findById(surveyId)
-        .orElseThrow(() -> new RingoException("해당 설문을 찾을 수 없습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 설문을 찾을 수 없습니다.", ErrorCode.NOT_FOUND));
 
     GenericUtils.validateAndSetStringValue(dto.purpose(), survey::setPurpose);
     GenericUtils.validateAndSetStringValue(dto.content(), survey::setContent);
@@ -126,7 +126,6 @@ public class SurveyService {
     List<AnsweredSurvey> surveyResponses = responses.getList().stream()
         .map(response -> {
           AnsweredSurvey as = buildSurveyAnswerEntity(user, response);
-          log.info("[UPDATED_AT]: {}", String.valueOf(as.getUpdatedAt()));
           return as;
         })
         .toList();
@@ -197,7 +196,7 @@ public class SurveyService {
     } catch (Exception e) {
       if (e instanceof RingoException re) throw re;
       log.error("step=설문_엑셀_파싱_실패, filename={}", file.getOriginalFilename(), e);
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
     return surveys;
   }
@@ -230,6 +229,7 @@ public class SurveyService {
       log.info("step=설문_응답_수정, userId={}, surveyNum={}, before={}, after={}",
           user.getId(), response.surveyNum(), existing.getAnswer(), response.answer());
       existing.setAnswer(response.answer());
+      existing.setUpdatedAt(LocalDateTime.now());
       return existing;
     }
 

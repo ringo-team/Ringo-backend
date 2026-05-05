@@ -1,10 +1,10 @@
-package com.lingo.lingoproject.shared.presentation;
+package com.lingo.lingoproject.image;
 
 import com.lingo.lingoproject.shared.domain.model.User;
-import com.lingo.lingoproject.shared.presentation.dto.image.GetFeedImageInfoResponseDto;
-import com.lingo.lingoproject.shared.presentation.dto.image.UploadAllFeedImageRequestDto;
-import com.lingo.lingoproject.shared.presentation.dto.image.GetImageUrlResponseDto;
-import com.lingo.lingoproject.shared.presentation.dto.image.UpdateFeedImageDescriptionRequestDto;
+import com.lingo.lingoproject.image.dto.GetFeedImageInfoResponseDto;
+import com.lingo.lingoproject.image.dto.UploadAllFeedImageRequestDto;
+import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
+import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -42,7 +43,7 @@ public interface ImageApi {
   @PostMapping(value = "profiles", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   ResponseEntity<?> uploadProfileImage(
       @Parameter(description = "이미지 파일") @RequestParam(value = "image") MultipartFile image,
-      @RequestParam(value = "userId") Long userId
+      @AuthenticationPrincipal User user
   );
 
   @Operation(summary = "프로필 조회", description = "프로필 URL과 이미지 id를 반환합니다.")
@@ -91,9 +92,8 @@ public interface ImageApi {
   @PostMapping(value = "/feeds", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> uploadFeedImages(
       @Parameter(description = "이미지 파일들 업로드") @ModelAttribute UploadAllFeedImageRequestDto images,
-      @Parameter(description = "유저 id", example = "5") @RequestParam("userId") Long userId
 
-      //@AuthenticationPrincipal User user
+      @AuthenticationPrincipal User user
   );
 
   @Operation(summary = "피드 이미지 조회.", description = "유저가 올린 모든 피드 사진을 조회")
@@ -146,7 +146,7 @@ public interface ImageApi {
   @PatchMapping("/feeds/{feed-image-id}/description")
   ResponseEntity<ResultMessageResponseDto> updateFeedImageDescription(
       @Parameter(description = "피드 사진 id", example = "11") @PathVariable(value = "feed-image-id") Long feedImageId,
-      @RequestBody UpdateFeedImageDescriptionRequestDto dto,
+      @RequestBody @Valid UpdateFeedImageDescriptionRequestDto dto,
       @AuthenticationPrincipal User user
   );
 

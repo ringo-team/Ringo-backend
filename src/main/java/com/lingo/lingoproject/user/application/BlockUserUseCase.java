@@ -28,9 +28,9 @@ public class BlockUserUseCase {
   @Transactional
   public void blockUser(Long userId, Long adminId) {
     User admin = userRepository.findById(adminId)
-        .orElseThrow(() -> new RingoException("id 에 해당하는 관리자가 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("id 에 해당하는 관리자가 없습니다.", ErrorCode.USER_NOT_FOUND));
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException("id에 해당하는 유저가 없습니다.", ErrorCode.NOT_FOUND_ADMIN, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("id에 해당하는 유저가 없습니다.", ErrorCode.ADMIN_NOT_FOUND));
 
     BlockedUser blockedUser = BlockedUser.of(user, admin);
 

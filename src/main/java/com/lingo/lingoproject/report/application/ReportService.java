@@ -110,7 +110,7 @@ public class ReportService {
   public void suspendUser(Long reportId, String reportedUserStatus, Long adminId){
     log.info("step=신고_처리_시작, reportId={}, reportedUserStatus={}, adminId={}", reportId, reportedUserStatus, adminId);
     Report report = reportRepository.findById(reportId)
-        .orElseThrow(() -> new RingoException("해당 신고가 존재하지 않습니다.", ErrorCode.NOT_FOUND, HttpStatus.BAD_REQUEST));
+        .orElseThrow(() -> new RingoException("해당 신고가 존재하지 않습니다.", ErrorCode.NOT_FOUND));
     report.setAdminId(adminId);
 
     ReportStatus status = parseReportStatus(reportedUserStatus, reportId, adminId);
@@ -141,7 +141,7 @@ public class ReportService {
       default -> {
         log.warn("step=신고_처리_잘못된_조치, reportId={}, reportedUserStatus={}, adminId={}",
             reportId, reportedUserStatus, adminId);
-        throw new RingoException("적절하지 못한 조치가 입력되었습니다.", ErrorCode.BAD_PARAMETER, HttpStatus.BAD_REQUEST);
+        throw new RingoException("적절하지 못한 조치가 입력되었습니다.", ErrorCode.BAD_PARAMETER);
       }
     };
   }

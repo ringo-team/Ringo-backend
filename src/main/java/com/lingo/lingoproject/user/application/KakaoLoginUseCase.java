@@ -59,10 +59,10 @@ public class KakaoLoginUseCase {
           .timeout(Duration.ofSeconds(5))
           .block();
     }catch (Exception e){
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
     if(response == null){
-      throw new RingoException("Kakao token response is null", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("Kakao token response is null", ErrorCode.INTERNAL_SERVER_ERROR);
     }
     return response.accessToken();
   }
@@ -88,10 +88,10 @@ public class KakaoLoginUseCase {
           .timeout(Duration.ofSeconds(5))
           .block();
     }catch (Exception e){
-      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
     if(response == null){
-      throw new RingoException("Kakao user info response is null", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException("Kakao user info response is null", ErrorCode.INTERNAL_SERVER_ERROR);
     }
     Optional<User> user = userRepository.findByLoginId(response.id().toString());
     User loginUser = user.orElseGet(() -> oAuthUtils.signup(response.id().toString()));

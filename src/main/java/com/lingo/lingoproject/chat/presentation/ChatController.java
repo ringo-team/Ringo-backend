@@ -9,7 +9,6 @@ import com.lingo.lingoproject.chat.presentation.dto.SaveAppointmentRequestDto;
 import com.lingo.lingoproject.shared.domain.model.Appointment;
 import com.lingo.lingoproject.shared.domain.model.Chatroom;
 import com.lingo.lingoproject.shared.domain.model.Message;
-import com.lingo.lingoproject.shared.domain.model.NotificationType;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -40,7 +39,6 @@ public class ChatController implements ChatApi {
 
 
   public ResponseEntity<GetChatResponseDto> getChattingMessages(Long roomId, int page, int size, User user) {
-    chatService.validateParticipant(roomId, user.getId());
 
     log.info("step=메세지_조회_시작, userId={}, chatroomId={}", user.getId(), roomId);
     GetChatResponseDto responses = chatService.getChatMessages(user, roomId, page, size);
@@ -58,7 +56,7 @@ public class ChatController implements ChatApi {
   public ResponseEntity<ApiListResponseDto<GetChatroomResponseDto>> getChatrooms(Long userId, User user) {
     if (!userId.equals(user.getId())) {
       log.error("step=잘못된_유저_요청, authUserId={}, userId={}, status=FAILED", user.getId(), userId);
-      throw new RingoException("채팅방 조회를 할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("채팅방 조회를 할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
 
     log.info("step=채팅방_조회_시작, userId={}", user.getId());
@@ -71,10 +69,8 @@ public class ChatController implements ChatApi {
 
   public ResponseEntity<ResultMessageResponseDto> deleteChatroom(Long roomId, User user) {
 
-    chatService.validateParticipant(roomId, user.getId());
-
     log.info("step=채팅방_삭제_시작, userId={}, chatroomId={}", user.getId(), roomId);
-    chatService.deleteChatroom(roomId);
+    chatService.deleteChatroom(roomId, user);
     log.info("step=채팅방_삭제_완료, userId={}, chatroomId={}", user.getId(), roomId);
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "채팅방을 성공적으로 삭제했습니다."));
@@ -85,23 +81,27 @@ public class ChatController implements ChatApi {
 
     chatService.validateParticipant(roomId, chatMessageDto.getSenderId());
 
-    List<User> roomMembers = chatService.getParticipants(roomId);
-    List<Long> connectedUserIdList = chatService.getConnectedUserIds(roomMembers, roomId);
+    List<User> chatroomMembers = chatService.getNonWithdrawnParticipantUsers(roomId);
+    List<Long> connectedUserIdList = chatService.getConnectedUserIds(chatroomMembers, roomId);
+
     if (!connectedUserIdList.contains(chatMessageDto.getSenderId())) {
-      throw new RingoException("레디스에 채팅방에 존재하는 유저 id가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new RingoException(
+          "레디스에 채팅방에 존재하는 유저 id가 없습니다.",
+          ErrorCode.INTERNAL_SERVER_ERROR
+      );
     }
 
-    String createdAt = DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm:ss").format(LocalDateTime.now());
     chatMessageDto.setReaderIds(connectedUserIdList);
-    chatMessageDto.setCreatedAt(createdAt);
+    chatMessageDto.setCreatedAt(
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now())
+    );
 
-    Message savedMessage = null;
-    if (!chatMessageDto.getType().equalsIgnoreCase("CONNECT")) {
-      savedMessage = chatService.saveMessage(chatMessageDto, roomId);
-      if (savedMessage == null) return;
-    }
+    if (chatMessageDto.getType().equalsIgnoreCase("CONNECT")) return;
 
-    for (User member : roomMembers) {
+    Message savedMessage = chatService.saveMessage(chatMessageDto, roomId);
+    if (savedMessage == null) return;
+
+    for (User member : chatroomMembers) {
       try {
         log.info("step=메세지_전송, senderId={}, receiverId={}", chatMessageDto.getSenderId(), member.getId());
         simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/topic/" + roomId, chatMessageDto);
@@ -109,9 +109,9 @@ public class ChatController implements ChatApi {
         chatService.recordMessageDeliveryFailure(e, savedMessage, member.getLoginId(), "/topic/" + roomId);
       }
       try {
+        log.info("step=채팅_미리보기_전송, chatroomId={}, userLoginId={}", roomId, member.getLoginId());
         simpMessagingTemplate.convertAndSendToUser(member.getLoginId(), "/room-list", chatMessageDto);
       } catch (Exception e) {
-        log.error("step=채팅_미리보기_전송_실패, chatroomId={}, userLoginId={}, status=FAILED", roomId, member.getLoginId(), e);
         chatService.recordMessageDeliveryFailure(e, savedMessage, member.getLoginId(), "/room-list/" + roomId);
       }
 
@@ -123,7 +123,7 @@ public class ChatController implements ChatApi {
 
   public ResponseEntity<ResultMessageResponseDto> saveAppointment(SaveAppointmentRequestDto dto, User user) {
     if (!dto.registerId().equals(user.getId())) {
-      throw new RingoException("등록할 권한이 없습니다.", ErrorCode.NO_AUTH, HttpStatus.FORBIDDEN);
+      throw new RingoException("등록할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
     GetChatMessageResponseDto response = chatService.createAppointment(dto);
     sendMessage(response.getChatroomId(), response);

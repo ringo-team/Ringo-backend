@@ -42,7 +42,7 @@ public class ReportDomainService {
     if (reportRepository.existsByReportUserIdAndReportedUserIdAndReportedUserStatus(
         reportUserId, reportedUserId, ReportStatus.PENDING)) {
       log.warn("step=신고_중복_접수, reportUserId={}, reportedUserId={}", reportUserId, reportedUserId);
-      throw new RingoException("이미 접수된 신고입니다.", ErrorCode.DUPLICATED, HttpStatus.BAD_REQUEST);
+      throw new RingoException("이미 접수된 신고입니다.", ErrorCode.PROFILE_DUPLICATED);
     }
   }
 

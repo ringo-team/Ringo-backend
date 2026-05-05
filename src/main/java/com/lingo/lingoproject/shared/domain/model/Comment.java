@@ -45,6 +45,10 @@ public class Comment extends Timestamp {
         .build();
   }
 
+  public boolean hasUserOwnership(User user){
+    return this.user.getId().equals(user.getId());
+  }
+
   public boolean hasParent(){
     return parentComment != null;
   }

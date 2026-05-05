@@ -1,7 +1,6 @@
 package com.lingo.lingoproject.notification.application;
 
 import com.lingo.lingoproject.matching.domain.event.MatchingAcceptedEvent;
-import com.lingo.lingoproject.shared.domain.model.NotificationType;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -30,7 +29,7 @@ public class MatchingAcceptedNotificationHandler {
     log.info("MatchingAcceptedEvent(알림) 수신: matchingId={}, requestUser={}",
         event.getMatchingId(), event.getRequestUserId());
     User requestUser = userRepository.findById(event.getRequestUserId())
-        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.NOT_FOUND));
+        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
     //fcmNotificationUseCase.sendFcmNotification(requestUser, "누군가 요청을 수락했어요", null, NotificationType.MATCHING_ACCEPTED);
   }
 }

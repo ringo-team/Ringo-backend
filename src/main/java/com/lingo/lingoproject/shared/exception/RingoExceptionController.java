@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.shared.exception;
 
 import com.lingo.lingoproject.shared.domain.model.ExceptionMessage;
+import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ExceptionMessageRepository;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -22,13 +23,33 @@ public class RingoExceptionController {
 
   @ExceptionHandler(RingoException.class)
   public ResponseEntity<ResultMessageResponseDto> handleRingoException(RingoException e){
-    if (e.getStatus().equals(HttpStatus.INTERNAL_SERVER_ERROR)) {
+    if (e.getErrorCode() == null || e.getErrorCode().equals(ErrorCode.INTERNAL_SERVER_ERROR)) {
       log.error(e.getMessage(), e);
     } else {
       log.warn(e.getMessage(), e);
     }
-    exceptionMessageRepository.save(new ExceptionMessage(e.getMessage(), e.getStatus().toString()));
-    return ResponseEntity.status(e.getStatus()).body(new ResultMessageResponseDto(e.getErrorCode().getCode(), "오류가 발생했습니다."));
+    HttpStatus httpStatus = switch (e.getErrorCode()){
+      case ErrorCode.BAD_REQUEST,
+           ErrorCode.BAD_PARAMETER,
+           ErrorCode.NOT_FOUND,
+           ErrorCode.ADMIN_NOT_FOUND,
+           ErrorCode.USER_NOT_FOUND,
+           ErrorCode.PROFILE_DUPLICATED,
+           ErrorCode.INADEQUATE,
+           ErrorCode.FACE_NOT_FOUND,
+           ErrorCode.OVERFLOW -> HttpStatus.BAD_REQUEST;
+      case ErrorCode.FORBIDDEN,
+           ErrorCode.BLOCKED ,
+           ErrorCode.BEFORE_SIGNUP,
+           ErrorCode.LOGOUT,
+           ErrorCode.NO_AUTH,
+           ErrorCode.NOT_ADULT,
+           ErrorCode.TOKEN_INVALID,
+           ErrorCode.TOKEN_EXPIRED -> HttpStatus.FORBIDDEN;
+      default -> HttpStatus.INTERNAL_SERVER_ERROR;
+    };
+    exceptionMessageRepository.save(new ExceptionMessage(e.getMessage(), httpStatus.toString()));
+    return ResponseEntity.status(httpStatus).body(new ResultMessageResponseDto(e.getErrorCode().getCode(), "오류가 발생했습니다."));
   }
 
   @ExceptionHandler(Exception.class)

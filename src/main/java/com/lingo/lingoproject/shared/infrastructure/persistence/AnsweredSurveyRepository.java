@@ -9,6 +9,7 @@ import com.lingo.lingoproject.survey.presentation.dto.GetUserSurveyResponseDto;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -31,6 +32,23 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
         group by S.category
         """)
   List<SurveyScoreResultInterface> calcSurveyScore(@Param("user1") Long user1, @Param("user2") Long user2);
+
+  @Query(value = """
+      select
+          B.user.id as userId,
+          S.category as category,
+          avg(1 - abs(A.answer - B.answer) / 4.0) as avgAnswer
+      from Survey S, AnsweredSurvey A, AnsweredSurvey B
+      where S.surveyNum = A.surveyNum
+        and S.confrontSurveyNum = B.surveyNum
+        and A.user.id = :userId
+        and B.user.id in :selectedUserIds
+      group by B.user.id, S.category
+      """)
+  List<SurveyScoreResultInterface> batchCalcSurveyScore(
+      @Param("userId") Long userId,
+      @Param("selectedUserIds") List<Long> selectedUserIds
+  );
 
   @Query(value = """
     select S.id as surveyId, A.answer as answer

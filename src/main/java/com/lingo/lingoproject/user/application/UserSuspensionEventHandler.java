@@ -33,9 +33,9 @@ public class UserSuspensionEventHandler {
     log.info("UserSuspendedEvent(영구정지) 수신: reportedUserId={}", event.getReportedUserId());
 
     User admin = userRepository.findById(event.getAdminId())
-        .orElseThrow(() -> new RingoException("관리자를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_ADMIN, HttpStatus.NOT_FOUND));
+        .orElseThrow(() -> new RingoException("관리자를 찾을 수 없습니다.", ErrorCode.ADMIN_NOT_FOUND));
     User user = userRepository.findById(event.getReportedUserId())
-        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.NOT_FOUND_USER, HttpStatus.NOT_FOUND));
+        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
 
     blockedUserRepository.save(BlockedUser.of(user, admin));
     log.info("BlockedUser 저장 완료: userId={}", user.getId());

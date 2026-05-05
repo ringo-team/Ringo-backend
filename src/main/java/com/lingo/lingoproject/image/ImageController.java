@@ -1,11 +1,11 @@
-package com.lingo.lingoproject.shared.presentation;
-import com.lingo.lingoproject.shared.infrastructure.storage.S3ImageStorageService;
+package com.lingo.lingoproject.image;
+import com.lingo.lingoproject.image.application.S3ImageStorageService;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
-import com.lingo.lingoproject.shared.presentation.dto.image.GetFeedImageInfoResponseDto;
-import com.lingo.lingoproject.shared.presentation.dto.image.UploadAllFeedImageRequestDto;
-import com.lingo.lingoproject.shared.presentation.dto.image.GetImageUrlResponseDto;
-import com.lingo.lingoproject.shared.presentation.dto.image.UpdateFeedImageDescriptionRequestDto;
+import com.lingo.lingoproject.image.dto.GetFeedImageInfoResponseDto;
+import com.lingo.lingoproject.image.dto.UploadAllFeedImageRequestDto;
+import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
+import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
 import com.lingo.lingoproject.user.application.UserUpdateUseCase;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
@@ -28,17 +28,17 @@ public class ImageController implements ImageApi {
   private final UserUpdateUseCase userUpdateUseCase;
 
 
-  public ResponseEntity<?> uploadProfileImage(MultipartFile image, Long userId) {
-    log.info("step=프로필_업로드_시작, userId={}", userId);
-    GetImageUrlResponseDto dto = imageService.uploadProfileImage(image, userId);
+  public ResponseEntity<?> uploadProfileImage(MultipartFile image, User user) {
+    log.info("step=프로필_업로드_시작, userId={}", user.getId());
+    GetImageUrlResponseDto dto = imageService.uploadProfileImage(image, user);
 
     if (dto == null) {
-      log.info("step=프로필_업로드_실패, userId={}, reason=이미_존재", userId);
+      log.info("step=프로필_업로드_실패, userId={}, reason=이미_존재", user.getId());
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto(
-          ErrorCode.DUPLICATED.getCode(), "이미 프로필 사진이 존재합니다."));
+          ErrorCode.PROFILE_DUPLICATED.getCode(), "이미 프로필 사진이 존재합니다."));
     }
 
-    log.info("step=프로필_업로드_완료, userId={}, imageId={}", userId, dto.imageId());
+    log.info("step=프로필_업로드_완료, userId={}, imageId={}", user.getId(), dto.imageId());
     return ResponseEntity.status(HttpStatus.CREATED).body(dto);
   }
 
@@ -61,7 +61,7 @@ public class ImageController implements ImageApi {
 
   public ResponseEntity<ResultMessageResponseDto> deleteProfileImage(Long profileId, User user) {
     log.info("step=프로필_삭제_시작, userId={}, profileId={}", user.getId(), profileId);
-    imageService.deleteProfileImage(profileId, user.getId());
+    imageService.deleteProfileImage(user);
     log.info("step=프로필_삭제_완료, userId={}, profileId={}", user.getId(), profileId);
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
         ErrorCode.SUCCESS.getCode(), "이미지를 성공적으로 삭제했습니다."));
@@ -69,10 +69,10 @@ public class ImageController implements ImageApi {
 
 
   public ResponseEntity<ApiListResponseDto<GetImageUrlResponseDto>> uploadFeedImages(
-      UploadAllFeedImageRequestDto images, Long userId) {
-    log.info("step=피드_업로드_시작, userId={}", userId);
-    List<GetImageUrlResponseDto> dtos = imageService.uploadFeedImages(images.getList(), userId);
-    log.info("step=피드_업로드_완료, userId={}, count={}", userId, dtos.size());
+      UploadAllFeedImageRequestDto images, User user) {
+    log.info("step=피드_업로드_시작, userId={}", user.getId());
+    List<GetImageUrlResponseDto> dtos = imageService.uploadFeedImages(images.getList(), user);
+    log.info("step=피드_업로드_완료, userId={}, count={}", user.getId(), dtos.size());
     return ResponseEntity.status(HttpStatus.CREATED).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));
   }
 

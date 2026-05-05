@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.shared.presentation.dto.image;
+package com.lingo.lingoproject.image.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

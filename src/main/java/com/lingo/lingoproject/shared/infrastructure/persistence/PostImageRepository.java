@@ -2,6 +2,7 @@ package com.lingo.lingoproject.shared.infrastructure.persistence;
 
 import com.lingo.lingoproject.shared.domain.model.Post;
 import com.lingo.lingoproject.shared.domain.model.PostImage;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -12,4 +13,8 @@ public interface PostImageRepository extends JpaRepository<PostImage, Long> {
   void deleteByPost(Post post);
 
   List<PostImage> findAllByPost(Post post);
+
+  List<PostImage> findAllByIdIn(Collection<Long> ids);
+
+  void deleteAllByPost(Post post);
 }
