@@ -1,7 +1,5 @@
 package com.lingo.lingoproject.matching.domain.service;
 
-import com.lingo.lingoproject.matching.application.MatchService;
-import com.lingo.lingoproject.matching.application.MatchService.UserScoreEntry;
 import com.lingo.lingoproject.shared.domain.model.Profile;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.domain.model.UserActivityLog;

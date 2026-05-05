@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.user.application;
 
+import com.lingo.lingoproject.matching.application.MatchQueryUseCase;
 import com.lingo.lingoproject.matching.presentation.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Hashtag;
@@ -9,7 +10,6 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
 import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.infrastructure.persistence.NotificationOptionOutUserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
@@ -45,7 +45,7 @@ public class UserQueryUseCase {
   private final HashtagRepository hashtagRepository;
   private final RedisUtils redisUtils;
   private final RedisTemplate<String, Object> redisTemplate;
-  private final MatchingRepository matchingRepository;
+  private final MatchQueryUseCase matchQueryUseCase;
   private final DormantAccountUseCase dormantAccountUseCase;
   private final NotificationOptionOutUserRepository notificationOptionOutUserRepository;
 
@@ -65,7 +65,7 @@ public class UserQueryUseCase {
   }
 
   private List<Long> getMatchingUserIds(User user){
-    return matchingRepository.findAllByRequestUserOrRequestedUser(user, user)
+    return matchQueryUseCase.findAllByRequestUserOrRequestedUser(user, user)
         .stream()
         .map(m -> {
           User requestUser = m.getRequestUser();

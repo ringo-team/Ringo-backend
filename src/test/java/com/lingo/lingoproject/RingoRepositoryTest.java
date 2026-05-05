@@ -9,7 +9,6 @@ import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.elastic.PlaceSearchRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
 import com.lingo.lingoproject.image.application.S3ImageStorageService;
-import com.lingo.lingoproject.matching.application.MatchService;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueMessagePayLoad;
 import com.lingo.lingoproject.shared.infrastructure.retry.RedisQueueService;
 import java.util.List;
@@ -23,9 +22,6 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @ActiveProfiles("dev")
 public class RingoRepositoryTest {
-
-  @Autowired
-  MatchService matchService;
 
   @Autowired
   S3ImageStorageService imageService;

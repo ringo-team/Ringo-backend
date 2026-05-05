@@ -5,9 +5,7 @@ import com.lingo.lingoproject.shared.domain.model.MatchingStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
-import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 /**
@@ -27,12 +25,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class MatchingValidationService {
 
-  private final MatchingRepository matchingRepository;
-
-  public MatchingValidationService(MatchingRepository matchingRepository) {
-    this.matchingRepository = matchingRepository;
-  }
-
   /**
    * 매칭 수락·거절 권한을 검증한다.
    * 피요청자(requestedUser)만 응답할 수 있다.
@@ -46,15 +38,6 @@ public class MatchingValidationService {
       throw new RingoException(
           "매칭 수락 여부를 결정할 권한이 없습니다.",
           ErrorCode.NO_AUTH);
-    }
-  }
-
-  public void validateAlreadyMatched(User requestUser, User requestedUser) {
-    if (matchingRepository.existsByRequestUserAndRequestedUser(requestUser, requestedUser) ||
-        matchingRepository.existsByRequestUserAndRequestedUser(requestedUser, requestUser)){
-      throw new RingoException(
-          "이미 매칭된 연결입니다.",
-          ErrorCode.BAD_REQUEST);
     }
   }
 

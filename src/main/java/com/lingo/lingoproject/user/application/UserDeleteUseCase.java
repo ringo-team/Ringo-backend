@@ -9,7 +9,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.BlockedFriendRep
 import com.lingo.lingoproject.shared.infrastructure.persistence.ChatroomParticipantRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.DormantAccountRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.FcmTokenRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
+import com.lingo.lingoproject.matching.application.MatchQueryUseCase;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserPointRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.WithdrawerRepository;
 import com.lingo.lingoproject.image.application.S3ImageStorageService;
@@ -35,7 +35,7 @@ public class UserDeleteUseCase {
   private final BlockedFriendRepository blockedFriendRepository;
   private final DormantAccountRepository dormantAccountRepository;
   private final S3ImageStorageService imageService;
-  private final MatchingRepository matchingRepository;
+  private final MatchQueryUseCase matchQueryUseCase;
   private final FcmTokenRepository fcmTokenRepository;
   private final ChatroomParticipantRepository chatroomParticipantRepository;
   private final UserPointRepository userPointRepository;
@@ -50,8 +50,8 @@ public class UserDeleteUseCase {
       dormantAccountRepository.deleteByUser(user);
       imageService.deleteProfileImage(user);
       imageService.deleteAllFeedImagesByUser(user);
-      matchingRepository.deleteAllByRequestedUser(user);
-      matchingRepository.deleteAllByRequestUser(user);
+      matchQueryUseCase.deleteAllByRequestedUser(user);
+      matchQueryUseCase.deleteAllByRequestUser(user);
       fcmTokenRepository.deleteByUser(user);
       chatroomParticipantRepository.disconnectChatroomParticipantWithUser(user);
       userPointRepository.deleteAllByUser(user);

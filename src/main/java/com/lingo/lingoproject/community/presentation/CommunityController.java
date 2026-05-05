@@ -16,7 +16,7 @@ import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
-import com.lingo.lingoproject.matching.application.MatchService;
+import com.lingo.lingoproject.matching.application.MatchingPlaceUseCase;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -39,7 +39,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class CommunityController implements CommunityApi {
 
   private final CommunityService communityService;
-  private final MatchService matchService;
+  private final MatchingPlaceUseCase matchingPlaceUseCase;
 
   @Override
   public ResponseEntity<List<GetPostResponseDto>> getPost(String category, int page, int size, User user) {
@@ -164,8 +164,8 @@ public class CommunityController implements CommunityApi {
 
   @Override
   public ResponseEntity<GetPlaceResponseDto> getIndividualRecommendationPlaces(User user){
-    List<GetPlaceDetailResponseDto> individual = matchService.getIndividualUserPlaces(user);
-    List<GetPlaceDetailResponseDto> common = matchService.getRandomlySelectedPlaces(user);
+    List<GetPlaceDetailResponseDto> individual = matchingPlaceUseCase.getIndividualUserPlaces(user);
+    List<GetPlaceDetailResponseDto> common = matchingPlaceUseCase.getRandomlySelectedPlaces(user);
 
     GetPlaceResponseDto response = new GetPlaceResponseDto(individual, common, ErrorCode.SUCCESS.getCode());
 
@@ -174,7 +174,7 @@ public class CommunityController implements CommunityApi {
 
   @Override
   public ResponseEntity<List<GetPlaceDetailResponseDto>> getRankedPagedPlaces(User user, int page, int size) {
-    List<GetPlaceDetailResponseDto> rankedPlaces = matchService.getRankedPagedPlaces(user, page, size);
+    List<GetPlaceDetailResponseDto> rankedPlaces = matchingPlaceUseCase.getRankedPagedPlaces(user, page, size);
     return ResponseEntity.status(HttpStatus.OK).body(rankedPlaces);
   }
 

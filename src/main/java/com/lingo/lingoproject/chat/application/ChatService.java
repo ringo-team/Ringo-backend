@@ -21,7 +21,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.AppointmentRepos
 import com.lingo.lingoproject.shared.infrastructure.persistence.ChatroomParticipantRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ChatroomRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.FailedChatMessageLogRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
+import com.lingo.lingoproject.matching.application.MatchQueryUseCase;
 import com.lingo.lingoproject.shared.infrastructure.persistence.MessageRepository;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
@@ -76,7 +76,7 @@ public class ChatService {
   private final MessageRepository messageRepository;
   private final UserQueryUseCase userQueryUseCase;
   private final ChatroomParticipantRepository chatroomParticipantRepository;
-  private final MatchingRepository matchingRepository;
+  private final MatchQueryUseCase matchQueryUseCase;
   private final RedisTemplate<String, Object> redisTemplate;
   private final FailedChatMessageLogRepository failedChatMessageLogRepository;
   private final AppointmentRepository appointmentRepository;
@@ -310,9 +310,9 @@ public class ChatService {
 
   private void validateUsersAreMatched(User user1, User user2) {
     boolean matched =
-        matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(
+        matchQueryUseCase.existsByRequestUserAndRequestedUserAndMatchingStatus(
             user1, user2, MatchingStatus.ACCEPTED)
-        || matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(
+        || matchQueryUseCase.existsByRequestUserAndRequestedUserAndMatchingStatus(
             user2, user1, MatchingStatus.ACCEPTED);
 
     if (!matched) {
@@ -324,8 +324,8 @@ public class ChatService {
   }
 
   private void logMatchingCreationError(User user1, User user2) {
-    Matching matching1 = matchingRepository.findFirstByRequestUserAndRequestedUser(user1, user2);
-    Matching matching2 = matchingRepository.findFirstByRequestUserAndRequestedUser(user2, user1);
+    Matching matching1 = matchQueryUseCase.findFirstByRequestUserAndRequestedUser(user1, user2);
+    Matching matching2 = matchQueryUseCase.findFirstByRequestUserAndRequestedUser(user2, user1);
 
     if (matching1 == null && matching2 == null) {
       log.error("user1Id={}, user2Id={}, step=매칭_이력_없음", user1.getId(), user2.getId());
