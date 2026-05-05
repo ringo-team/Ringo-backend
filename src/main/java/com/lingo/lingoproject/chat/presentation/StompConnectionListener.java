@@ -4,7 +4,6 @@ import com.lingo.lingoproject.chat.application.ChatService;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +22,6 @@ import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 public class StompConnectionListener {
 
   private final RedisTemplate<String, Object> redisTemplate;
-  private final UserRepository userRepository;
   private final ChatService chatService;
 
   @EventListener

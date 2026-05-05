@@ -5,7 +5,6 @@ import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.notification.presentation.dto.GetNotificationResponseDto;
 import com.lingo.lingoproject.notification.presentation.dto.SaveFcmTokenRequestDto;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,7 +32,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificationController {
 
   private final FcmNotificationUseCase fcmService;
-  private final UserRepository userRepository;
 
   @PostMapping("/fcm/refresh")
   @ApiResponses(

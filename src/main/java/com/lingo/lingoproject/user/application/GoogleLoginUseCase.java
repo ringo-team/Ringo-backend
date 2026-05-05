@@ -4,7 +4,6 @@ package com.lingo.lingoproject.user.application;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.security.oauth.OAuthUtils;
 import com.lingo.lingoproject.user.presentation.dto.oauth.google.GoogleTokenResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.oauth.google.GoogleUserInfoResponseDto;
@@ -28,7 +27,7 @@ public class GoogleLoginUseCase {
 
   private final String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
   private final String GOOGLE_GMAIL_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
 
   @Value("${oauth.google.client_id}")
   private String clientId;
@@ -108,7 +107,7 @@ public class GoogleLoginUseCase {
     }
 
     // 3
-    Optional<User> user = userRepository.findByLoginId(response.loginId());
+    Optional<User> user = userQueryUseCase.findByLoginId(response.loginId());
     User loginUser = user.orElseGet(() -> oAuthUtils.signup(response.loginId()));
 
 

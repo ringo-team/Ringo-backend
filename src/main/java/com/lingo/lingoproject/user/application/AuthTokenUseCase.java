@@ -3,7 +3,6 @@ package com.lingo.lingoproject.user.application;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.security.TokenType;
 import com.lingo.lingoproject.shared.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.shared.security.dto.RegenerateTokenResponseDto;
@@ -30,7 +29,7 @@ public class AuthTokenUseCase {
   private static final String ACCESS_TOKEN_PREFIX = "Bearer ";
 
   private final JwtUtil jwtUtil;
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final RedisTemplate<String, Object> redisTemplate;
 
   public LoginResponseDto login(User user) {
@@ -69,7 +68,7 @@ public class AuthTokenUseCase {
   }
 
   private RegenerateTokenResponseDto generateTokenAndSaveRefreshTokenInRedis(String loginId) {
-    User user = userRepository.findByLoginId(loginId)
+    User user = userQueryUseCase.findByLoginId(loginId)
         .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.BAD_REQUEST));
     String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);

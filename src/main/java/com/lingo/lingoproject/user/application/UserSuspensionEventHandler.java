@@ -4,7 +4,6 @@ import com.lingo.lingoproject.report.domain.event.UserSuspendedEvent;
 import com.lingo.lingoproject.shared.domain.model.BlockedUser;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.infrastructure.persistence.BlockedUserRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +22,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class UserSuspensionEventHandler {
 
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final BlockedUserRepository blockedUserRepository;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -32,9 +31,9 @@ public class UserSuspensionEventHandler {
 
     log.info("UserSuspendedEvent(영구정지) 수신: reportedUserId={}", event.getReportedUserId());
 
-    User admin = userRepository.findById(event.getAdminId())
+    User admin = userQueryUseCase.findById(event.getAdminId())
         .orElseThrow(() -> new RingoException("관리자를 찾을 수 없습니다.", ErrorCode.ADMIN_NOT_FOUND));
-    User user = userRepository.findById(event.getReportedUserId())
+    User user = userQueryUseCase.findById(event.getReportedUserId())
         .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
 
     blockedUserRepository.save(BlockedUser.of(user, admin));

@@ -5,7 +5,6 @@ package com.lingo.lingoproject.user.application;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.security.oauth.OAuthUtils;
 import com.lingo.lingoproject.user.presentation.dto.oauth.kakao.KakaoTokenResponseDto;
 import com.lingo.lingoproject.user.presentation.dto.oauth.kakao.KakaoUserInfoResponseDto;
@@ -36,7 +35,7 @@ public class KakaoLoginUseCase {
   private String redirectUri;
 
   private final OAuthUtils oAuthUtils;
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
 
   public String getKakaoAccessToken(String code){
     WebClient webClient = WebClient.create();
@@ -93,7 +92,7 @@ public class KakaoLoginUseCase {
     if(response == null){
       throw new RingoException("Kakao user info response is null", ErrorCode.INTERNAL_SERVER_ERROR);
     }
-    Optional<User> user = userRepository.findByLoginId(response.id().toString());
+    Optional<User> user = userQueryUseCase.findByLoginId(response.id().toString());
     User loginUser = user.orElseGet(() -> oAuthUtils.signup(response.id().toString()));
 
     oAuthUtils.login(loginUser);

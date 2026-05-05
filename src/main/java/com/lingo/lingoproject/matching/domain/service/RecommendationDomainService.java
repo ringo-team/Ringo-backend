@@ -7,7 +7,6 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.domain.model.UserActivityLog;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserActivityLogRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -40,15 +39,13 @@ public class RecommendationDomainService {
   private final ProfileRepository profileRepository;
   private final UserActivityLogRepository userActivityLogRepository;
   private final RedisTemplate<String, Object> redisTemplate;
-  private final UserRepository userRepository;
 
   public RecommendationDomainService(ProfileRepository profileRepository,
       UserActivityLogRepository userActivityLogRepository,
-      RedisTemplate<String, Object> redisTemplate, UserRepository userRepository) {
+      RedisTemplate<String, Object> redisTemplate) {
     this.profileRepository = profileRepository;
     this.userActivityLogRepository = userActivityLogRepository;
     this.redisTemplate = redisTemplate;
-    this.userRepository = userRepository;
   }
 
   /**

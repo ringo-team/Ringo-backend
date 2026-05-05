@@ -14,7 +14,6 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.FcmTokenReposito
 import com.lingo.lingoproject.shared.infrastructure.persistence.FriendInvitationLogRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserPointRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
 import com.lingo.lingoproject.user.presentation.dto.SignupInfoDto;
 import com.lingo.lingoproject.user.presentation.dto.SignupUserInfoDto;
@@ -51,7 +50,7 @@ public class SignupUseCase {
   );
 
   private final PasswordEncoder passwordEncoder;
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final HashtagRepository hashtagRepository;
   private final UserPointRepository userPointRepository;
   private final FcmTokenRepository fcmTokenRepository;
@@ -60,20 +59,20 @@ public class SignupUseCase {
 
   public User signup(SignupInfoDto dto) {
     validateLoginDto(dto);
-    return userRepository.save(User.forSignup(dto.loginId(), passwordEncoder.encode(dto.password()), dto.isMarketingReceptionConsent()));
+    return userQueryUseCase.save(User.forSignup(dto.loginId(), passwordEncoder.encode(dto.password()), dto.isMarketingReceptionConsent()));
   }
 
   public boolean verifyDuplicatedLoginId(String loginId) {
-    return userRepository.existsByLoginId(loginId);
+    return userQueryUseCase.existsByLoginId(loginId);
   }
 
   public boolean verifyDuplicatedNickname(String nickname) {
-    return userRepository.existsByNickname(nickname);
+    return userQueryUseCase.existsByNickname(nickname);
   }
 
   @Transactional
   public void saveUserInfo(SignupUserInfoDto dto) {
-    User user = userRepository.findById(dto.id())
+    User user = userQueryUseCase.findById(dto.id())
         .orElseThrow(() -> new RingoException("해당 회원을 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
 
     validateSignupUserAndDto(user, dto);
@@ -82,7 +81,7 @@ public class SignupUseCase {
 
     if (user.getFriendInvitationCode() != null && !user.getFriendInvitationCode().isBlank()) {
       try {
-        userRepository.save(user);
+        userQueryUseCase.save(user);
         hashtagRepository.deleteAllByUser(user);
         hashtagRepository.saveAll(hashtags);
         return;
@@ -97,7 +96,7 @@ public class SignupUseCase {
 
     user.setFriendInvitationCode(generateFriendInvitationCode());
     try {
-      userRepository.save(user);
+      userQueryUseCase.save(user);
       hashtagRepository.saveAll(hashtags);
       userPointRepository.save(UserPoint.of(user));
       fcmTokenRepository.save(FcmToken.of(user));
@@ -126,7 +125,7 @@ public class SignupUseCase {
           "이미 완료한 이벤트거나 입력횟수를 초과하였습니다.", ErrorCode.PROFILE_DUPLICATED);
     }
 
-    Optional<User> host = userRepository.findByFriendInvitationCode(code);
+    Optional<User> host = userQueryUseCase.findByFriendInvitationCode(code);
     if (host.isEmpty()) {
       friendInvitationLogRepository.save(FriendInvitationLog.of(null, user.getId(), false));
       throw new RingoException("친구초대코드를 잘못 입력하였습니다.", ErrorCode.BAD_REQUEST);
@@ -149,7 +148,7 @@ public class SignupUseCase {
     if (!dto.password().matches("^(?=.*[A-Za-z])(?=.*\\d).{8,}$")) {
       throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER);
     }
-    if (userRepository.existsByLoginId(dto.loginId())) {
+    if (userQueryUseCase.existsByLoginId(dto.loginId())) {
       throw new RingoException("중복된 로그인 아이디 입니다.", ErrorCode.PROFILE_DUPLICATED);
     }
   }

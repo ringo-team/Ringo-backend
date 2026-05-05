@@ -11,7 +11,6 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.DormantAccountRe
 import com.lingo.lingoproject.shared.infrastructure.persistence.FcmTokenRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserPointRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.WithdrawerRepository;
 import com.lingo.lingoproject.image.application.S3ImageStorageService;
 import jakarta.transaction.Transactional;
@@ -30,7 +29,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class UserDeleteUseCase {
 
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final WithdrawerRepository withdrawerRepository;
   private final AnsweredSurveyRepository answeredSurveyRepository;
   private final BlockedFriendRepository blockedFriendRepository;
@@ -56,7 +55,7 @@ public class UserDeleteUseCase {
       fcmTokenRepository.deleteByUser(user);
       chatroomParticipantRepository.disconnectChatroomParticipantWithUser(user);
       userPointRepository.deleteAllByUser(user);
-      userRepository.delete(user);
+      userQueryUseCase.delete(user);
     } catch (Exception e) {
       log.error("유저 데이터 삭제 실패. userId: {}, reason: {}", user.getId(), reason, e);
       throw new RingoException("유저 정보를 삭제하는데 실패하였습니다." + e.getMessage(),

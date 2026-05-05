@@ -11,7 +11,6 @@ import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
 import com.lingo.lingoproject.user.presentation.dto.Address;
 import com.lingo.lingoproject.user.presentation.dto.UpdateUserInfoRequestDto;
@@ -39,7 +38,7 @@ public class UserUpdateUseCase {
       "INTJ", "INTP", "INFJ", "INFP"
   );
 
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final HashtagRepository hashtagRepository;
   private final ProfileRepository profileRepository;
   private final PasswordEncoder passwordEncoder;
@@ -74,7 +73,7 @@ public class UserUpdateUseCase {
 
 
     if (dto.mbti() != null) setUserMbti(user, dto.mbti());
-    userRepository.save(user);
+    userQueryUseCase.save(user);
   }
 
   public void resetPassword(String newPassword, User user) {
@@ -83,7 +82,7 @@ public class UserUpdateUseCase {
       throw new RingoException("비밀번호를 재설정할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
     user.setPassword(passwordEncoder.encode(newPassword));
-    userRepository.save(user);
+    userQueryUseCase.save(user);
   }
 
   public void updateUserProfileVerification(User user) {

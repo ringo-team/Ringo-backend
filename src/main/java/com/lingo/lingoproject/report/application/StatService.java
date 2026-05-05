@@ -2,7 +2,7 @@ package com.lingo.lingoproject.report.application;
 
 import com.lingo.lingoproject.shared.domain.model.Gender;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserAccessLogRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import com.lingo.lingoproject.report.presentation.dto.stats.GetDailyNumberOfVisitorRequestDto;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,7 +30,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class StatService {
   private final UserAccessLogRepository userAccessLogRepository;
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
 
   /**
    * 오늘(자정 이후) 방문자 수를 반환한다.
@@ -77,7 +77,7 @@ public class StatService {
         ));
 
     // 날짜 - 회원가입 수
-    Map<String, Long> userSignupMap = userRepository.findAllByCreatedAtAfter(startDateTime)
+    Map<String, Long> userSignupMap = userQueryUseCase.findAllByCreatedAtAfter(startDateTime)
         .stream()
         .collect(Collectors.groupingBy(
             user -> user.getCreatedAt().toLocalDate().toString(),

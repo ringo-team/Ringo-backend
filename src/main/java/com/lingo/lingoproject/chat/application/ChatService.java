@@ -23,7 +23,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.ChatroomReposito
 import com.lingo.lingoproject.shared.infrastructure.persistence.FailedChatMessageLogRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.MessageRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
@@ -74,7 +74,7 @@ public class ChatService {
 
   private final ChatroomRepository chatroomRepository;
   private final MessageRepository messageRepository;
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final ChatroomParticipantRepository chatroomParticipantRepository;
   private final MatchingRepository matchingRepository;
   private final RedisTemplate<String, Object> redisTemplate;
@@ -277,17 +277,12 @@ public class ChatService {
   // ============================================================
 
   public User findUserOrThrow(Long userId) {
-    return userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException(
-            "해당 id의 유저를 찾을 수 없습니다.",
-            ErrorCode.USER_NOT_FOUND));
+    return userQueryUseCase.findUserOrThrow(userId);
   }
 
   public User findUserByLoginIdOrThrow(String loginId) {
-    return userRepository.findByLoginId(loginId)
-        .orElseThrow(() -> new RingoException(
-            "유저 정보가 올바르지 않습니다.",
-            ErrorCode.FORBIDDEN));
+    return userQueryUseCase.findByLoginId(loginId)
+        .orElseThrow(() -> new RingoException("유저 정보가 올바르지 않습니다.", ErrorCode.FORBIDDEN));
   }
 
   /** destination 경로의 마지막 세그먼트에서 채팅방 ID를 추출한다. 예: "/user/queue/topic/42" → 42L */

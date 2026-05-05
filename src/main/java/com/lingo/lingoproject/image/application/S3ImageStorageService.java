@@ -11,7 +11,7 @@ import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.FeedImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PhotographerImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import com.lingo.lingoproject.image.dto.FeedImageDataRequestDto;
 import com.lingo.lingoproject.image.dto.GetFeedImageInfoResponseDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
@@ -61,7 +61,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 @Slf4j
 public class S3ImageStorageService {
 
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final FeedImageRepository feedImageRepository;
   private final PhotographerImageRepository photographerImageRepository;
   private final S3Client amazonS3Client;
@@ -525,13 +525,11 @@ public class S3ImageStorageService {
 
   public void completeSignupStatus(User user) {
     user.setStatus(SignupStatus.COMPLETED);
-    userRepository.save(user);
+    userQueryUseCase.save(user);
   }
 
 
   private User findUserOrThrow(Long userId) {
-    return userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException(
-            "유저를 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
+    return userQueryUseCase.findUserOrThrow(userId);
   }
 }

@@ -5,7 +5,6 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.BlockedUserRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -21,15 +20,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class BlockUserUseCase {
 
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final BlockedUserRepository blockedUserRepository;
   private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public void blockUser(Long userId, Long adminId) {
-    User admin = userRepository.findById(adminId)
+    User admin = userQueryUseCase.findById(adminId)
         .orElseThrow(() -> new RingoException("id 에 해당하는 관리자가 없습니다.", ErrorCode.USER_NOT_FOUND));
-    User user = userRepository.findById(userId)
+    User user = userQueryUseCase.findById(userId)
         .orElseThrow(() -> new RingoException("id에 해당하는 유저가 없습니다.", ErrorCode.ADMIN_NOT_FOUND));
 
     BlockedUser blockedUser = BlockedUser.of(user, admin);

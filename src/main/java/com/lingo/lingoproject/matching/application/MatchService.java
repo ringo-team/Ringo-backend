@@ -46,7 +46,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.BlockedUserRepos
 import com.lingo.lingoproject.shared.infrastructure.persistence.DormantAccountRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -85,7 +85,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MatchService {
 
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final MatchingRepository matchingRepository;
   private final BlockedFriendRepository blockedFriendRepository;
   private final DormantAccountRepository dormantAccountRepository;
@@ -304,7 +304,7 @@ public class MatchService {
 
   @Scheduled(cron = "0 40 23 * * * ")
   public void cacheCumulativeProfile(){
-    List<User> users = userRepository.findAll();
+    List<User> users = userQueryUseCase.findAll();
     users.forEach(this::cacheEachCumulativeProfile);
   }
 
@@ -329,10 +329,10 @@ public class MatchService {
 
     List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
 
-    List<Long> userIds = userRepository.findByUserIdNotInExcludedUserIds(excludedUserIds);
+    List<Long> userIds = userQueryUseCase.findByUserIdNotInExcludedUserIds(excludedUserIds);
     List<Long> randomlySelectedUserIds = recommendationDomainService.selectRandomCandidates(userIds, 5);
 
-    return userRepository.findAllByIdIn(randomlySelectedUserIds)
+    return userQueryUseCase.findAllByIdIn(randomlySelectedUserIds)
         .stream()
         .map(u -> buildUserProfileDto(user, u))
         .toList();
@@ -352,7 +352,7 @@ public class MatchService {
 
   @Scheduled(cron = "0 50 23 * * *")
   public void cacheDailyProfile(){
-    List<User> users = userRepository.findAll();
+    List<User> users = userQueryUseCase.findAll();
     users.forEach(this::cacheEachDailyProfile);
   }
 
@@ -488,7 +488,7 @@ public class MatchService {
   }
 
   private List<Long> getSignupIncompleteUsersIds(){
-    return userRepository.findAllByStatusNot(SignupStatus.COMPLETED)
+    return userQueryUseCase.findAllByStatusNot(SignupStatus.COMPLETED)
         .stream()
         .map(User::getId)
         .toList();
@@ -513,7 +513,7 @@ public class MatchService {
   }
 
   private List<GetUserProfileResponseDto> getUserProfilesByIds(User requestUser, List<Long> selectedIds) {
-    List<User> users = userRepository.findAllByIdIn(selectedIds);
+    List<User> users = userQueryUseCase.findAllByIdIn(selectedIds);
     Map<Long, List<String>> hashtagsMap = batchGetHashtagsByUsers(users);
     Set<Long> scrappedUserIds = scrappedUserRepository.findAllByUser(requestUser).stream()
         .map(s -> s.getScrappedUser().getId())
@@ -675,7 +675,7 @@ public class MatchService {
 
   @Scheduled(cron = "0 30 23 * * *")
   public void cacheIndividualUserPlaces(){
-    userRepository.findAll()
+    userQueryUseCase.findAll()
         .forEach(this::buildPlaceDtoAndCache);
   }
 
@@ -900,7 +900,7 @@ public class MatchService {
   // ============================================================
 
   private User findUserOrThrow(Long userId) {
-    return userRepository.findById(userId)
+    return userQueryUseCase.findById(userId)
         .orElseThrow(() -> new RingoException(
             "유저를 찾을 수 없습니다.",
             ErrorCode.USER_NOT_FOUND));
@@ -936,7 +936,7 @@ public class MatchService {
   /** 프로필 목록에 해시태그·나이 등 추가 사용자 정보를 채워넣는다. */
   private void enrichProfilesWithUserInfo(List<GetUserProfileResponseDto> profiles) {
     List<Long> userIds = profiles.stream().map(GetUserProfileResponseDto::getUserId).toList();
-    Map<Long, User> userMap = userRepository.findAllByIdIn(userIds).stream()
+    Map<Long, User> userMap = userQueryUseCase.findAllByIdIn(userIds).stream()
         .collect(Collectors.toMap(User::getId, Function.identity()));
     Map<Long, List<String>> hashtagsMap = batchGetHashtagsByUsers(new ArrayList<>(userMap.values()));
 

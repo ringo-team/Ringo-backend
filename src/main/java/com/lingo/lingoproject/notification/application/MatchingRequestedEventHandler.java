@@ -2,12 +2,9 @@ package com.lingo.lingoproject.notification.application;
 
 import com.lingo.lingoproject.matching.domain.event.MatchingRequestedEvent;
 import com.lingo.lingoproject.shared.domain.model.User;
-import com.lingo.lingoproject.shared.exception.ErrorCode;
-import com.lingo.lingoproject.shared.exception.RingoException;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -22,14 +19,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class MatchingRequestedEventHandler {
 
   private final FcmNotificationUseCase fcmNotificationUseCase;
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handle(MatchingRequestedEvent event) {
     log.info("MatchingRequestedEvent 수신: matchingId={}, requestUser={}, requestedUser={}",
         event.getMatchingId(), event.getRequestUserId(), event.getRequestedUserId());
-    User requestedUser = userRepository.findById(event.getRequestedUserId())
-        .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
+    User requestedUser = userQueryUseCase.findUserOrThrow(event.getRequestedUserId());
     //fcmNotificationUseCase.sendFcmNotification(requestedUser, "누군가 매칭 요청을 했어요!", null, NotificationType.MATCHING_REQUEST);
   }
 }

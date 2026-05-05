@@ -9,7 +9,7 @@ import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PhotographerImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PhotographerInfoRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.SnapApplyRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import com.lingo.lingoproject.snap.presentation.dto.ApplySnapShootingRequestDto;
 import com.lingo.lingoproject.snap.presentation.dto.GetPhotographerInfosResponseDto;
 import com.lingo.lingoproject.snap.presentation.dto.UpdatePhotographerExampleImagesInfoRequestDto;
@@ -39,7 +39,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class SnapService {
 
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final SnapApplyRepository snapApplyRepository;
   private final PhotographerInfoRepository photographerInfoRepository;
   private final PhotographerImageRepository photographerImageRepository;
@@ -55,8 +55,7 @@ public class SnapService {
    */
   public void applySnapShooting(ApplySnapShootingRequestDto dto){
 
-    User photographer = userRepository.findById(dto.photographerId())
-        .orElseThrow(() -> new RingoException("해당 촬영 기사가 없습니다.", ErrorCode.NOT_FOUND));
+    User photographer = userQueryUseCase.findUserOrThrow(dto.photographerId());
 
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -77,8 +76,7 @@ public class SnapService {
    */
   public void savePhotographerInfo(SavePhotographerInfoRequestDto dto, Long photographerId){
 
-    User photographer = userRepository.findById(photographerId)
-        .orElseThrow(() -> new RingoException("해당 촬영 기사가 없습니다.", ErrorCode.NOT_FOUND));
+    User photographer = userQueryUseCase.findUserOrThrow(photographerId);
 
     photographerInfoRepository.save(PhotographerInfo.of(photographer, dto.content(), dto.instagramId(), dto.chatIntro()));
   }

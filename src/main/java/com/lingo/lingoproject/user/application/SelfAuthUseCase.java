@@ -15,7 +15,6 @@ import com.lingo.lingoproject.user.presentation.dto.auth.UserSelfAuthInfo;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
@@ -56,7 +55,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class SelfAuthUseCase {
 
   private final ObjectMapper objectMapper;
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final RedisUtils redisUtils;
   private final RedisTemplate<String, Object> redisTemplate;
 
@@ -359,11 +358,11 @@ public class SelfAuthUseCase {
   }
 
     user.setUserSelfAuthInfo(userSelfAuthInfo);
-    userRepository.save(user);
+    userQueryUseCase.save(user);
   }
 
   private User findUserByIdOrThrow(Long userId){
-    return userRepository.findById(userId).orElseThrow(() ->
+    return userQueryUseCase.findById(userId).orElseThrow(() ->
             new RingoException(
             "유저 인증 정보 저장 중 유저를 찾을 수 없습니다.",
             ErrorCode.USER_NOT_FOUND)
@@ -372,7 +371,7 @@ public class SelfAuthUseCase {
 
   private User findUserByPhoneNumberOrThrow(String phoneNumber){
     phoneNumber = phoneNumber.replaceAll("[^0-9]", "");
-    return userRepository.findByPhoneNumber(phoneNumber).orElseThrow(() ->
+    return userQueryUseCase.findByPhoneNumber(phoneNumber).orElseThrow(() ->
         new RingoException(
             "해당 번호로 가입된 적이 없습니다.",
             ErrorCode.BAD_REQUEST
@@ -381,7 +380,7 @@ public class SelfAuthUseCase {
 
   private User findUserByLoginIdAndPhoneNumberOrThrow(String loginId, String phoneNumber){
     phoneNumber = phoneNumber.replaceAll("[^0-9]", "");
-    return userRepository.findByLoginIdAndPhoneNumber(loginId, phoneNumber).orElseThrow(() ->
+    return userQueryUseCase.findByLoginIdAndPhoneNumber(loginId, phoneNumber).orElseThrow(() ->
         new RingoException(
             "해당 아이디의 비밀번호를 찾을 수 없습니다.",
             ErrorCode.BAD_REQUEST

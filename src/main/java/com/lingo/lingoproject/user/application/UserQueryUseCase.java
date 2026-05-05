@@ -10,12 +10,15 @@ import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.MatchingRepository;
+import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.infrastructure.persistence.NotificationOptionOutUserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import com.lingo.lingoproject.user.presentation.dto.GetUserInfoResponseDto;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -134,5 +137,66 @@ public class UserQueryUseCase {
         .stream()
         .map(Hashtag::getHashtag)
         .toList();
+  }
+
+  public Optional<User> findById(Long id) {
+    return userRepository.findById(id);
+  }
+
+  public Optional<User> findByLoginId(String loginId) {
+    return userRepository.findByLoginId(loginId);
+  }
+
+  public User findByLoginIdOrThrow(String loginId) {
+    return userRepository.findByLoginId(loginId)
+        .orElseThrow(() -> new RingoException("해당 loginId의 유저를 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
+  }
+
+  public List<User> findAllByIdIn(Collection<Long> ids) {
+    return userRepository.findAllByIdIn(ids);
+  }
+
+  public List<User> findAll() {
+    return userRepository.findAll();
+  }
+
+  public List<Long> findByUserIdNotInExcludedUserIds(List<Long> excludedUserIds) {
+    return userRepository.findByUserIdNotInExcludedUserIds(excludedUserIds);
+  }
+
+  public List<User> findAllByStatusNot(SignupStatus status) {
+    return userRepository.findAllByStatusNot(status);
+  }
+
+  public List<User> findAllByCreatedAtAfter(LocalDateTime createdAtAfter) {
+    return userRepository.findAllByCreatedAtAfter(createdAtAfter);
+  }
+
+  public User save(User user) {
+    return userRepository.save(user);
+  }
+
+  public void delete(User user) {
+    userRepository.delete(user);
+  }
+
+  public boolean existsByLoginId(String loginId) {
+    return userRepository.existsByLoginId(loginId);
+  }
+
+  public boolean existsByNickname(String nickname) {
+    return userRepository.existsByNickname(nickname);
+  }
+
+  public Optional<User> findByFriendInvitationCode(String code) {
+    return userRepository.findByFriendInvitationCode(code);
+  }
+
+  public Optional<User> findByPhoneNumber(String phoneNumber) {
+    return userRepository.findByPhoneNumber(phoneNumber);
+  }
+
+  public Optional<User> findByLoginIdAndPhoneNumber(String loginId, String phoneNumber) {
+    return userRepository.findByLoginIdAndPhoneNumber(loginId, phoneNumber);
   }
 }

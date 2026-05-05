@@ -3,7 +3,6 @@ import com.lingo.lingoproject.chat.application.ChatService;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.security.jwt.JwtUtil;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +50,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
   private final ChatService chatService;
-  private final UserRepository userRepository;
   private final JwtUtil jwtUtil;
 
   /**

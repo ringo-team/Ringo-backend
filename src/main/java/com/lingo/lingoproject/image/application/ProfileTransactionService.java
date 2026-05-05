@@ -10,7 +10,7 @@ import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.FeedImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -22,16 +22,16 @@ import org.springframework.stereotype.Service;
 public class ProfileTransactionService {
 
   private final ProfileRepository profileRepository;
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final FeedImageRepository feedImageRepository;
 
   private static final int MAX_FEED_IMAGE_COUNT = 9;
 
 
   public ProfileTransactionService(ProfileRepository profileRepository,
-      UserRepository userRepository, FeedImageRepository feedImageRepository) {
+      UserQueryUseCase userQueryUseCase, FeedImageRepository feedImageRepository) {
     this.profileRepository = profileRepository;
-    this.userRepository = userRepository;
+    this.userQueryUseCase = userQueryUseCase;
     this.feedImageRepository = feedImageRepository;
   }
 
@@ -50,13 +50,13 @@ public class ProfileTransactionService {
     Profile profile = Profile.of(user, imageUrl);
     Profile saved = profileRepository.save(profile);
     user.setProfile(saved);
-    userRepository.save(user);
+    userQueryUseCase.save(user);
     return saved;
   }
 
   public void completeSignupStatus(User user) {
     user.setStatus(SignupStatus.COMPLETED);
-    userRepository.save(user);
+    userQueryUseCase.save(user);
   }
 
   @Transactional

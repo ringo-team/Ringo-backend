@@ -44,7 +44,6 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostLikeUserMappingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserScrapPlaceRepository;
 import com.lingo.lingoproject.image.application.S3ImageStorageService;
 import com.lingo.lingoproject.shared.utils.GenericUtils;

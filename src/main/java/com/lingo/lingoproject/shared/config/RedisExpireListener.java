@@ -1,17 +1,14 @@
 package com.lingo.lingoproject.shared.config;
 
-import com.lingo.lingoproject.shared.exception.ErrorCode;
-import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.domain.model.UserActivityLog;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserActivityLogRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -48,12 +45,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class RedisExpireListener implements MessageListener {
 
-  private final UserRepository userRepository;
+  private final UserQueryUseCase userQueryUseCase;
   private final UserActivityLogRepository userActivityLogRepository;
 
-  public RedisExpireListener(UserRepository userRepository,
+  public RedisExpireListener(UserQueryUseCase userQueryUseCase,
       UserActivityLogRepository userActivityLogRepository) {
-    this.userRepository = userRepository;
+    this.userQueryUseCase = userQueryUseCase;
     this.userActivityLogRepository = userActivityLogRepository;
   }
 
@@ -75,9 +72,7 @@ public class RedisExpireListener implements MessageListener {
 
       Long userId = Long.parseLong(parts[1]);
 
-      User user = userRepository.findById(userId).orElseThrow(
-          () -> new RingoException("찾을 수 없는 유저", ErrorCode.NOT_FOUND)
-      );
+      User user = userQueryUseCase.findUserOrThrow(userId);
 
       // 활동 시작 시간: 키 생성 시 함께 저장한 LocalDateTime
       LocalDateTime startTime = LocalDateTime.parse(parts[2]);
