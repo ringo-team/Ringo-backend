@@ -76,14 +76,12 @@ public class SecurityConfig {
    * - /swagger-ui/**, v3/api-docs/**: Swagger UI
    * - /ws, /stomp/**: WebSocket 연결 (토큰은 STOMP 헤더로 별도 검증)
    * - /actuator/**: Spring Actuator (모니터링)
-   * - /profiles, /feeds: 비로그인 상태에서도 프로필/피드 열람 가능
    */
   private final String[] whiteList = {
-      "/signup/**", "/users/access", "/health",
+      "/login/**", "/signup/**", "/users/access", "/health",
       "/swagger-ui/**", "/v3/api-docs/**",
       "/ws", "/stomp/**", "/stomp-test.html",
-      "/actuator/**",
-      "/profiles", "/feeds"
+      "/actuator/**"
   };
 
   /**

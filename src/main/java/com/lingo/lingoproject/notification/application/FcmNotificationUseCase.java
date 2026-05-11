@@ -1,5 +1,7 @@
 package com.lingo.lingoproject.notification.application;
 
+import com.google.firebase.messaging.ApnsConfig;
+import com.google.firebase.messaging.Aps;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
@@ -18,6 +20,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.NotificationOpti
 import com.lingo.lingoproject.shared.infrastructure.persistence.NotificationRepository;
 import com.lingo.lingoproject.notification.infrastructure.retry.FcmRetryQueueService;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
+import jakarta.transaction.Transactional;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +39,7 @@ public class FcmNotificationUseCase {
 
   private final int RETRY_COUNT = 0;
 
+  @Transactional
   public void refreshFcmToken(SaveFcmTokenRequestDto dto, User user){
     FcmToken fcmToken = fcmTokenRepository.findByUser(user)
         .orElseThrow(() -> new RingoException("유저의 fcm 토큰 엔티티를 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR));
@@ -54,6 +58,12 @@ public class FcmNotificationUseCase {
 
     FcmToken token = fcmTokenRepository.findByUser(receiver)
         .orElseThrow(() -> new RingoException("fcm 토큰을 찾을 수 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR));
+
+    if (token.getToken() == null || token.getToken().isBlank()) {
+      log.warn("step=FCM_토큰_없음, userId={}, 알림 전송 스킵", receiver.getId());
+      return;
+    }
+
     Message message = Message.builder()
         .setToken(token.getToken())
         .setNotification(
@@ -61,6 +71,16 @@ public class FcmNotificationUseCase {
                 .setTitle(title)
                 .setBody(body)
                 .setImage("ImageUrl")
+                .build()
+        )
+        .setApnsConfig(  // ✅ iOS용 APNs 설정 추가
+            ApnsConfig.builder()
+                .setAps(
+                    Aps.builder()
+                        .setSound("default")  // 알림음
+                        .setBadge(1)          // 앱 뱃지
+                        .build()
+                )
                 .build()
         )
         .build();

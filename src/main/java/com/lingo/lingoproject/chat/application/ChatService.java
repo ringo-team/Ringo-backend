@@ -144,7 +144,12 @@ public class ChatService {
     Long chatroomId = extractChatroomIdFromDestination(destination);
     failedChatMessageLogRepository.save(
         FailedChatMessageLog.of(
-            chatroomId, e, savedMessage.getId(), destination, senderLoginId));
+            chatroomId,
+            e,
+            savedMessage != null ? savedMessage.getId() : null,
+            destination,
+            senderLoginId
+        ));
   }
 
   // ============================================================
@@ -158,7 +163,8 @@ public class ChatService {
     Map<Long, ChatroomSummaryProjection> summaryMap = messageRepository
         .findChatroomSummaries(chatroomIds, user.getId())
         .stream()
-        .collect(Collectors.toMap(ChatroomSummaryProjection::getId, p -> p));
+        .collect(Collectors.toMap(ChatroomSummaryProjection::getChatroomId, p -> p));
+
 
     return chatrooms.stream()
         .filter(chatroom -> chatroom.userIsActive(user))
@@ -227,9 +233,11 @@ public class ChatService {
     chatroomRepository.delete(chatroom);
   }
 
+  @Transactional
   public void validateParticipant(Long chatroomId, Long userId) {
     Chatroom chatroom = findChatroomOrThrow(chatroomId);
     User user = findUserOrThrow(userId);
+    log.info("chatroomId={}, userId={}", chatroomId, userId);
     if (!chatroom.isParticipant(user)) {
       log.error("chatroomId={}, userId={}, step=채팅방_접근_권한_없음", chatroomId, userId);
       throw new RingoException("채팅방에 소속되지 않은 유저입니다.", ErrorCode.NO_AUTH);

@@ -20,6 +20,7 @@ import com.lingo.lingoproject.community.presentation.dto.UpdatePostImageResponse
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
+import com.lingo.lingoproject.matching.application.MatchingPlaceUseCase;
 import com.lingo.lingoproject.shared.domain.elastic.PlaceDocument;
 import com.lingo.lingoproject.shared.domain.elastic.PostDocument;
 import com.lingo.lingoproject.shared.domain.model.Comment;
@@ -46,7 +47,9 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.PostLikeUserMapp
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserScrapPlaceRepository;
 import com.lingo.lingoproject.image.application.S3ImageStorageService;
+import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
+import com.lingo.lingoproject.shared.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -63,6 +66,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -110,6 +114,9 @@ public class CommunityService {
   private final PlaceSearchRepository placeSearchRepository;
   private final PlaceImageRepository placeImageRepository;
   private final CommunityUploadTransactionService communityUploadTransactionService;
+  private final RedisTemplate<String, Object> redisTemplate;
+  private final MatchingPlaceUseCase matchingPlaceUseCase;
+  private final RedisUtils redisUtils;
 
   /**
    * 게시물을 생성한다.
@@ -125,7 +132,8 @@ public class CommunityService {
   public SavePostResponseDto createPost(SavePostRequestDto dto, List<MultipartFile> images, User user) {
     log.info("step=게시물_작성_시작, userId={}, topic={}", dto.userId(), dto.category());
 
-    List<String> imageUrls = uploadImages(images);
+    List<String> imageUrls = new ArrayList<>();
+    if (images != null)  imageUrls = uploadImages(images);
 
     try {
       return communityUploadTransactionService.savePostAndImages(dto, user, imageUrls);
@@ -227,13 +235,15 @@ public class CommunityService {
    * @param size             페이지당 게시물 수
    * @return 게시물 요약 목록 (이미지 포함)
    */
-  public List<GetPostResponseDto> findPosts(User user, String topic, int page, int size) {
+  public List<GetPostResponseDto> findPosts(User user, String topic, Long placeId, int page, int size) {
     PostCategory postCategory = GenericUtils.validateAndReturnEnumValue(PostCategory.values(), topic);
+    postCategory = postCategory != PostCategory.ENTIRE ? postCategory : null;
+    placeId = placeId != 0 ? placeId : null;
     Pageable pageable = PageRequest.of(page, size);
 
-    Page<Post> posts = (postCategory == PostCategory.ENTIRE)
-        ? postRepository.findAll(pageable)
-        : postRepository.findByCategory(postCategory, pageable);
+    log.info("placeId={}, category={}", placeId, postCategory);
+
+    Page<Post> posts = postRepository.findByPlaceAndCategory(placeId, postCategory, pageable);
 
     return buildPostResponseDto(posts.stream().toList(), user);
   }
@@ -591,8 +601,28 @@ public class CommunityService {
   @Transactional
   public void scrapPlace(Long placeId, User user){
     Place place = findPlaceOrThrow(placeId);
+    updatePlaceCache(placeId, user.getId());
     UserScrapPlace scrap = UserScrapPlace.of(place, user);
     userScrapPlaceRepository.save(scrap);
+  }
+
+  private void updatePlaceCache(Long placeId, Long userId){
+    List<GetPlaceDetailResponseDto> individualCache = matchingPlaceUseCase.getCachedUserPlaces("individual-place::", userId);
+    List<GetPlaceDetailResponseDto> randomCache = matchingPlaceUseCase.getCachedUserPlaces("random-place::", userId);
+    for (GetPlaceDetailResponseDto place : individualCache){
+      if (place.getId().equals(placeId)){
+        if (place.getIsScrap() == true) place.setIsScrap(false);
+        else place.setIsScrap(true);
+      }
+    }
+    redisUtils.cacheUntilMidnight("individual-place::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), individualCache));
+    for (GetPlaceDetailResponseDto place : randomCache){
+      if (place.getId().equals(placeId)){
+        if (place.getIsScrap() == true) place.setIsScrap(false);
+        else place.setIsScrap(true);
+      }
+    }
+    redisUtils.cacheUntilMidnight("random-place::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), randomCache));
   }
 
   public List<GetPlaceDetailResponseDto> getScrappedPlace(User user){

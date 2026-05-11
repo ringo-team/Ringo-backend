@@ -25,6 +25,7 @@ import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -42,11 +43,11 @@ public class CommunityController implements CommunityApi {
   private final MatchingPlaceUseCase matchingPlaceUseCase;
 
   @Override
-  public ResponseEntity<List<GetPostResponseDto>> getPost(String category, int page, int size, User user) {
+  public ResponseEntity<ApiListResponseDto<GetPostResponseDto>> getPost(String category, Long placeId, int page, int size, User user) {
     log.info("step=게시물_조회_시작, userId={}", user.getId());
-    List<GetPostResponseDto> response = communityService.findPosts(user, category, page, size);
+    List<GetPostResponseDto> response = communityService.findPosts(user, category, placeId, page, size);
     log.info("step=게시물_조회_완료, userId={}", user.getId());
-    return ResponseEntity.status(HttpStatus.OK).body(response);
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), response));
   }
 
   @Override
@@ -74,11 +75,11 @@ public class CommunityController implements CommunityApi {
   }
 
   @Override
-  public ResponseEntity<List<GetCommentResponseDto>> getComments(Long postId, User user) {
+  public ResponseEntity<ApiListResponseDto<GetCommentResponseDto>> getComments(Long postId, User user) {
     log.info("step=댓글_조회_시작, userId={}", user.getId());
     List<GetCommentResponseDto> response = communityService.findCommentsByPost(postId, user);
     log.info("step=댓글_조회_완료, userId={}", user.getId());
-    return ResponseEntity.status(HttpStatus.OK).body(response);
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), response));
   }
 
   @Override
@@ -147,12 +148,12 @@ public class CommunityController implements CommunityApi {
   }
 
   @Override
-  public ResponseEntity<List<GetPostResponseDto>> getPlaceRelatedPost(User user, String keyword, String place, int page, int size) {
+  public ResponseEntity<ApiListResponseDto<GetPostResponseDto>> getPlaceRelatedPost(User user, String keyword, String place, int page, int size) {
     log.info("step=게시물_관련_장소/컨텐츠_조회_시작");
     List<GetPostResponseDto> dtos = communityService.searchPostsByKeywordOrPlace(user, keyword, place, page, size);
     log.info("step=게시물_관련_장소/컨텐츠_조회_완료");
 
-    return ResponseEntity.status(HttpStatus.OK).body(dtos);
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));
   }
 
   @Override
@@ -173,9 +174,9 @@ public class CommunityController implements CommunityApi {
   }
 
   @Override
-  public ResponseEntity<List<GetPlaceDetailResponseDto>> getRankedPagedPlaces(User user, int page, int size) {
+  public ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getRankedPagedPlaces(User user, int page, int size) {
     List<GetPlaceDetailResponseDto> rankedPlaces = matchingPlaceUseCase.getRankedPagedPlaces(user, page, size);
-    return ResponseEntity.status(HttpStatus.OK).body(rankedPlaces);
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), rankedPlaces));
   }
 
   @Override
@@ -197,9 +198,9 @@ public class CommunityController implements CommunityApi {
   }
 
   @Override
-  public ResponseEntity<List<GetPlaceDetailResponseDto>> getScrappedPlace(User user) {
+  public ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getScrappedPlace(User user) {
     List<GetPlaceDetailResponseDto> scrappedPlaces = communityService.getScrappedPlace(user);
-    return ResponseEntity.status(HttpStatus.OK).body(scrappedPlaces);
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), scrappedPlaces));
   }
 
   @Override

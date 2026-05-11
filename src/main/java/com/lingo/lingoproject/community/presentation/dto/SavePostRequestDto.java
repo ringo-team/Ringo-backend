@@ -7,7 +7,8 @@ public record SavePostRequestDto(
     @NotBlank String title,
     @NotBlank String content,
     @NotNull Long userId,
-    @NotBlank String category
+    @NotBlank String category,
+    Long placeId
 ) {
 
 }

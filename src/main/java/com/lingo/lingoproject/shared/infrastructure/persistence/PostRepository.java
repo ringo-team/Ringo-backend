@@ -31,7 +31,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
   @Query("update Post p set p.commentCount = p.commentCount - :count where p.id = :postId")
   void decreaseCommentCount(Long postId, int count);
 
-  Page<Post> findByCategory(PostCategory category, Pageable pageable);
+  @Query("select p from Post p left join p.place q where (:placeId is null or q.id = :placeId) and (:category is null or p.category = :category)")
+  Page<Post> findByPlaceAndCategory(Long placeId, PostCategory category, Pageable pageable);
 
   List<Post> findAllByIdIn(Collection<Long> ids);
 

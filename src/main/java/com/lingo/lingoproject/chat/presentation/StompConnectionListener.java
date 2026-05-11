@@ -37,7 +37,10 @@ public class StompConnectionListener {
       // 접속 중인 채팅방 조회
       String destination = accessor.getDestination();
       Long roomId = chatService.extractChatroomIdFromDestination(destination);
-      if (roomId == null) return;
+      if (roomId == null) {
+        log.warn("connect 할때 roomid가 없습니다.");
+        return;
+      }
 
       // 유저 채팅방 레디스에 저장
       log.info("step=채팅방_입장, userId={}, chatroomId={}", user.getId(), roomId);
@@ -71,9 +74,9 @@ public class StompConnectionListener {
 
       // 유저 id 로 저장된 키 모두 삭제
       Set<String> keyset = redisTemplate.keys("connect::" + user.getId() + "*");
-      if (keyset.isEmpty()){
-        log.info("redis key cannot found");
-        throw new RingoException("redis key cannot found", ErrorCode.INTERNAL_SERVER_ERROR);
+      if (keyset == null || keyset.isEmpty()){
+        log.info("step=WebSocket_연결_해제_키_없음, userId={}", user.getId());
+        return;
       }
       for (String key : keyset) {
         log.info("step=WebSocket_연결_키_삭제, key={}", key);

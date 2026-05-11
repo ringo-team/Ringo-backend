@@ -7,6 +7,7 @@ import com.lingo.lingoproject.shared.security.jwt.JwtUtil;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -51,6 +52,7 @@ import org.springframework.stereotype.Component;
 public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
   private final ChatService chatService;
   private final JwtUtil jwtUtil;
+  private final RedisTemplate<String, Object> redisTemplate;
 
   /**
    * STOMP 메시지가 채널로 전송되기 전에 호출됩니다.
@@ -65,7 +67,11 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
 
     StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-    if (accessor == null) return message;
+    log.info("message={}, command={}, dest={}", accessor.getMessage(), accessor.getCommand(), accessor.getDestination());
+
+    if (accessor == null) {
+      return message;
+    }
 
     // DISCONNECT 명령어는 인증 검사 없이 통과
     if (StompCommand.DISCONNECT.equals(accessor.getCommand())){
@@ -73,11 +79,15 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     }
 
     String token = accessor.getFirstNativeHeader("Authorization");
+    log.info("token={}", token);
     User user;
     /*------------------------------------토큰 검증-----------------------------------------*/
     if (token == null || !token.startsWith("Bearer ")) {
       // 토큰이 없는 경우: 이미 CONNECT 단계에서 Principal이 설정된 경우 재사용
-      if (accessor.getUser() != null) user = chatService.findUserByLoginIdOrThrow(accessor.getUser().getName());
+      if (accessor.getUser() != null) {
+        log.info("accessor user = {}", accessor.getUser().getName());
+        user = chatService.findUserByLoginIdOrThrow(accessor.getUser().getName());
+      }
       else throw new RingoException("토큰이 없습니다.", ErrorCode.TOKEN_INVALID);
     }
     else {
@@ -109,6 +119,8 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     String destination = accessor.getDestination();
     Long roomId = chatService.extractChatroomIdFromDestination(destination);
 
+    log.info("command={}, roomId={}", accessor.getCommand(), roomId);
+
     // destination에서 roomId를 파싱할 수 없는 경우 (예: /user/queue 구독 등) 통과
     if (roomId == null) {
       log.info("roomId is null");
@@ -117,7 +129,10 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
 
     if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())){
       // 구독 시 해당 채팅방 참여자인지 확인
+      log.info("subscribe block");
       chatService.validateParticipant(roomId, user.getId());
+      log.info("connect complete");
+      redisTemplate.opsForValue().set("connect::" + user.getId() + "::" + roomId, true);
     }
     else if (StompCommand.SEND.equals(accessor.getCommand())){
       // 메시지 전송 시 해당 채팅방 참여자인지 확인

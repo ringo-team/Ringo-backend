@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.user.application;
 
+import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -10,6 +11,7 @@ import com.lingo.lingoproject.shared.security.jwt.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,8 +37,10 @@ public class AuthTokenUseCase {
   public LoginResponseDto login(User user) {
     String access = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
+    boolean isComplete = Objects.equals(SignupStatus.COMPLETED, user.getStatus());
+
     redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refresh, 30, TimeUnit.DAYS);
-    return new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), access, refresh);
+    return new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), access, refresh, isComplete);
   }
 
   public RegenerateTokenResponseDto regenerateToken(String refreshToken) {
@@ -52,7 +56,7 @@ public class AuthTokenUseCase {
     if (token.equals(refreshToken)) {
       return generateTokenAndSaveRefreshTokenInRedis(claims.getSubject());
     }
-    throw new RingoException("유효하지 않은 토큰입니다.", ErrorCode.NO_AUTH);
+    throw new RingoException("유효하지 않은 토큰입니다." + token, ErrorCode.NO_AUTH);
   }
 
   public void logout(HttpServletRequest request) {

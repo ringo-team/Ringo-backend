@@ -70,7 +70,7 @@ public class GetUserProfileResponseDto {
   private String mbti;
 
   @Schema(description = "스크랩 여부", example = "true")
-  private boolean isScrap;
+  private Boolean isScrap;
 
   @Override
   public int hashCode(){

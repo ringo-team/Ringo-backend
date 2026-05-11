@@ -8,6 +8,7 @@ import com.lingo.lingoproject.community.presentation.dto.UpdatePostImageResponse
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.shared.domain.event.DomainEventPublisher;
 import com.lingo.lingoproject.shared.domain.model.Comment;
+import com.lingo.lingoproject.shared.domain.model.Place;
 import com.lingo.lingoproject.shared.domain.model.Post;
 import com.lingo.lingoproject.shared.domain.model.PostCategory;
 import com.lingo.lingoproject.shared.domain.model.PostImage;
@@ -15,6 +16,7 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.infrastructure.persistence.CommentLikeUserMappingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.CommentRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostLikeUserMappingRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PostRepository;
@@ -34,25 +36,29 @@ public class CommunityUploadTransactionService {
   private final PostLikeUserMappingRepository postLikeUserMappingRepository;
   private final CommentRepository commentRepository;
   private final CommentLikeUserMappingRepository commentLikeUserMappingRepository;
+  private final PlaceRepository placeRepository;
 
   public CommunityUploadTransactionService(PostRepository postRepository,
       PostImageRepository postImageRepository, DomainEventPublisher domainEventPublisher,
       PostLikeUserMappingRepository postLikeUserMappingRepository,
       CommentRepository commentRepository,
-      CommentLikeUserMappingRepository commentLikeUserMappingRepository) {
+      CommentLikeUserMappingRepository commentLikeUserMappingRepository,
+      PlaceRepository placeRepository) {
     this.postRepository = postRepository;
     this.postImageRepository = postImageRepository;
     this.domainEventPublisher = domainEventPublisher;
     this.postLikeUserMappingRepository = postLikeUserMappingRepository;
     this.commentRepository = commentRepository;
     this.commentLikeUserMappingRepository = commentLikeUserMappingRepository;
+    this.placeRepository = placeRepository;
   }
 
   @Transactional
   public SavePostResponseDto savePostAndImages(SavePostRequestDto dto, User user, List<String> imageUrls){
     PostCategory postCategory = GenericUtils.validateAndReturnEnumValue(PostCategory.values(), dto.category());
 
-    Post savedPost = postRepository.save(Post.of(user, dto.title(), dto.content(), postCategory));
+    Place place = findPlaceOrNull(dto.placeId());
+    Post savedPost = postRepository.save(Post.of(user, dto.title(), dto.content(), postCategory, place));
     List<PostImage> postImages = imageUrls.stream().map(url -> PostImage.of(savedPost, url)).toList();
     List<PostImage> savedPostImages = postImageRepository.saveAll(postImages);
 
@@ -64,6 +70,11 @@ public class CommunityUploadTransactionService {
 
     log.info("step=게시물_저장_완료, postId={}, userId={}, imageCount={}", savedPost.getId(), dto.userId(), savedPostImages.size());
     return new SavePostResponseDto(savedPost.getId(), imageResponse, ErrorCode.SUCCESS.getCode());
+  }
+
+  private Place findPlaceOrNull(Long placeId){
+    if (placeId == null) return null;
+    return placeRepository.findById(placeId).orElse(null);
   }
 
   @Transactional

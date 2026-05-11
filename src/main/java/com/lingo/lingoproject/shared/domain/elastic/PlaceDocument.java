@@ -1,6 +1,8 @@
 package com.lingo.lingoproject.shared.domain.elastic;
 
 import jakarta.persistence.Id;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -24,4 +26,5 @@ public class PlaceDocument {
   private String name;
   private String image;
   private String keyword;
+
 }

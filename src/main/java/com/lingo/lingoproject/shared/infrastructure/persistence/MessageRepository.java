@@ -41,11 +41,16 @@ public interface MessageRepository extends MongoRepository<Message, String> {
       // 1. 대상 채팅방 필터
       "{ $match: { 'chatroomId': { $in: ?0 } } }",
 
-      // 2. 채팅방별로 그룹핑
+      // 2. createdAt 내림차순 정렬 (그룹 전에!)
+      "{ $sort: { 'createdAt': -1 } }",
+
+      // 3. 채팅방별 그룹핑
       """
       { $group: {
           '_id': '$chatroomId',
-          'lastMessage': { $max: { 'createdAt': '$createdAt', 'content': '$content' } },
+          'chatroomId': { $first: '$chatroomId' },
+          'content': { $first: '$content' },
+          'createdAt': { $first: '$createdAt' },
           'unreadCount': {
               $sum: {
                   $cond: [

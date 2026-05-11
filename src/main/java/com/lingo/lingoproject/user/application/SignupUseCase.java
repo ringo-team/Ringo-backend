@@ -28,7 +28,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -58,7 +57,7 @@ public class SignupUseCase {
   private final ApplicationEventPublisher eventPublisher;
 
   public User signup(SignupInfoDto dto) {
-    validateLoginDto(dto);
+    validateSignupDto(dto);
     return userQueryUseCase.save(User.forSignup(dto.loginId(), passwordEncoder.encode(dto.password()), dto.isMarketingReceptionConsent()));
   }
 
@@ -140,7 +139,7 @@ public class SignupUseCase {
     return Base64.getEncoder().encodeToString(UUID.randomUUID().toString().getBytes()).substring(0, 8);
   }
 
-  private void validateLoginDto(SignupInfoDto dto) {
+  private void validateSignupDto(SignupInfoDto dto) {
     if (!dto.loginId().matches("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]+$")) {
       log.warn("회원가입 로그인 요청값: {}", dto.loginId());
       throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER);

@@ -50,7 +50,7 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
   @GetMapping("/posts")
-  ResponseEntity<List<GetPostResponseDto>> getPost(@RequestParam(value = "category") String category, @RequestParam(value = "page") int page, @RequestParam(value = "size") int size, @AuthenticationPrincipal User user);
+  ResponseEntity<ApiListResponseDto<GetPostResponseDto>> getPost(@RequestParam(value = "category") String category, @RequestParam(value = "place") Long placeId, @RequestParam(value = "page") int page, @RequestParam(value = "size") int size, @AuthenticationPrincipal User user);
 
   @Operation(summary = "게시물 업로드")
   @ApiResponses(value = {
@@ -90,7 +90,7 @@ public interface CommunityApi {
       @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation =  ResultMessageResponseDto.class)))
   })
   @GetMapping("/posts/{post-id}/comments")
-  ResponseEntity<List<GetCommentResponseDto>> getComments(@PathVariable(value = "post-id") Long postId, @AuthenticationPrincipal User user);
+  ResponseEntity<ApiListResponseDto<GetCommentResponseDto>> getComments(@PathVariable(value = "post-id") Long postId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "댓글 업로드")
   @ApiResponses(value = {
@@ -170,7 +170,7 @@ public interface CommunityApi {
 
   @Operation(summary = "장소/컨텐츠 관련 게시물 조회")
   @GetMapping("/posts/search")
-  ResponseEntity<List<GetPostResponseDto>> getPlaceRelatedPost(@AuthenticationPrincipal User user, @RequestParam(required = false) String keyword, @RequestParam(required = false) String place, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
+  ResponseEntity<ApiListResponseDto<GetPostResponseDto>> getPlaceRelatedPost(@AuthenticationPrincipal User user, @RequestParam(required = false) String keyword, @RequestParam(required = false) String place, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
 
   @PostMapping(value = "/places/excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   ResponseEntity<ResultMessageResponseDto> savePlace(@RequestParam("file") MultipartFile file);
@@ -179,7 +179,7 @@ public interface CommunityApi {
   ResponseEntity<GetPlaceResponseDto> getIndividualRecommendationPlaces(@AuthenticationPrincipal User user);
 
   @GetMapping(value = "/places/rank")
-  ResponseEntity<List<GetPlaceDetailResponseDto>> getRankedPagedPlaces(@AuthenticationPrincipal User user, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
+  ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getRankedPagedPlaces(@AuthenticationPrincipal User user, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
 
   @GetMapping(value = "/places/{place-id}")
   ResponseEntity<GetPlaceDetailResponseDto> getDetailPlaceInfo(@AuthenticationPrincipal User user, @PathVariable(value = "place-id") Long placeId);
@@ -191,7 +191,7 @@ public interface CommunityApi {
   ResponseEntity<ResultMessageResponseDto> scrapPlace(@RequestBody ScrapPlaceRequestDto request, @AuthenticationPrincipal User user);
 
   @GetMapping(value = "/places/scrap")
-  ResponseEntity<List<GetPlaceDetailResponseDto>> getScrappedPlace(@AuthenticationPrincipal User user);
+  ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getScrappedPlace(@AuthenticationPrincipal User user);
 
   @GetMapping(value = "/places/search")
   ResponseEntity<ApiListResponseDto<SearchPlaceRequestDto>> searchPlacesByKeywords(@RequestParam String keyword);

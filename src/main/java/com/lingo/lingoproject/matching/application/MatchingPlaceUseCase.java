@@ -236,7 +236,7 @@ public class MatchingPlaceUseCase {
   }
 
   @SuppressWarnings("unchecked")
-  private List<GetPlaceDetailResponseDto> getCachedUserPlaces(String key, Long userId) {
+  public List<GetPlaceDetailResponseDto> getCachedUserPlaces(String key, Long userId) {
     if (redisTemplate.hasKey(key + userId)) {
       return ((ApiListResponseDto<GetPlaceDetailResponseDto>) redisTemplate.opsForValue().get(key + userId)).getList();
     }

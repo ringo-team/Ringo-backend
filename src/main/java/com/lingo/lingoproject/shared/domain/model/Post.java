@@ -32,12 +32,19 @@ import org.hibernate.annotations.DynamicInsert;
 @Getter@Setter
 public class Post extends Timestamp {
 
-  public static Post of(User author, String title, String content, PostCategory category) {
+  public static Post of(
+      User author,
+      String title,
+      String content,
+      PostCategory category,
+      Place place
+      ) {
     return Post.builder()
         .author(author)
         .title(title)
         .content(content)
         .category(category)
+        .place(place)
         .build();
   }
 
@@ -64,9 +71,6 @@ public class Post extends Timestamp {
   @Lob
   private String content;
 
-  @Column(length = 10)
-  private String place;
-
   @Enumerated(value = EnumType.STRING)
   private PostCategory category;
 
@@ -81,4 +85,8 @@ public class Post extends Timestamp {
   @ManyToOne
   @JoinColumn(name = "author_id")
   private User author;
+
+  @ManyToOne
+  @JoinColumn(name = "place_id", nullable = true)
+  private Place place;
 }

@@ -81,7 +81,7 @@ public class MatchingRecommendationUseCase {
     Long userId = user.getId();
 
     List<GetUserProfileResponseDto> cached = getCumulativeCachedProfile(user);
-    if (cached != null && cached.size() == MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE) {
+    if (!cached.isEmpty() && cached.size() == MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE) {
       log.info("step=누적설문_추천_캐시_히트, userId={}, cacheSize={}", userId, cached.size());
       return cached;
     }
@@ -132,7 +132,7 @@ public class MatchingRecommendationUseCase {
 
   public List<GetUserProfileResponseDto> getDailySurveyBasedRecommendationProfiles(User user) {
     List<GetUserProfileResponseDto> cached = getDailyCachedProfile(user);
-    if (cached != null && cached.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) {
+    if (!cached.isEmpty() && cached.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) {
       return cached;
     }
     return cacheEachDailyProfile(user);
@@ -372,22 +372,10 @@ public class MatchingRecommendationUseCase {
     Long userId = user.getId();
     if (redisTemplate.hasKey(keyPrefix + userId)) {
       List<GetUserProfileResponseDto> cached = function.apply(userId.toString());
-      updateIsScrapFlag(user, cached, keyPrefix);
       logCachedProfiles(user, cached);
       return cached;
     }
-    return null;
-  }
-
-  private void updateIsScrapFlag(User user, List<GetUserProfileResponseDto> profiles, String keyPrefix) {
-    Set<Long> scrappedUserIds = scrappedUserRepository.findAllByUser(user).stream()
-        .map(s -> s.getScrappedUser().getId())
-        .collect(Collectors.toSet());
-    profiles.forEach(profile -> profile.setScrap(scrappedUserIds.contains(profile.getUserId())));
-    redisUtils.cacheUntilMidnight(
-        keyPrefix + user.getId(),
-        new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), profiles)
-    );
+    return new ArrayList<>();
   }
 
   private void applyHideFlagToCache(

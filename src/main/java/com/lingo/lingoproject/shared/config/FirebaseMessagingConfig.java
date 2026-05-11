@@ -6,9 +6,11 @@ import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
+@Slf4j
 @Configuration
 public class FirebaseMessagingConfig {
   @PostConstruct
@@ -21,18 +23,25 @@ public class FirebaseMessagingConfig {
       for (FirebaseApp app : firebaseApps) {
         if (app.getName().equals(FirebaseApp.DEFAULT_APP_NAME)){
           firebaseApp = app;
+          log.info("step=FIREBASE_이미_초기화됨, appName={}", app.getName());
           return;
         }
       }
     }
 
-    GoogleCredentials googleCredentials = GoogleCredentials
-        .fromStream(new ClassPathResource("firebase/ringo-cloud-messaging-project-firebase-adminsdk-fbsvc-4bbbe99bb2.json").getInputStream())
-        .createScoped(List.of("https://www.googleapis.com/auth/firebase.messaging"));
-    googleCredentials.refresh();
-    FirebaseOptions options = FirebaseOptions.builder()
-        .setCredentials(googleCredentials)
-        .build();
-    firebaseApp = FirebaseApp.initializeApp(options);
+    try {
+      GoogleCredentials googleCredentials = GoogleCredentials
+          .fromStream(new ClassPathResource("firebase/ringo-bdd26-firebase-adminsdk-fbsvc-107cc408f2.json").getInputStream())
+          .createScoped(List.of("https://www.googleapis.com/auth/firebase.messaging"));
+      log.info("step=FIREBASE_자격증명_갱신_성공, accessToken_존재={}", googleCredentials.getAccessToken() != null);
+      FirebaseOptions options = FirebaseOptions.builder()
+          .setCredentials(googleCredentials)
+          .build();
+      FirebaseApp.initializeApp(options);
+      log.info("step=FIREBASE_초기화_완료");
+    } catch (Exception e) {
+      log.error("step=FIREBASE_초기화_실패", e);
+      throw e;
+    }
   }
 }

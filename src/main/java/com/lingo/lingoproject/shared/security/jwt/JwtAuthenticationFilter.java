@@ -13,8 +13,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.security.Principal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
@@ -63,7 +65,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     String accessToken = request.getHeader("Authorization");
 
     // /login 요청은 CustomAuthenticationFilter가 처리하므로 이 필터에서는 건너뜀
-    if (request.getRequestURI().equalsIgnoreCase("/login")){
+    if (request.getRequestURI().startsWith("/login")  ||
+        request.getRequestURI().startsWith("/signup") ){
       filterChain.doFilter(request, response);
       return;
     }
@@ -77,6 +80,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       User user = userRepository.findByLoginId(claims.getSubject())
           .orElseThrow(() -> new RingoException("유효하지 않은 토큰입니다.", ErrorCode.TOKEN_INVALID));
 
+      if (request.getRequestURI().startsWith("/profile")){
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(user, "password", user.getAuthorities()
+        ));
+        filterChain.doFilter(request, response);
+        return;
+      }
       // 로그아웃한 유저가 기존 토큰으로 접근하려고 할때 접근을 차단함
       // 로그아웃 시 해당 토큰의 jti를 Redis에 등록 (TTL = 토큰 잔여 만료 시간)
       if(redisTemplate.hasKey("logoutUser::" + claims.getId())){
@@ -96,7 +106,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
       // 회원가입을 마치치 않은 회원의 경우 접근을 차단함
       // /signup/** 경로와 공개 조회 엔드포인트는 예외적으로 허용
-      if(!user.getStatus().equals(SignupStatus.COMPLETED)){
+      if(!Objects.equals(SignupStatus.COMPLETED, user.getStatus())){
         throw new RingoException("회원가입을 마치고 요청 주시길 바랍니다.", ErrorCode.BEFORE_SIGNUP );
       }
 

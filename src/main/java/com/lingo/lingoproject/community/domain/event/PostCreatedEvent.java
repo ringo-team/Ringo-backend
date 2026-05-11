@@ -2,6 +2,7 @@ package com.lingo.lingoproject.community.domain.event;
 
 import com.lingo.lingoproject.shared.domain.event.DomainEvent;
 import com.lingo.lingoproject.shared.domain.event.DomainEventType;
+import com.lingo.lingoproject.shared.domain.model.Place;
 import com.lingo.lingoproject.shared.domain.model.Post;
 import lombok.Getter;
 
@@ -17,7 +18,7 @@ public class PostCreatedEvent extends DomainEvent {
   private final Long   postId;
   private final String title;
   private final String content;
-  private final String place;
+  private final Place place;
 
   public PostCreatedEvent(Post post) {
     super(DomainEventType.POST_CREATED);

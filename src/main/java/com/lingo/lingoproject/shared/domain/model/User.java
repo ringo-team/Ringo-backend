@@ -12,6 +12,7 @@ import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.user.presentation.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.shared.utils.Timestamp;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -118,7 +119,7 @@ public class User extends Timestamp implements UserDetails {
   private String name;
 
   /** 로그인 ID. JWT의 subject 클레임으로도 사용됩니다. */
-  @Column(length = 20, unique = true)
+  @Column(length = 40, unique = true)
   private String loginId;
 
   /** BCrypt 인코딩된 비밀번호. OAuth 유저는 null입니다. */
@@ -129,7 +130,7 @@ public class User extends Timestamp implements UserDetails {
   private String phoneNumber;
 
   /** 프로필 이미지 정보 (1:1 관계). */
-  @OneToOne
+  @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   @JoinColumn(name = "profile_id")
   private Profile profile;
 

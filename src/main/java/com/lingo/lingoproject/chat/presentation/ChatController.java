@@ -9,6 +9,7 @@ import com.lingo.lingoproject.chat.presentation.dto.SaveAppointmentRequestDto;
 import com.lingo.lingoproject.shared.domain.model.Appointment;
 import com.lingo.lingoproject.shared.domain.model.Chatroom;
 import com.lingo.lingoproject.shared.domain.model.Message;
+import com.lingo.lingoproject.shared.domain.model.NotificationType;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -96,10 +97,13 @@ public class ChatController implements ChatApi {
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now())
     );
 
-    if (chatMessageDto.getType().equalsIgnoreCase("CONNECT")) return;
+    Message savedMessage = null;
+    if (!chatMessageDto.getType().equalsIgnoreCase("CONNECT")) {
 
-    Message savedMessage = chatService.saveMessage(chatMessageDto, roomId);
-    if (savedMessage == null) return;
+      savedMessage = chatService.saveMessage(chatMessageDto, roomId);
+      if (savedMessage == null)
+        return;
+    }
 
     for (User member : chatroomMembers) {
       try {
@@ -115,8 +119,8 @@ public class ChatController implements ChatApi {
         chatService.recordMessageDeliveryFailure(e, savedMessage, member.getLoginId(), "/room-list/" + roomId);
       }
 
-      if (!connectedUserIdList.contains(member.getId())) {
-        //fcmNotificationUseCase.sendFcmNotification(member, "메세지가 도착했어요", savedMessage.getContent(), NotificationType.MESSAGE);
+      if (!connectedUserIdList.contains(member.getId()) && savedMessage != null) {
+        fcmNotificationUseCase.sendFcmNotification(member, member.getNickname(), savedMessage.getContent(), NotificationType.MESSAGE);
       }
     }
   }

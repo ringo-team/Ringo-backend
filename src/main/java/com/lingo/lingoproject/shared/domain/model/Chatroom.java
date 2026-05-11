@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -20,10 +21,12 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import org.springframework.http.HttpStatus;
 
+@Slf4j
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @Builder
@@ -47,7 +50,7 @@ public class Chatroom {
   @Column(length = 30)
   private String chatroomName;
 
-  @OneToMany(mappedBy = "chatroom")
+  @OneToMany(mappedBy = "chatroom", fetch = FetchType.EAGER)
   private List<ChatroomParticipant> participants;
 
   @CreationTimestamp
@@ -59,16 +62,21 @@ public class Chatroom {
 
   public boolean isParticipant(User user){
 
+    log.info("participant size = {}", participants.size());
+
     if (participants.size() != 2) throw new RingoException(
         "chat participant 2미만",
         ErrorCode.INTERNAL_SERVER_ERROR
     );
 
-    return participants.stream()
+    boolean result = participants.stream()
         .filter(p -> !p.isWithdrawn())
         .map(ChatroomParticipant::getParticipant)
         .map(User::getId)
         .anyMatch(id -> id.equals(user.getId()));
+
+    log.info("isparticipant result={}", result);
+    return result;
   }
 
   public ChatroomParticipant getOpponent(User user){

@@ -2,6 +2,7 @@ package com.lingo.lingoproject.shared.domain.elastic;
 
 
 import com.lingo.lingoproject.community.domain.event.PostCreatedEvent;
+import com.lingo.lingoproject.shared.domain.model.Place;
 import jakarta.persistence.Id;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,7 +22,7 @@ public class PostDocument {
   private String title;
   private String content;
 
-  private String place;
+  private Place place;
 
   public static PostDocument from(PostCreatedEvent event){
     return PostDocument.builder()

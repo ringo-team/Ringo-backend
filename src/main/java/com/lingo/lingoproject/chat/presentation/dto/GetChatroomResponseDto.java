@@ -5,9 +5,12 @@ import com.lingo.lingoproject.shared.domain.model.Chatroom;
 import com.lingo.lingoproject.shared.domain.model.Profile;
 import com.lingo.lingoproject.shared.domain.model.User;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.ZoneId;
 import java.util.Optional;
 import lombok.Builder;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Builder
 public record GetChatroomResponseDto(
     @Schema(description = "채팅방 id", example = "5")
@@ -27,13 +30,30 @@ public record GetChatroomResponseDto(
 ) {
 
   public static GetChatroomResponseDto of(Chatroom chatroom, User opponent, ChatroomSummaryProjection summary) {
+
+    if (summary == null){
+      log.info("projection is null");
+      return GetChatroomResponseDto.builder()
+          .chatroomId(chatroom.getId())
+          .chatOpponent(Optional.ofNullable(opponent).map(User::getNickname).orElse(null))
+          .chatOpponentProfileUrl(Optional.ofNullable(opponent).map(User::getProfile).map(Profile::getImageUrl).orElse(null))
+          .lastChatMessage(null)
+          .numberOfNotReadMessages(null)
+          .lastSendDateTime(null)
+          .chatroomSize(2)
+          .build();
+    }
+
+
     return GetChatroomResponseDto.builder()
         .chatroomId(chatroom.getId())
         .chatOpponent(Optional.ofNullable(opponent).map(User::getNickname).orElse(null))
         .chatOpponentProfileUrl(Optional.ofNullable(opponent).map(User::getProfile).map(Profile::getImageUrl).orElse(null))
-        .lastChatMessage(summary.getLastMessage().getContent())
+        .lastChatMessage(summary.getContent())
         .numberOfNotReadMessages(summary.getUnreadCount())
-        .lastSendDateTime(summary.getLastMessage().getCreatedAt().toString())
+        .lastSendDateTime(summary.getCreatedAt() != null ?
+            summary.getCreatedAt().toString()
+            : null)
         .chatroomSize(2)
         .build();
   }
