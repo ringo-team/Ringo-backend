@@ -10,13 +10,11 @@ import com.lingo.lingoproject.shared.security.dto.RegenerateTokenResponseDto;
 import com.lingo.lingoproject.shared.security.jwt.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.transaction.Transactional;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 /**
@@ -44,7 +42,7 @@ public class AuthTokenUseCase {
   }
 
   public RegenerateTokenResponseDto regenerateToken(String refreshToken) {
-    Claims claims = jwtUtil.getClaims(refreshToken);
+    Claims claims = jwtUtil.토큰에서_claim_추출(refreshToken);
     Object redisToken = redisTemplate.opsForValue().get("redis::refresh::" + claims.getSubject());
     String token = redisToken != null ? redisToken.toString() : null;
 
@@ -65,7 +63,7 @@ public class AuthTokenUseCase {
       throw new RingoException("토큰이 형식이 잘못되었습니다.", ErrorCode.BAD_REQUEST);
 
     accessToken = accessToken.substring(7);
-    Claims claims = jwtUtil.getClaims(accessToken);
+    Claims claims = jwtUtil.토큰에서_claim_추출(accessToken);
 
     redisTemplate.delete("redis::refresh::" + claims.getSubject());
     redisTemplate.opsForValue().set("logoutUser::" + claims.getId(), accessToken, 1, TimeUnit.DAYS);

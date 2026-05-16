@@ -3,6 +3,7 @@ package com.lingo.lingoproject.shared.infrastructure.retry;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.DeadLetterFcmMessageRepository;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import java.util.Optional;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -40,11 +41,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class RedisQueueService {
-  /** FCM 재시도 큐 Redis 키. */
-  private static final String keyForFcm = "fcm::retry-queue";
-
-  /** Discord 웹훅 재시도 큐 Redis 키. */
-  private static final String keyForDiscord = "discord::retry-queue";
 
   private final RedisTemplate<String, Object> redisTemplate;
   protected final DeadLetterFcmMessageRepository deadLetterFcmMessageRepository;
@@ -65,8 +61,8 @@ public class RedisQueueService {
    */
   public void pushToQueue(String key, RedisQueueMessagePayLoad payload){
     switch (key) {
-      case "FCM" -> redisTemplate.opsForList().leftPush(keyForFcm, payload);
-      case "DISCORD" -> redisTemplate.opsForList().leftPush(keyForDiscord, payload);
+      case "FCM" -> redisTemplate.opsForList().leftPush(RedisKey.FCM_재시도_레디스_키, payload);
+      case "DISCORD" -> redisTemplate.opsForList().leftPush(RedisKey.디스코드_재시도_레디스_키, payload);
       default -> throw new RingoException("적절하지 않은 키 값입니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
@@ -83,8 +79,8 @@ public class RedisQueueService {
   public Optional<?> pollFromQueue(String key){
     try{
       Object log = switch (key){
-        case "FCM" -> redisTemplate.opsForList().rightPop(keyForFcm);
-        case "DISCORD" -> redisTemplate.opsForList().rightPop(keyForDiscord);
+        case "FCM" -> redisTemplate.opsForList().rightPop(RedisKey.FCM_재시도_레디스_키);
+        case "DISCORD" -> redisTemplate.opsForList().rightPop(RedisKey.디스코드_재시도_레디스_키);
         default -> null;
       };
       if (log == null) return Optional.empty();
@@ -103,8 +99,8 @@ public class RedisQueueService {
    */
   public boolean isEmpty(String key){
     Long size = switch (key){
-      case "FCM" -> redisTemplate.opsForList().size(keyForFcm);
-      case "DISCORD" -> redisTemplate.opsForList().size(keyForDiscord);
+      case "FCM" -> redisTemplate.opsForList().size(RedisKey.FCM_재시도_레디스_키);
+      case "DISCORD" -> redisTemplate.opsForList().size(RedisKey.디스코드_재시도_레디스_키);
       default -> null;
     };
     if (size == null){

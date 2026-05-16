@@ -20,6 +20,9 @@ public record UpdateUserInfoRequestDto(
     @Schema(description = "학력", example = "대학교졸업")
     String degree,
 
+    @Schema(description = "대학교명", example = "서울대")
+    String school,
+
     @Schema(description = "음주여부", example = "OFTEN", allowableValues = {"ALWAYS", "OFTEN", "RARELY", "ON_NEED", "NEVER"})
     String isDrinking,
 

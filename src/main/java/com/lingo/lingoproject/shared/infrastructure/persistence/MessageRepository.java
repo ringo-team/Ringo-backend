@@ -31,7 +31,7 @@ public interface MessageRepository extends MongoRepository<Message, String> {
         '$addToSet': { 'readerIds': ?1 } 
         }"""
   )
-  void readAllMessages(Long chatroomId, Long userId);
+  void 모든_메세지_읽음_처리(Long chatroomId, Long userId);
 
   Page<Message> findAllByChatroomIdOrderByCreatedAtDesc(Long chatroomId, Pageable pageable);
 

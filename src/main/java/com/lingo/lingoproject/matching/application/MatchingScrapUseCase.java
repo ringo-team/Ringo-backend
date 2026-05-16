@@ -9,6 +9,7 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ScrappedUserRepository;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import jakarta.transaction.Transactional;
@@ -30,10 +31,6 @@ public class MatchingScrapUseCase {
   private final MatchingRecommendationUseCase matchingRecommendationUseCase;
   private final ScrappedUserRepository scrappedUserRepository;
   private final UserQueryUseCase userQueryUseCase;
-
-  private static final String DAILY_RECOMMENDATION_REDIS_KEY_PREFIX = "recommend-for-daily-survey::";
-  private static final String CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX = "recommend::";
-  private final RedisTemplate<String, Object> redisTemplate;
   private final RedisUtils redisUtils;
 
 
@@ -41,14 +38,14 @@ public class MatchingScrapUseCase {
   public void scrapUser(Long recommendedUserId, User user) {
     Long userId = user.getId();
 
-    List<GetUserProfileResponseDto> cumulativeCachedProfile = matchingRecommendationUseCase.getCumulativeCachedProfile(user);
-    updateScrapCache(cumulativeCachedProfile, userId, recommendedUserId, CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX);
+    List<GetUserProfileResponseDto> cumulativeCachedProfile = matchingRecommendationUseCase.캐시된_누적_설문_기반_추천_프로필_조회(user);
+    updateScrapCache(cumulativeCachedProfile, userId, recommendedUserId, RedisKey.누적_설문_기반_추천_프로필_캐시_키);
     List<Long> cumulativeRecommendedIds = extractIdFromProfileDtos(cumulativeCachedProfile);
     log.info("step=스크랩_누적설문_추천목록, recommendedIds={}", cumulativeRecommendedIds);
 
 
-    List<GetUserProfileResponseDto> dailyCachedProfile = matchingRecommendationUseCase.getDailyCachedProfile(user);
-    updateScrapCache(dailyCachedProfile, userId, recommendedUserId, DAILY_RECOMMENDATION_REDIS_KEY_PREFIX);
+    List<GetUserProfileResponseDto> dailyCachedProfile = matchingRecommendationUseCase.캐시된_일일_설문_기반_추천_프로필_조회(user);
+    updateScrapCache(dailyCachedProfile, userId, recommendedUserId, RedisKey.일일_설문_기반_추천_캐시_레디스_키);
     List<Long> dailyRecommendedIds = extractIdFromProfileDtos(dailyCachedProfile);
     log.info("step=스크랩_일일설문_추천목록, recommendedIds={}", dailyRecommendedIds);
 
@@ -61,7 +58,7 @@ public class MatchingScrapUseCase {
       return;
     }
 
-    User recommendedUser = userQueryUseCase.findUserOrThrow(recommendedUserId);
+    User recommendedUser = userQueryUseCase.유저_찾기_혹은_오류(recommendedUserId);
 
     if (scrappedUserRepository.existsByUserAndScrappedUser(user, recommendedUser)) {
       scrappedUserRepository.deleteByUserAndScrappedUser(user, recommendedUser);

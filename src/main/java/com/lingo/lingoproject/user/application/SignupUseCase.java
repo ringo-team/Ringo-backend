@@ -140,7 +140,7 @@ public class SignupUseCase {
   }
 
   private void validateSignupDto(SignupInfoDto dto) {
-    if (!dto.loginId().matches("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]+$")) {
+    if (!dto.loginId().matches("^[A-Za-z0-9]{6,}$")) {
       log.warn("회원가입 로그인 요청값: {}", dto.loginId());
       throw new RingoException("적절하지 않은 입력값입니다.", ErrorCode.BAD_PARAMETER);
     }
@@ -156,9 +156,9 @@ public class SignupUseCase {
     if (LocalDate.parse(dto.birthday()).getYear() + 19 > LocalDate.now().getYear()) {
       throw new RingoException("미성년자는 회원가입이 불가합니다.", ErrorCode.NOT_ADULT);
     }
-    GenericUtils.validateAndReturnEnumValue(Smoking.values(), dto.isSmoking());
-    GenericUtils.validateAndReturnEnumValue(Drinking.values(), dto.isDrinking());
-    GenericUtils.validateAndReturnEnumValue(Religion.values(), dto.religion());
+    GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(Smoking.values(), dto.isSmoking());
+    GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(Drinking.values(), dto.isDrinking());
+    GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(Religion.values(), dto.religion());
     if (!MBTI_TYPE_LIST.contains(dto.mbti().toUpperCase())) {
       throw new RingoException("mbti 카테고리에 포함되지 않습니다.", ErrorCode.BAD_PARAMETER);
     }

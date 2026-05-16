@@ -55,7 +55,7 @@ public class CommunityUploadTransactionService {
 
   @Transactional
   public SavePostResponseDto savePostAndImages(SavePostRequestDto dto, User user, List<String> imageUrls){
-    PostCategory postCategory = GenericUtils.validateAndReturnEnumValue(PostCategory.values(), dto.category());
+    PostCategory postCategory = GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(PostCategory.values(), dto.category());
 
     Place place = findPlaceOrNull(dto.placeId());
     Post savedPost = postRepository.save(Post.of(user, dto.title(), dto.content(), postCategory, place));

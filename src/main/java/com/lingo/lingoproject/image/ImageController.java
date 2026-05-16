@@ -30,7 +30,7 @@ public class ImageController implements ImageApi {
 
   public ResponseEntity<?> uploadProfileImage(MultipartFile image, User user) {
     log.info("step=프로필_업로드_시작, userId={}", user.getId());
-    GetImageUrlResponseDto dto = imageService.uploadProfileImage(image, user);
+    GetImageUrlResponseDto dto = imageService.프로필_사진_업로드(image, user);
 
     if (dto == null) {
       log.info("step=프로필_업로드_실패, userId={}, reason=이미_존재", user.getId());
@@ -89,9 +89,6 @@ public class ImageController implements ImageApi {
     GetImageUrlResponseDto dto = imageService.updateFeedImage(image, feedImageId, description, user.getId());
     log.info("step=피드_업데이트_완료, userId={}, feedImageId={}", user.getId(), feedImageId);
 
-    if (dto == null) {
-      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto(ErrorCode.UNMODERATE.getCode(), "부적절한 사진 입력"));
-    }
     return ResponseEntity.status(HttpStatus.OK).body(dto);
   }
 
@@ -106,7 +103,7 @@ public class ImageController implements ImageApi {
 
   public ResponseEntity<ResultMessageResponseDto> updateFeedImageDescription(Long feedImageId, UpdateFeedImageDescriptionRequestDto dto, User user) {
     log.info("step=피드_설명_저장_시작, userId={}, feedImageId={}", user.getId(), feedImageId);
-    imageService.updateFeedImageDescription(dto, feedImageId, user.getId());
+    imageService.피드_이미지_설명글_업데이트(dto, feedImageId, user.getId());
     log.info("step=피드_설명_저장_완료, userId={}, feedImageId={}", user.getId(), feedImageId);
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(
         ErrorCode.SUCCESS.getCode(), "성공적으로 피드 사진 설명을 성공적으로 저장하였습니다."));

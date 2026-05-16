@@ -20,7 +20,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 /**
@@ -55,7 +54,7 @@ public class SnapService {
    */
   public void applySnapShooting(ApplySnapShootingRequestDto dto){
 
-    User photographer = userQueryUseCase.findUserOrThrow(dto.photographerId());
+    User photographer = userQueryUseCase.유저_찾기_혹은_오류(dto.photographerId());
 
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -76,7 +75,7 @@ public class SnapService {
    */
   public void savePhotographerInfo(SavePhotographerInfoRequestDto dto, Long photographerId){
 
-    User photographer = userQueryUseCase.findUserOrThrow(photographerId);
+    User photographer = userQueryUseCase.유저_찾기_혹은_오류(photographerId);
 
     photographerInfoRepository.save(PhotographerInfo.of(photographer, dto.content(), dto.instagramId(), dto.chatIntro()));
   }

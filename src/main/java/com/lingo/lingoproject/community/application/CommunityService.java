@@ -1,7 +1,6 @@
 package com.lingo.lingoproject.community.application;
 
 import com.lingo.lingoproject.community.domain.event.CommentCreatedEvent;
-import com.lingo.lingoproject.community.domain.event.PostCreatedEvent;
 import com.lingo.lingoproject.community.domain.service.CommunityDomainService;
 import com.lingo.lingoproject.community.presentation.dto.CommentRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.CommentResponseDto;
@@ -10,13 +9,14 @@ import com.lingo.lingoproject.community.presentation.dto.GetCommentResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostImageResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.SavePostImageResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.InputStatusResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SearchPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto;
+import com.lingo.lingoproject.community.presentation.dto.UpdatePlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostImageRequestDto;
-import com.lingo.lingoproject.community.presentation.dto.UpdatePostImageResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
@@ -55,8 +55,11 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Row;
@@ -67,7 +70,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -138,7 +140,7 @@ public class CommunityService {
     try {
       return communityUploadTransactionService.savePostAndImages(dto, user, imageUrls);
     } catch (Exception e) {
-      imageUrls.forEach(imageService::deleteS3Object);
+      imageUrls.forEach(imageService::S3_버킷_이미지_삭제);
       throw new RingoException("게시물 저장에 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
@@ -148,19 +150,19 @@ public class CommunityService {
     try{
       images.forEach(
           i -> {
-            String imageUrl = imageService.uploadImageToS3(i, "/post");
+            String imageUrl = imageService.S3_버킷에_이미지_업로드(i, "/post");
             imageUrls.add(imageUrl);
           }
       );
     } catch (Exception e) {
-      imageUrls.forEach(imageService::deleteS3Object);
+      imageUrls.forEach(imageService::S3_버킷_이미지_삭제);
       throw new RingoException("게시물 이미지 업로드에 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
     return imageUrls;
   }
 
   public void deleteImages(List<String> images){
-    images.forEach(imageService::deleteS3Object);
+    images.forEach(imageService::S3_버킷_이미지_삭제);
   }
 
   /**
@@ -218,7 +220,7 @@ public class CommunityService {
     postImageRepository.findAllByPost(post)
         .stream()
         .map(PostImage::getImageUrl)
-        .forEach(imageService::deleteS3Object);
+        .forEach(imageService::S3_버킷_이미지_삭제);
 
     communityUploadTransactionService.deletePost(post);
 
@@ -236,7 +238,7 @@ public class CommunityService {
    * @return 게시물 요약 목록 (이미지 포함)
    */
   public List<GetPostResponseDto> findPosts(User user, String topic, Long placeId, int page, int size) {
-    PostCategory postCategory = GenericUtils.validateAndReturnEnumValue(PostCategory.values(), topic);
+    PostCategory postCategory = GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(PostCategory.values(), topic);
     postCategory = postCategory != PostCategory.ENTIRE ? postCategory : null;
     placeId = placeId != 0 ? placeId : null;
     Pageable pageable = PageRequest.of(page, size);
@@ -607,8 +609,8 @@ public class CommunityService {
   }
 
   private void updatePlaceCache(Long placeId, Long userId){
-    List<GetPlaceDetailResponseDto> individualCache = matchingPlaceUseCase.getCachedUserPlaces("individual-place::", userId);
-    List<GetPlaceDetailResponseDto> randomCache = matchingPlaceUseCase.getCachedUserPlaces("random-place::", userId);
+    List<GetPlaceDetailResponseDto> individualCache = matchingPlaceUseCase.캐시된_장소_컨텐츠_조회("individual-place::", userId);
+    List<GetPlaceDetailResponseDto> randomCache = matchingPlaceUseCase.캐시된_장소_컨텐츠_조회("random-place::", userId);
     for (GetPlaceDetailResponseDto place : individualCache){
       if (place.getId().equals(placeId)){
         if (place.getIsScrap() == true) place.setIsScrap(false);
@@ -646,6 +648,65 @@ public class CommunityService {
     Place place = findPlaceOrThrow(placeId);
     boolean isScrap = userScrapPlaceRepository.existsByUserAndPlace(user, place);
     return place.createPlaceDetailDto(isScrap);
+  }
+
+  public PlaceSummaryRequestDto getPlaceSummary(Long placeId){
+    Place place = placeRepository.findById(placeId).orElse(null);
+    if (place == null) return new PlaceSummaryRequestDto(null, null);
+    return new PlaceSummaryRequestDto(place.getName(), place.getDetailAddress());
+  }
+
+  @Transactional
+  public void updatePlace(UpdatePlaceRequestDto dto){
+    Place place = placeRepository.findById(dto.id()).orElse(null);
+    if (place == null) return;
+    if (dto.modifiedName() != null && !dto.modifiedName().isBlank()){
+      place.setName(dto.modifiedName());
+    }
+    place.setCity("서울");
+    place.setDistrict(dto.sigungu());
+    place.setNeighbor(dto.dong());
+    place.setKeyword(String.join(", ", dto.keywords()));
+    place.setAddressCategory(dto.hotplaceCategory());
+    place.setAddressSubcategory(dto.hotplaceSubCategory());
+    place.setType(dto.type());
+    placeRepository.save(place);
+  }
+
+  private final Map<String, int[]> userRanges = new LinkedHashMap<>() {{
+    put("정재윤", new int[]{1339, 1473});
+    put("박주성", new int[]{1474, 1607});
+    put("유효선", new int[]{1608, 1741});
+    put("권가은", new int[]{1742, 1875});
+    put("주민재", new int[]{1876, 2007});
+  }};
+
+  public Map<String, InputStatusResponseDto> getInputStatus() {
+    Map<String, InputStatusResponseDto> result = new HashMap<>();
+    Map<Long, Place> places = placeRepository.findAll()
+        .stream()
+        .collect(Collectors.toMap(Place::getId, Function.identity()));
+
+    for (Map.Entry<String, int[]> entry : userRanges.entrySet()) {
+      String userName = entry.getKey();
+      int[] range = entry.getValue();
+      Map<String, Boolean> number = new HashMap<>();
+      int count = 0;
+
+      for (long i = range[0]; i <= range[1]; i++) {
+        Place place = places.get(i);
+        if (place.getAddressCategory() != null &&
+            !place.getAddressCategory().isBlank()) {
+          count++;
+          number.put(String.valueOf(i), true);
+        }
+        else number.put(String.valueOf(i), false);
+      }
+      int rate = (int) ((count / (float) (range[1] - range[0] + 1)) * 100);
+      result.put(userName, new InputStatusResponseDto(rate, number));
+    }
+
+    return result;
   }
 
 }

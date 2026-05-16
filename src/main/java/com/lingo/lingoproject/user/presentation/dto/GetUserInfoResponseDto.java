@@ -13,6 +13,9 @@ public record GetUserInfoResponseDto(
     @Schema(description = "유저 id", example = "4")
     Long userId,
 
+    @Schema(description = "활동지")
+    Address activeAddress,
+
     @Schema(description = "닉네임", example = "불타는 망고")
     String nickname,
 
@@ -53,6 +56,12 @@ public record GetUserInfoResponseDto(
     @Schema(description = "해시태그", example = "[\"운동\", \"건강\"]")
     List<String> hashtags,
 
+    @Schema(description = "학력", example = "대학교 졸업")
+    String degree,
+
+    @Schema(description = "학교", example = "서울대")
+    String school,
+
     @Schema(description = "얼굴 인증 여부", example = "true")
     boolean isFaceVerify,
 
@@ -60,6 +69,9 @@ public record GetUserInfoResponseDto(
     boolean isDormant,
 
     Map<String, Boolean> notificationSettingMap,
+
+    @Schema(description = "프로필 완성율", example = "75")
+    int profileCompleteRate,
 
     @Schema(description = "결과코드", example = "0000")
     String result
@@ -70,26 +82,37 @@ public record GetUserInfoResponseDto(
       List<String> hashtags,
       boolean isDormant,
       boolean isFaceVerify,
-      Map<String, Boolean> notificationSettingMap
+      Map<String, Boolean> notificationSettingMap,
+      int profileCompleteRate
   ) {
+
+    Address address = new Address(
+        user.getActivityAddress() != null ? user.getActivityAddress().getProvince() : null,
+        user.getActivityAddress() != null ? user.getActivityAddress().getCity() : null
+    );
+
     return GetUserInfoResponseDto.builder()
         .userId(user.getId())
+        .activeAddress(address)
         .nickname(user.getNickname())
-        .profile(user.getProfile().getImageUrl())
-        .birthday(user.getBirthday().toString())
-        .gender(user.getGender().toString())
+        .profile(user.getProfile() != null ? user.getProfile().getImageUrl() : null)
+        .birthday(user.getBirthday() != null ? user.getBirthday().toString() : null)
+        .gender(user.getGender() != null ? user.getGender().toString() : null)
         .mbti(user.getMbti())
         .height(user.getHeight())
-        .isDrinking(user.getIsDrinking().toString())
-        .isSmoking(user.getIsSmoking().toString())
+        .isDrinking(user.getIsDrinking() != null ? user.getIsDrinking().toString() : null)
+        .isSmoking(user.getIsSmoking() != null ? user.getIsSmoking().toString() : null)
         .job(user.getJob())
+        .degree(user.getDegree())
+        .school(user.getSchoolName())
         .workPlace(user.getWorkPlace())
-        .religion(user.getReligion().toString())
+        .religion(user.getReligion() != null ? user.getReligion().toString() : null)
         .biography(user.getBiography())
         .hashtags(hashtags)
         .isDormant(isDormant)
         .isFaceVerify(isFaceVerify)
         .notificationSettingMap(notificationSettingMap)
+        .profileCompleteRate(profileCompleteRate)
         .result(ErrorCode.SUCCESS.getCode())
         .build();
   }
@@ -98,11 +121,11 @@ public record GetUserInfoResponseDto(
     return GetUserInfoResponseDto.builder()
         .userId(user.getId())
         .nickname(user.getNickname())
-        .gender(user.getGender().toString())
+        .gender(user.getGender() != null ? user.getGender().toString() : null)
         .height(user.getHeight())
-        .isDrinking(user.getIsDrinking().toString())
-        .isSmoking(user.getIsSmoking().toString())
-        .religion(user.getReligion().toString())
+        .isDrinking(user.getIsDrinking() != null ? user.getIsDrinking().toString() : null)
+        .isSmoking(user.getIsSmoking() != null ? user.getIsSmoking().toString() : null)
+        .religion(user.getReligion() != null ? user.getReligion().toString() : null)
         .job(user.getJob())
         .biography(user.getBiography())
         .build();

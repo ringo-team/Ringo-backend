@@ -18,5 +18,7 @@ public enum DomainEventType {
 
   // ── Community Context ─────────────────────────────
   POST_CREATED,
-  COMMENT_CREATED
+  COMMENT_CREATED,
+
+  CHAT
 }

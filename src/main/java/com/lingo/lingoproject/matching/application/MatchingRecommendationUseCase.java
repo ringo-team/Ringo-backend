@@ -7,7 +7,6 @@ import com.lingo.lingoproject.shared.domain.model.AnsweredSurvey;
 import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Hashtag;
 import com.lingo.lingoproject.shared.domain.model.Profile;
-import com.lingo.lingoproject.shared.domain.model.ScrappedUser;
 import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.domain.model.UserActivityLog;
@@ -21,6 +20,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepositor
 import com.lingo.lingoproject.shared.infrastructure.persistence.ScrappedUserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserActivityLogRepository;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import jakarta.transaction.Transactional;
@@ -32,7 +32,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -64,93 +63,91 @@ public class MatchingRecommendationUseCase {
   private final RedisTemplate<String, Object> redisTemplate;
   private final ScrappedUserRepository scrappedUserRepository;
 
-  private static final int MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE = 4;
-  private static final int MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE = 4;
-  private static final float SURVEY_SCORE_THRESHOLD = 0;
-  private static final int ACTIVE_DAY_DURATION = 14;
-  private static final int HIDE_PROFILE_FLAG = 1;
-  private static final int EXPOSE_PROFILE_FLAG = 0;
-  private static final int PROFILE_VERIFICATION_FLAG = 1;
-  private static final int PROFILE_NON_VERIFICATION_FLAG = 0;
-  private static final String REDIS_ACTIVE_USER_IDS = "redis::active::ids";
-  private static final String DAILY_RECOMMENDATION_REDIS_KEY_PREFIX = "recommend-for-daily-survey::";
-  private static final String CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX = "recommend::";
+  private static final int 누적_설문_기반_추천_크기 = 4;
+  private static final int 일일_설문_기반_추천_크기 = 4;
+  private static final float 설문_매칭_점수_임계값 = 0;
+  private static final int 활성_유저_최대_최근_접속일 = 14;
+  private static final int 프로필_숨김처리_활성화 = 1;
+  private static final int 프로필_숨김처리_비활성화 = 0;
+  private static final int 프로필_얼굴인증_활성화 = 1;
+  private static final int 프로필_얼굴인증_비활성화 = 0;
 
   @Transactional
-  public List<GetUserProfileResponseDto> getCumulativeSurveyBasedRecommendationProfiles(User user) {
+  public List<GetUserProfileResponseDto> 누적_설문_기반_추천(User user) {
     Long userId = user.getId();
 
-    List<GetUserProfileResponseDto> cached = getCumulativeCachedProfile(user);
-    if (!cached.isEmpty() && cached.size() == MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE) {
+    List<GetUserProfileResponseDto> cached = 캐시된_누적_설문_기반_추천_프로필_조회(user);
+    if (!cached.isEmpty() && cached.size() == 누적_설문_기반_추천_크기) {
       log.info("step=누적설문_추천_캐시_히트, userId={}, cacheSize={}", userId, cached.size());
       return cached;
     }
 
-    List<GetUserProfileResponseDto> result = getFirstUserCumulativeProfile(user);
+    List<GetUserProfileResponseDto> result = 처음_접속한_유저를_위한_추천(user);
 
     redisUtils.cacheUntilMidnight(
-        CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
+        RedisKey.누적_설문_기반_추천_프로필_캐시_키 + userId,
         new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
     );
 
     return result;
   }
 
-  @Scheduled(cron = "0 40 23 * * * ")
-  public void cacheCumulativeProfile() {
+  @Scheduled(cron = "0 40 0 * * * ")
+  public void 누적_설문_기반_추천_캐싱_스케줄링() {
     List<User> users = userQueryUseCase.findAll();
-    users.forEach(this::cacheEachCumulativeProfile);
+    users.forEach(this::각각의_유저_누적_설문_기반_추천);
   }
 
   @Transactional
-  void cacheEachCumulativeProfile(User user) {
+  void 각각의_유저_누적_설문_기반_추천(User user) {
     Long userId = user.getId();
 
-    List<Long> activeUserIds = getActiveUserIds(user);
-    Map<Long, Float> candidates = getUserAboveSurveyScore(userId, activeUserIds);
-    List<Long> selectedIds = selectCandidatesByScore(candidates);
-    log.info("step=누적설문_추천_대상_선정, selectedIds={}", selectedIds);
+    List<Long> 활성_유저_ids = 활성_유저_조회(user);
+    Map<Long, Float> 후보 = 일정_설문_점수_이상의_추천_후보_조회(userId, 활성_유저_ids);
+    List<Long> 선택된_유저_ids = 최종_매칭_점수_계산후_이성_추천(후보);
+    log.info("step=누적설문_추천_대상_선정, selectedIds={}", 선택된_유저_ids);
 
-    List<GetUserProfileResponseDto> result = getUserProfilesByIds(user, selectedIds);
+    List<GetUserProfileResponseDto> result = 유저_id로부터_추천_프로필_생성(user, 선택된_유저_ids);
 
     redisUtils.cacheUntilMidnight(
-        CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX + userId,
+        RedisKey.누적_설문_기반_추천_프로필_캐시_키 + userId,
         new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
     );
   }
 
-  List<GetUserProfileResponseDto> getFirstUserCumulativeProfile(User user) {
-    List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
-    List<Long> userIds = userQueryUseCase.findByUserIdNotInExcludedUserIds(excludedUserIds);
-    List<Long> randomlySelectedUserIds = recommendationDomainService.selectRandomCandidates(userIds, 5);
+  @Transactional
+  List<GetUserProfileResponseDto> 처음_접속한_유저를_위한_추천(User user) {
 
-    return userQueryUseCase.findAllByIdIn(randomlySelectedUserIds)
+    List<Long> 활성_유저 = 활성_유저_조회(user);
+    List<Long> 랜덤_유저_ids = recommendationDomainService.랜덤_유저_선택(활성_유저, 누적_설문_기반_추천_크기);
+
+    return userQueryUseCase.findAllByIdIn(랜덤_유저_ids)
         .stream()
-        .map(u -> buildUserProfileDto(user, u))
+        .map(u -> 추천_프로필_생성(user, u))
         .toList();
   }
 
-  public List<GetUserProfileResponseDto> getDailySurveyBasedRecommendationProfiles(User user) {
-    List<GetUserProfileResponseDto> cached = getDailyCachedProfile(user);
-    if (!cached.isEmpty() && cached.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) {
+  public List<GetUserProfileResponseDto> 일일_설문_기반_유저_추천(User user) {
+    List<GetUserProfileResponseDto> cached = 캐시된_일일_설문_기반_추천_프로필_조회(user);
+    if (!cached.isEmpty() && cached.size() == 일일_설문_기반_추천_크기) {
       return cached;
     }
     return cacheEachDailyProfile(user);
   }
 
-  @Scheduled(cron = "0 50 23 * * *")
+  @Scheduled(cron = "0 50 0 * * *")
   public void cacheDailyProfile() {
     List<User> users = userQueryUseCase.findAll();
     users.forEach(this::cacheEachDailyProfile);
   }
 
   List<GetUserProfileResponseDto> cacheEachDailyProfile(User user) {
-    List<GetUserProfileResponseDto> result = getEachDailyProfile(user);
+    List<GetUserProfileResponseDto> result = 해당_유저_일일_추천_기반_프로필_추천(user);
 
     if (result == null) return null;
 
     redisUtils.cacheUntilMidnight(
-        DAILY_RECOMMENDATION_REDIS_KEY_PREFIX + user.getId(),
+        RedisKey.일일_설문_기반_추천_캐시_레디스_키 + user.getId(),
         new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
     );
 
@@ -158,53 +155,53 @@ public class MatchingRecommendationUseCase {
   }
 
   public void hideRecommendedUser(User user, Long recommendedUserId) {
-    applyHideFlagToCache(
-        CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX,
+    캐시된_프로필에_숨김처리_활성화(
+        RedisKey.누적_설문_기반_추천_프로필_캐시_키,
         user,
         recommendedUserId,
-        this::getCumulativeCachedProfile
+        this::캐시된_누적_설문_기반_추천_프로필_조회
     );
-    applyHideFlagToCache(
-        DAILY_RECOMMENDATION_REDIS_KEY_PREFIX,
+    캐시된_프로필에_숨김처리_활성화(
+        RedisKey.일일_설문_기반_추천_캐시_레디스_키,
         user,
         recommendedUserId,
-        this::getDailyCachedProfile
+        this::캐시된_일일_설문_기반_추천_프로필_조회
     );
   }
 
   @Transactional
-  public void refreshActiveUserCache() {
-    LocalDateTime cutoff = LocalDate.now().minusDays(ACTIVE_DAY_DURATION).atStartOfDay();
-    Set<Long> activeUserIds = userActivityLogRepository.findAllByStartAfter(cutoff)
+  public void 활성_유저_캐시_리프레시() {
+    LocalDateTime cutoff = LocalDate.now().minusDays(활성_유저_최대_최근_접속일).atStartOfDay();
+    Set<Long> 최근_접속한_유저_ids = userActivityLogRepository.findAllByStartAfter(cutoff)
         .stream()
         .map(UserActivityLog::getUser)
         .map(User::getId)
         .collect(Collectors.toSet());
-    Set<Long> connectedUserIds = redisTemplate.keys("connect-app::*")
+    Set<Long> 현재_접속중인_유저_ids = redisTemplate.keys(RedisKey.접속_유저_레디스_키)
         .stream()
         .map(s -> Long.parseLong(s.split("::")[1]))
         .collect(Collectors.toSet());
-    activeUserIds.addAll(connectedUserIds);
-    List<Long> allActiveUserIds = activeUserIds.stream().toList();
-    redisTemplate.delete(REDIS_ACTIVE_USER_IDS);
+    최근_접속한_유저_ids.addAll(현재_접속중인_유저_ids);
+    List<Long> 모든_활성_유저_id_리스트 = 최근_접속한_유저_ids.stream().toList();
+    redisTemplate.delete(RedisKey.활성_유저_레디스_키);
     redisTemplate.opsForValue().set(
-        REDIS_ACTIVE_USER_IDS,
-        new ApiListResponseDto<>(ErrorCode.SUCCESS.toString(), allActiveUserIds),
+        RedisKey.활성_유저_레디스_키,
+        new ApiListResponseDto<>(ErrorCode.SUCCESS.toString(), 모든_활성_유저_id_리스트),
         5,
         TimeUnit.MINUTES
     );
   }
 
-  public List<Long> getRecommendationExcludedUserIds(User user) {
+  public List<Long> 이성_추천에_제외되는_유저_조회(User user) {
     Long userId = user.getId();
 
-    List<Long> blockedFriendIds = blockedFriendRepository.findUsersMutuallyBlockedWith(userId);
-    List<Long> dormantUserIds = getDormantUserIds();
-    List<Long> blockedUserIds = getBlockedUserIds();
-    List<Long> suspendedUserIds = getSuspendedUserIds();
-    List<Long> usersWhoRequestedMe = getUserWhoRequestedMe(user);
-    List<Long> usersIRequested = getUsersIRequested(user);
-    List<Long> signupIncompleteUserIds = getSignupIncompleteUsersIds();
+    List<Long> blockedFriendIds    = 연락처_차단_유저_ids(userId);
+    List<Long> dormantUserIds      = 휴면_계정_ids();
+    List<Long> blockedUserIds      = 블락된_유저_ids();
+    List<Long> suspendedUserIds    = 정지된_유저_ids();
+    List<Long> usersWhoRequestedMe = 나에게_요청_보낸_유저_ids(user);
+    List<Long> usersIRequested     = 내가_요청_보낸_유저_ids(user);
+    List<Long> signupIncompleteUserIds = 회원가입_미완료_유저_ids();
 
     Set<Long> excluded = new HashSet<>();
     excluded.add(userId);
@@ -220,96 +217,100 @@ public class MatchingRecommendationUseCase {
     return new ArrayList<>(excluded);
   }
 
+  public List<Long> 연락처_차단_유저_ids(Long userId){
+    return blockedFriendRepository.findUsersMutuallyBlockedWith(userId);
+  }
+
   @Transactional
   public void updateProfileClickCount(User user) {
     profileRepository.updateProfileClickCount(user.getProfile().getId());
   }
 
-  public List<GetUserProfileResponseDto> getCumulativeCachedProfile(User user) {
-    return getCachedRecommendationProfiles(
-        CUMULATIVE_RECOMMENDATION_REDIS_KEY_PREFIX,
-        redisUtils::getCumulativeSurveyBasedCachedProfile,
+  public List<GetUserProfileResponseDto> 캐시된_누적_설문_기반_추천_프로필_조회(User user) {
+    return 캐시된_추천_프로필_조회(
+        RedisKey.누적_설문_기반_추천_프로필_캐시_키,
+        redisUtils::캐시된_누적_설문_기반_추천_프로필_조회,
         user
     );
   }
 
-  public List<GetUserProfileResponseDto> getDailyCachedProfile(User user) {
-    return getCachedRecommendationProfiles(
-        DAILY_RECOMMENDATION_REDIS_KEY_PREFIX,
-        redisUtils::getDailySurveyBasedCachedProfile,
+  public List<GetUserProfileResponseDto> 캐시된_일일_설문_기반_추천_프로필_조회(User user) {
+    return 캐시된_추천_프로필_조회(
+        RedisKey.일일_설문_기반_추천_캐시_레디스_키,
+        redisUtils::캐시된_일일_설문_기반_추천_프로필_조회,
         user
     );
   }
 
   @Transactional
-  List<Long> getActiveUserIds(User user) {
-    List<Long> activeUserIds = getCachedActiveUserIds();
-    if (activeUserIds.isEmpty()) {
-      refreshActiveUserCache();
-      activeUserIds = getCachedActiveUserIds();
+  List<Long> 활성_유저_조회(User user) {
+    List<Long> 활성_유저_ids = 캐시된_활성_유저_ids_조회();
+    if (활성_유저_ids.isEmpty()) {
+      활성_유저_캐시_리프레시();
+      활성_유저_ids = 캐시된_활성_유저_ids_조회();
     }
-    log.info("step=누적설문_추천_활성유저_조회, activeUserCount={}", activeUserIds);
+    log.info("step=누적설문_추천_활성유저_조회, activeUserCount={}", 활성_유저_ids);
 
-    List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
-    log.info("step=누적설문_추천_제외유저_조회, excludedUserCount={}", excludedUserIds.size());
+    List<Long> 제외된_유저_ids = 이성_추천에_제외되는_유저_조회(user);
+    log.info("step=누적설문_추천_제외유저_조회, excludedUserCount={}", 제외된_유저_ids.size());
 
-    activeUserIds.removeAll(excludedUserIds);
-    log.info("step=누적설문_추천_풀_확정, candidateCount={}", activeUserIds.size());
+    활성_유저_ids.removeAll(제외된_유저_ids);
+    log.info("step=누적설문_추천_풀_확정, candidateCount={}", 활성_유저_ids.size());
 
-    return activeUserIds;
+    return 활성_유저_ids;
   }
 
-  private List<GetUserProfileResponseDto> getEachDailyProfile(User user) {
-    List<AnsweredSurvey> todayAnswers = getTodayAnsweredSurveys(user);
-    if (todayAnswers.isEmpty()) {
+  @Transactional
+  List<GetUserProfileResponseDto> 해당_유저_일일_추천_기반_프로필_추천(User user) {
+    List<AnsweredSurvey> 금일_설문 = 금일_웅답한_설문_조회(user);
+    if (금일_설문.isEmpty()) {
       log.info("step=금일_설문_응답_부재, todayAnswersSize=0");
       return null;
     }
 
-    Collections.shuffle(todayAnswers);
+    Collections.shuffle(금일_설문);
 
-    List<Long> excludedUserIds = getRecommendationExcludedUserIds(user);
-    log.info("step=일일설문_추천_제외유저_조회, excludedUserCount={}", excludedUserIds.size());
+    List<Long> 활성_유저 = 활성_유저_조회(user);
 
-    return getSimilarAnsweredUserProfiles(user, todayAnswers, excludedUserIds);
+    return 비슷한_응답한_유저_프로필_조회(user, 금일_설문, 활성_유저);
   }
 
-  private List<GetUserProfileResponseDto> getSimilarAnsweredUserProfiles(
+  private List<GetUserProfileResponseDto> 비슷한_응답한_유저_프로필_조회(
       User user,
       List<AnsweredSurvey> todayAnswers,
-      List<Long> excludedUserIds
+      List<Long> 활성_유저_ids
   ) {
     Set<GetUserProfileResponseDto> result = new HashSet<>();
     for (AnsweredSurvey todayAnswer : todayAnswers) {
-      if (result.size() == MAX_DAILY_SURVEY_BASED_RECOMMENDATION_SIZE) break;
+      if (result.size() == 일일_설문_기반_추천_크기) break;
 
-      User recommendedUser = getRandomlySimilarAnsweredUser(todayAnswer, excludedUserIds);
-      if (recommendedUser == null) continue;
+      User 추천_이성 = 유저와_비슷하게_응답한_설문을_랜덤으로_조회(todayAnswer, 활성_유저_ids);
+      if (추천_이성 == null) continue;
 
-      result.add(buildUserProfileDto(user, recommendedUser));
+      result.add(추천_프로필_생성(user, 추천_이성));
     }
     return new ArrayList<>(result);
   }
 
-  private User getRandomlySimilarAnsweredUser(AnsweredSurvey todayAnswer, List<Long> excludedUserIds) {
-    List<AnsweredSurvey> similarAnswers = getSimilarAnswers(todayAnswer, excludedUserIds);
+  private User 유저와_비슷하게_응답한_설문을_랜덤으로_조회(AnsweredSurvey 금일_응답, List<Long> 활성_유저_ids) {
+    List<AnsweredSurvey> 비슷한_응답_리스트 = 비슷한_응답_객체_조회(금일_응답, 활성_유저_ids);
 
-    if (similarAnswers.isEmpty()) return null;
+    if (비슷한_응답_리스트.isEmpty()) return null;
 
-    int index = ThreadLocalRandom.current().nextInt(similarAnswers.size());
-    User recommendedUser = similarAnswers.get(index).getUser();
+    int index = ThreadLocalRandom.current().nextInt(비슷한_응답_리스트.size());
+    User 추천_이성 = 비슷한_응답_리스트.get(index).getUser();
 
-    logDailySurveyBasedRecommendationLogic(
-        todayAnswer,
-        similarAnswers.get(index),
-        todayAnswer.getUser(),
-        recommendedUser
+    비슷한_응답_리스트_로그_남기기(
+        금일_응답,
+        비슷한_응답_리스트.get(index),
+        금일_응답.getUser(),
+        추천_이성
     );
 
-    return recommendedUser;
+    return 추천_이성;
   }
 
-  private List<GetUserProfileResponseDto> getUserProfilesByIds(User requestUser, List<Long> selectedIds) {
+  private List<GetUserProfileResponseDto> 유저_id로부터_추천_프로필_생성(User requestUser, List<Long> selectedIds) {
     List<User> users = userQueryUseCase.findAllByIdIn(selectedIds);
     Map<Long, List<String>> hashtagsMap = batchGetHashtagsByUsers(users);
     Set<Long> scrappedUserIds = scrappedUserRepository.findAllByUser(requestUser).stream()
@@ -321,7 +322,7 @@ public class MatchingRecommendationUseCase {
         .map(recommended -> {
           Profile profile = recommended.getProfile();
           float surveyScore = surveyScoreMap.get(recommended.getId());
-          int isVerify = FaceVerify.PASS == profile.getFaceVerify() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG;
+          int isVerify = FaceVerify.PASS == profile.getFaceVerify() ? 프로필_얼굴인증_활성화 : 프로필_얼굴인증_비활성화;
           List<String> hashtags = hashtagsMap.getOrDefault(recommended.getId(), List.of());
           boolean isScrap = scrappedUserIds.contains(recommended.getId());
 
@@ -330,7 +331,7 @@ public class MatchingRecommendationUseCase {
               surveyScore,
               hashtags,
               isVerify,
-              EXPOSE_PROFILE_FLAG,
+              프로필_숨김처리_비활성화,
               requestUser.getMbti(),
               isScrap
           );
@@ -343,28 +344,28 @@ public class MatchingRecommendationUseCase {
         .toList();
   }
 
-  private List<Long> selectCandidatesByScore(Map<Long, Float> scoreMap) {
-    Map<Long, Double> finalScoreMap = recommendationDomainService.calculateFinalMatchingScore(scoreMap);
-    return finalScoreMap
+  private List<Long> 최종_매칭_점수_계산후_이성_추천(Map<Long, Float> scoreMap) {
+    Map<Long, Double> 유저_id_매칭_점수_맵 = recommendationDomainService.최종_매칭_점수_계산(scoreMap);
+    return 유저_id_매칭_점수_맵
         .entrySet()
         .stream()
         .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
         .map(Map.Entry::getKey)
-        .limit(MAX_CUMULATIVE_SURVEY_BASED_RECOMMENDATION_SIZE)
+        .limit(누적_설문_기반_추천_크기)
         .toList();
   }
 
-  private Map<Long, Float> getUserAboveSurveyScore(Long userId, List<Long> activeUserIds) {
+  private Map<Long, Float> 일정_설문_점수_이상의_추천_후보_조회(Long userId, List<Long> activeUserIds) {
     return surveyScoreCalculator.batchCalculate(userId, activeUserIds)
         .entrySet()
         .stream()
-        .filter(entry -> entry.getValue() >= SURVEY_SCORE_THRESHOLD)
+        .filter(entry -> entry.getValue() >= 설문_매칭_점수_임계값)
         .sorted((entry1, entry2) -> Float.compare(entry2.getValue(), entry1.getValue()))
         .limit(100)
         .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
   }
 
-  private List<GetUserProfileResponseDto> getCachedRecommendationProfiles(
+  private List<GetUserProfileResponseDto> 캐시된_추천_프로필_조회(
       String keyPrefix,
       Function<String, List<GetUserProfileResponseDto>> function,
       User user
@@ -378,7 +379,7 @@ public class MatchingRecommendationUseCase {
     return new ArrayList<>();
   }
 
-  private void applyHideFlagToCache(
+  private void 캐시된_프로필에_숨김처리_활성화(
       String redisKeyPrefix,
       User user,
       Long targetUserId,
@@ -396,7 +397,7 @@ public class MatchingRecommendationUseCase {
   private void markProfileAsHidden(List<GetUserProfileResponseDto> profiles, Long targetUserId, Long requestUserId) {
     for (GetUserProfileResponseDto profile : profiles) {
       if (profile.getUserId().equals(targetUserId)) {
-        profile.setHide(HIDE_PROFILE_FLAG);
+        profile.setHide(프로필_숨김처리_활성화);
         log.info("step=추천이성_숨김, requestUserId={}, hiddenUserId={}", requestUserId, targetUserId);
         return;
       }
@@ -404,27 +405,27 @@ public class MatchingRecommendationUseCase {
   }
 
   @SuppressWarnings("unchecked")
-  private List<Long> getCachedActiveUserIds() {
-    Object cache = redisTemplate.opsForValue().get(REDIS_ACTIVE_USER_IDS);
+  private List<Long> 캐시된_활성_유저_ids_조회() {
+    Object cache = redisTemplate.opsForValue().get(RedisKey.활성_유저_레디스_키);
     if (cache instanceof ApiListResponseDto<?> dto && dto.getList() != null) {
       return new ArrayList<>((List<Long>) dto.getList());
     }
     return new ArrayList<>();
   }
 
-  private GetUserProfileResponseDto buildUserProfileDto(User requestUser, User recommendedUser) {
-    Profile profile = recommendedUser.getProfile();
-    float surveyScore = surveyScoreCalculator.calculate(requestUser.getId(), recommendedUser.getId());
-    int isVerify = FaceVerify.PASS == profile.getFaceVerify() ? PROFILE_VERIFICATION_FLAG : PROFILE_NON_VERIFICATION_FLAG;
-    List<String> hashtags = getUserHashtags(recommendedUser);
-    boolean isScrap = scrappedUserRepository.existsByUserAndScrappedUser(requestUser, recommendedUser);
+  private GetUserProfileResponseDto 추천_프로필_생성(User requestUser, User recommendedUser) {
+    Profile profile       = recommendedUser.getProfile();
+    float surveyScore     = surveyScoreCalculator.설문_점수_계산(requestUser.getId(), recommendedUser.getId());
+    int isVerify          = FaceVerify.PASS == profile.getFaceVerify() ? 프로필_얼굴인증_활성화 : 프로필_얼굴인증_비활성화;
+    List<String> hashtags = 유저_해시태그_추출(recommendedUser);
+    boolean isScrap       = scrappedUserRepository.existsByUserAndScrappedUser(requestUser, recommendedUser);
 
     GetUserProfileResponseDto dto = GetUserProfileResponseDto.of(
         recommendedUser,
         surveyScore,
         hashtags,
         isVerify,
-        EXPOSE_PROFILE_FLAG,
+        프로필_숨김처리_비활성화,
         requestUser.getMbti(),
         isScrap
     );
@@ -445,44 +446,45 @@ public class MatchingRecommendationUseCase {
         ));
   }
 
-  private List<String> getUserHashtags(User user) {
+  private List<String> 유저_해시태그_추출(User user) {
     return hashtagRepository.findAllByUser(user)
         .stream()
         .map(Hashtag::getHashtag)
         .toList();
   }
 
-  private List<AnsweredSurvey> getSimilarAnswers(AnsweredSurvey todayAnswer, List<Long> excludedUserIds) {
-    int surveyNum = todayAnswer.getSurveyNum();
-    return answeredSurveyRepository.findAllByUserIdNotInAndAnswerAndSurveyNumIn(
-        excludedUserIds,
-        todayAnswer.getAnswer(),
-        List.of(surveyNum, surveyNum + 1, surveyNum - 1)
+  private List<AnsweredSurvey> 비슷한_응답_객체_조회(AnsweredSurvey todayAnswer, List<Long> 활성_유저_ids) {
+    int 설문_번호 = todayAnswer.getSurveyNum();
+    int 설문_응답 = todayAnswer.getAnswer();
+    return answeredSurveyRepository.findAllByUserIdInAndSurveyNumAndAnswerIn(
+        활성_유저_ids,
+        설문_번호,
+        List.of(설문_응답, 설문_응답 + 1, 설문_응답 - 1)
     );
   }
 
-  private List<AnsweredSurvey> getTodayAnsweredSurveys(User user) {
+  private List<AnsweredSurvey> 금일_웅답한_설문_조회(User user) {
     return answeredSurveyRepository.findAllByUserAndUpdatedAtAfter(
         user, LocalDate.now().atStartOfDay()
     );
   }
 
-  private List<Long> getSignupIncompleteUsersIds() {
+  private List<Long> 회원가입_미완료_유저_ids() {
     return userQueryUseCase.findAllByStatusNot(SignupStatus.COMPLETED)
         .stream()
         .map(User::getId)
         .toList();
   }
 
-  private List<Long> getDormantUserIds() {
+  private List<Long> 휴면_계정_ids() {
     return dormantAccountRepository.findAllDormantUserIds();
   }
 
-  private List<Long> getBlockedUserIds() {
+  private List<Long> 블락된_유저_ids() {
     return blockedUserRepository.findAllBlockedUserIds();
   }
 
-  private List<Long> getSuspendedUserIds() {
+  private List<Long> 정지된_유저_ids() {
     return redisTemplate.keys("suspension::*")
         .stream()
         .map(s -> s.replace("suspension::", ""))
@@ -490,15 +492,15 @@ public class MatchingRecommendationUseCase {
         .toList();
   }
 
-  private List<Long> getUsersIRequested(User user) {
+  private List<Long> 내가_요청_보낸_유저_ids(User user) {
     return matchQueryUseCase.findRequestedUserIdsByRequestUser(user);
   }
 
-  private List<Long> getUserWhoRequestedMe(User user) {
+  private List<Long> 나에게_요청_보낸_유저_ids(User user) {
     return matchQueryUseCase.findRequestUserIdsByRequestedUser(user);
   }
 
-  private void logDailySurveyBasedRecommendationLogic(
+  private void 비슷한_응답_리스트_로그_남기기(
       AnsweredSurvey todayAnswer,
       AnsweredSurvey selectedAnswer,
       User user,
@@ -511,7 +513,7 @@ public class MatchingRecommendationUseCase {
             requestUserAnswer={} | recommendedUserAnswer={}
             """,
         selectedAnswer.getId(), selectedAnswer.getSurveyNum(),
-        user.getId(), recommended.getId(),
+        user.getId(), recommended != null ? recommended.getId() : null,
         todayAnswer.getAnswer(), selectedAnswer.getAnswer());
   }
 

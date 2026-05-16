@@ -56,7 +56,7 @@ public class RecommendationDomainService {
    * @param maxSize    최대 선정 인원
    * @return 랜덤 선정된 후보 ID 목록 (candidates의 앞부분 서브리스트)
    */
-  public List<Long> selectRandomCandidates(List<Long> candidates, int maxSize) {
+  public List<Long> 랜덤_유저_선택(List<Long> candidates, int maxSize) {
     int n = Math.min(candidates.size(), maxSize);
     ThreadLocalRandom random = ThreadLocalRandom.current();
     for (int i = 0; i < n; i++) {
@@ -77,7 +77,7 @@ public class RecommendationDomainService {
    *   <li>신규 가입 부스트 (10%): 로지스틱 감쇠 (중심 30일, 2주 이내 ≈ 만점)</li>
    * </ul>
    */
-  public Map<Long, Double> calculateFinalMatchingScore(Map<Long, Float> scoreMap) {
+  public Map<Long, Double> 최종_매칭_점수_계산(Map<Long, Float> scoreMap) {
     List<Profile> profiles = profileRepository.findProfileByUserIdIn(scoreMap.keySet());
     Map<Long, Profile> profileMap = profiles.stream()
         .collect(Collectors.toMap(e -> e.getUser().getId(), Function.identity()));
@@ -205,7 +205,7 @@ public class RecommendationDomainService {
    * @param confrontAnswer 상대 유저의 응답 (1~5)
    * @return 계산된 매칭 점수
    */
-  public int calculateAnswerPairScore(int answer, int confrontAnswer) {
+  public int 설문_응답쌍_연관_가중치_계산(int answer, int confrontAnswer) {
     int score = 0;
 
     if (Math.abs(answer - confrontAnswer) == 0)      score += 4;
@@ -225,7 +225,7 @@ public class RecommendationDomainService {
    * @param answer 응답값 (1~5)
    * @return 1(극단값), 0(준극단값), -1(중간값)
    */
-  public int calculateAnswerScore(int answer) {
+  public int 응답_점수_계산(int answer) {
     if (answer == 1 || answer == 5)      return 5;
     else if (answer == 2 || answer == 4) return 2;
     else                                 return 0;

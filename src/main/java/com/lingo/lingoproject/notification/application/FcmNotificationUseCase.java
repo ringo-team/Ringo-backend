@@ -37,8 +37,6 @@ public class FcmNotificationUseCase {
   private final NotificationOptionOutUserRepository notificationOptionOutUserRepository;
   private final NotificationRepository notificationRepository;
 
-  private final int RETRY_COUNT = 0;
-
   @Transactional
   public void refreshFcmToken(SaveFcmTokenRequestDto dto, User user){
     FcmToken fcmToken = fcmTokenRepository.findByUser(user)
@@ -47,7 +45,13 @@ public class FcmNotificationUseCase {
     fcmTokenRepository.save(fcmToken);
   }
 
-  public void sendFcmNotification(User receiver, String title, String body, NotificationType type) {
+  public void sendFcmNotification(
+      User receiver,
+      String senderImageUrl,
+      String title,
+      String body,
+      NotificationType type
+  ) {
 
     log.info("fcm message sending start");
     if (!type.equals(NotificationType.MESSAGE)){
@@ -70,7 +74,7 @@ public class FcmNotificationUseCase {
             Notification.builder()
                 .setTitle(title)
                 .setBody(body)
-                .setImage("ImageUrl")
+                .setImage(senderImageUrl)
                 .build()
         )
         .setApnsConfig(  // ✅ iOS용 APNs 설정 추가
@@ -97,7 +101,7 @@ public class FcmNotificationUseCase {
 
   public void alterNotificationOption(User user, String notificationType){
 
-    NotificationType type = GenericUtils.validateAndReturnEnumValue(NotificationType.values(), notificationType);
+    NotificationType type = GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(NotificationType.values(), notificationType);
 
     if(notificationOptionOutUserRepository.existsByUserAndType(user, type)){
       notificationOptionOutUserRepository.deleteAllByUserAndType(user, type);

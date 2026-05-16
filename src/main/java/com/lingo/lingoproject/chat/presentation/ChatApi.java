@@ -109,6 +109,6 @@ public interface ChatApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
       }
   )
-  ResponseEntity<ResultMessageResponseDto> saveAppointment(@Valid @RequestBody SaveAppointmentRequestDto dto, @AuthenticationPrincipal User user);
+  ResponseEntity<ResultMessageResponseDto> 약속_잡기(@Valid @RequestBody SaveAppointmentRequestDto dto, @AuthenticationPrincipal User user);
 
 }

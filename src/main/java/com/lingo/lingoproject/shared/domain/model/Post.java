@@ -1,7 +1,6 @@
 package com.lingo.lingoproject.shared.domain.model;
 
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
-import com.lingo.lingoproject.shared.domain.elastic.PostDocument;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
 import com.lingo.lingoproject.shared.utils.Timestamp;
 import jakarta.persistence.Column;
@@ -50,7 +49,7 @@ public class Post extends Timestamp {
 
   public void updatePost(UpdatePostRequestDto dto){
     PostCategory postCategory = dto.topic() != null
-        ? GenericUtils.validateAndReturnEnumValue(PostCategory.values(), dto.topic())
+        ? GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(PostCategory.values(), dto.topic())
         : null;
 
     if (dto.title() != null && !dto.title().isBlank()) this.setTitle(dto.title());

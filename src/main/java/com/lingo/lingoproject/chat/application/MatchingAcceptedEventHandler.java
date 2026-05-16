@@ -5,6 +5,7 @@ import com.lingo.lingoproject.matching.domain.event.MatchingAcceptedEvent;
 import com.lingo.lingoproject.notification.application.FcmNotificationUseCase;
 import com.lingo.lingoproject.shared.domain.model.NotificationType;
 import com.lingo.lingoproject.shared.domain.model.User;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ public class MatchingAcceptedEventHandler {
 
   private final ChatService chatService;
   private final FcmNotificationUseCase fcmNotificationUseCase;
+  private final UserQueryUseCase userQueryUseCase;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -36,15 +38,15 @@ public class MatchingAcceptedEventHandler {
         event.getRequestedUserId(),
         "USER"
     );
-    chatService.createChatroom(dto);
-    User requestedUser = chatService.findUserOrThrow(event.getRequestedUserId());
-    /*
+    chatService.채팅방_생성(dto);
+    User 매칭_요청_유저 = userQueryUseCase.유저_찾기_혹은_오류(event.getRequestUserId());
+    User 매칭_응답_유저 = userQueryUseCase.유저_찾기_혹은_오류(event.getRequestedUserId());
     fcmNotificationUseCase.sendFcmNotification(
-        requestedUser,
+        매칭_요청_유저,
+        매칭_응답_유저.getProfile() != null ? 매칭_응답_유저.getProfile().getImageUrl() : null,
         "매칭이 승낙되었습니다.",
         null,
         NotificationType.MATCHING_ACCEPTED
         );
-     */
   }
 }

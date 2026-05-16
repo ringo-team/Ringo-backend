@@ -6,9 +6,11 @@ import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Hashtag;
 import com.lingo.lingoproject.shared.domain.model.NotificationOptionOutUser;
 import com.lingo.lingoproject.shared.domain.model.NotificationType;
+import com.lingo.lingoproject.shared.domain.model.Profile;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
+import com.lingo.lingoproject.shared.infrastructure.persistence.FeedImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepository;
 import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.infrastructure.persistence.NotificationOptionOutUserRepository;
@@ -30,7 +32,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 /**
@@ -48,23 +49,24 @@ public class UserQueryUseCase {
   private final MatchQueryUseCase matchQueryUseCase;
   private final DormantAccountUseCase dormantAccountUseCase;
   private final NotificationOptionOutUserRepository notificationOptionOutUserRepository;
+  private final FeedImageRepository feedImageRepository;
 
   public String findUserLoginId() {
     throw new RingoException("아이디를 얻을 권한이 없습니다.", ErrorCode.NO_AUTH);
   }
 
-  private List<Long> getCumulativeCachedUserIds(User user){
-    return Optional.ofNullable(redisUtils.getCumulativeSurveyBasedCachedProfile(user.getId().toString()))
+  private List<Long> 캐시된_누적_설문_기반_추천_유저_id_리스트(User user){
+    return Optional.ofNullable(redisUtils.캐시된_누적_설문_기반_추천_프로필_조회(user.getId().toString()))
         .orElseGet(Collections::emptyList)
         .stream().map(GetUserProfileResponseDto::getUserId).toList();
   }
-  private List<Long> getDailyCachedUserIds(User user){
-    return Optional.ofNullable(redisUtils.getDailySurveyBasedCachedProfile(user.getId().toString()))
+  private List<Long> 캐시된_일일_설문_기반_추천_유저_id_리스트(User user){
+    return Optional.ofNullable(redisUtils.캐시된_일일_설문_기반_추천_프로필_조회(user.getId().toString()))
         .orElseGet(Collections::emptyList)
         .stream().map(GetUserProfileResponseDto::getUserId).toList();
   }
 
-  private List<Long> getMatchingUserIds(User user){
+  private List<Long> 매칭_요청을_보내거나_받은_유저_id_리스트(User user){
     return matchQueryUseCase.findAllByRequestUserOrRequestedUser(user, user)
         .stream()
         .map(m -> {
@@ -75,9 +77,9 @@ public class UserQueryUseCase {
         .toList();
   }
   public GetUserInfoResponseDto getUserInfo(Long findUserId, User user) {
-    List<Long> cumulativeList = getCumulativeCachedUserIds(user);
-    List<Long> dailyList = getDailyCachedUserIds(user);
-    List<Long> matchingList = getMatchingUserIds(user);
+    List<Long> cumulativeList = 캐시된_누적_설문_기반_추천_유저_id_리스트(user);
+    List<Long> dailyList      = 캐시된_일일_설문_기반_추천_유저_id_리스트(user);
+    List<Long> matchingList   = 매칭_요청을_보내거나_받은_유저_id_리스트(user);
 
     List<Long> userIdList = new ArrayList<>();
     userIdList.addAll(cumulativeList);
@@ -93,16 +95,33 @@ public class UserQueryUseCase {
       throw new RingoException("유저를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH);
     }
 
-    User findUser = findUserOrThrow(findUserId);
-    List<String> hashtags = getUserHashtags(findUser);
-    boolean isDormant = dormantAccountUseCase.isDormant(findUser);
-    Map<String, Boolean> notificationSettingMap = getNotificationSetting(findUser);
-    boolean isFaceVerify = findUser.getProfile().getFaceVerify() == FaceVerify.PASS;
-    log.info("[FACE]: {}", isFaceVerify);
-    return GetUserInfoResponseDto.from(findUser, hashtags, isDormant, isFaceVerify, notificationSettingMap);
+    User findUser             = 유저_찾기_혹은_오류(findUserId);
+    Profile profile           = findUser.getProfile();
+    List<String> hashtags     = 유저_해시태그_조회(findUser);
+    boolean isDormant         = dormantAccountUseCase.isDormant(findUser);
+    Map<String, Boolean> notificationSettingMap = 알림_설정_여부_조회(findUser);
+    boolean isFaceVerify      = profile != null && profile.getFaceVerify() == FaceVerify.PASS;
+    int profileCompleteRate   = 유저_프로필_완성율_계산(user);
+    return GetUserInfoResponseDto.from(
+        findUser,
+        hashtags,
+        isDormant,
+        isFaceVerify,
+        notificationSettingMap,
+        profileCompleteRate
+    );
   }
 
-  private Map<String, Boolean> getNotificationSetting(User user){
+  private int 유저_프로필_완성율_계산(User user){
+    int score = 60;
+    if (user.getBiography() != null && !user.getBiography().isBlank()) score += 15;
+    if (feedImageRepository.existsByUser(user)) score += 15;
+    if (user.getMbti() != null && !user.getMbti().isBlank()) score += 5;
+    if (user.getDegree() != null && !user.getDegree().isBlank()) score += 5;
+    return score;
+  }
+
+  private Map<String, Boolean> 알림_설정_여부_조회(User user){
     Map<String, Boolean> notificationSettingMap = new HashMap<>();
     List<NotificationType> deactivateNotificationTypeList = notificationOptionOutUserRepository.findAllByUser(user)
         .stream()
@@ -125,14 +144,14 @@ public class UserQueryUseCase {
         .toList();
   }
 
-  public User findUserOrThrow(Long userId) {
+  public User 유저_찾기_혹은_오류(Long userId) {
     return userRepository.findById(userId)
         .orElseThrow(() -> new RingoException(
             "해당 id의 유저를 찾을 수 없습니다.",
             ErrorCode.USER_NOT_FOUND));
   }
 
-  private List<String> getUserHashtags(User user) {
+  private List<String> 유저_해시태그_조회(User user) {
     return hashtagRepository.findAllByUser(user)
         .stream()
         .map(Hashtag::getHashtag)
@@ -147,7 +166,7 @@ public class UserQueryUseCase {
     return userRepository.findByLoginId(loginId);
   }
 
-  public User findByLoginIdOrThrow(String loginId) {
+  public User 로그인_아이디로_유저_조회_혹은_오류_발생(String loginId) {
     return userRepository.findByLoginId(loginId)
         .orElseThrow(() -> new RingoException("해당 loginId의 유저를 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
   }

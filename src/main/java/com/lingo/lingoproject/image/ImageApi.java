@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.image;
 
+import com.lingo.lingoproject.image.dto.FeedImageDataRequestDto;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.image.dto.GetFeedImageInfoResponseDto;
 import com.lingo.lingoproject.image.dto.UploadAllFeedImageRequestDto;

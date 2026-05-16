@@ -8,12 +8,10 @@ import com.lingo.lingoproject.survey.presentation.dto.GetSurveyResponseDto;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -75,7 +73,7 @@ public class RedisUtils {
    * @param key 유저 ID (문자열)
    * @return 캐시된 추천 유저 목록 (없으면 null)
    */
-  public List<GetUserProfileResponseDto> getCumulativeSurveyBasedCachedProfile(String key){
+  public List<GetUserProfileResponseDto> 캐시된_누적_설문_기반_추천_프로필_조회(String key){
     try {
 
       ApiListResponseDto<GetUserProfileResponseDto> savedRecommendUserList = (ApiListResponseDto<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);
@@ -94,7 +92,7 @@ public class RedisUtils {
    * @param key 유저 ID (문자열)
    * @return 캐시된 추천 유저 목록 (없으면 null)
    */
-  public List<GetUserProfileResponseDto> getDailySurveyBasedCachedProfile(String key){
+  public List<GetUserProfileResponseDto> 캐시된_일일_설문_기반_추천_프로필_조회(String key){
     try {
 
       ApiListResponseDto<GetUserProfileResponseDto> savedRecommendUserList = (ApiListResponseDto<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend-for-daily-survey::" + key);

@@ -1,11 +1,14 @@
 package com.lingo.lingoproject.shared.domain.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 
 @Embeddable
 public class Address {
 
+  @Column(length = 10)
   private String province;
+  @Column(length = 10)
   private String city;
 
   protected Address() {}

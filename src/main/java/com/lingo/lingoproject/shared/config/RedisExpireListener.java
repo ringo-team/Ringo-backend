@@ -72,7 +72,7 @@ public class RedisExpireListener implements MessageListener {
 
       Long userId = Long.parseLong(parts[1]);
 
-      User user = userQueryUseCase.findUserOrThrow(userId);
+      User user = userQueryUseCase.유저_찾기_혹은_오류(userId);
 
       // 활동 시작 시간: 키 생성 시 함께 저장한 LocalDateTime
       LocalDateTime startTime = LocalDateTime.parse(parts[2]);

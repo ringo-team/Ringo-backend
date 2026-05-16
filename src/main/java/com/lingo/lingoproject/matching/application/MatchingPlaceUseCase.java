@@ -50,12 +50,12 @@ public class MatchingPlaceUseCase {
   private final RedisUtils redisUtils;
   private final RedisTemplate<String, Object> redisTemplate;
 
-  private static final List<Integer> PLACE_SELECTION_COUNT = List.of(7, 4, 3, 2, 1);
-  private static final List<Integer> POSITIVE_ANSWER_LIST = List.of(3, 4, 5);
+  private static final List<Integer> 키워드_순서에_따른_장소_컨텐츠_선정_개수 = List.of(7, 4, 3, 2, 1);
+  private static final List<Integer> 높은_응답_리스트 = List.of(3, 4, 5);
 
   public List<String> getMatchReasons(Long user1, Long user2) {
-    List<SortedAnswerPairWithWeight> pairs = findSortedRelatedAnswerPairs(user1, user2);
-    List<Long> surveyIds = pairs.stream().map(SortedAnswerPairWithWeight::getSurveyId).distinct().toList();
+    List<AnswerWeightPair> pairs = 설문_응답쌍과_연관_가중치_조회(user1, user2);
+    List<Long> surveyIds = pairs.stream().map(AnswerWeightPair::getSurveyId).distinct().toList();
     Map<Long, Survey> surveyMap = surveyRepository.findAllById(surveyIds).stream()
         .collect(Collectors.toMap(Survey::getId, Function.identity()));
 
@@ -63,7 +63,7 @@ public class MatchingPlaceUseCase {
         .filter(pair -> surveyMap.containsKey(pair.getSurveyId()))
         .map(pair -> {
           Survey survey = surveyMap.get(pair.getSurveyId());
-          return POSITIVE_ANSWER_LIST.contains(pair.getAnswer())
+          return 높은_응답_리스트.contains(pair.getAnswer())
               ? survey.getMatchedReasonForHigherAnswer()
               : survey.getMatchedReasonForLowerAnswer();
         })
@@ -71,137 +71,138 @@ public class MatchingPlaceUseCase {
         .toList();
   }
 
-  public List<GetPlaceDetailResponseDto> getMatchedUserPlaces(User user, Long user1, Long user2) {
-    List<String> keywords = getMatchedKeywords(user1, user2);
-    List<Place> places = selectPlacesByKeywords(keywords);
-    if (places.size() < 4) places = dealWithHasFewKeywords();
-    return buildPlaceDetailInfo(places, user);
+  public List<GetPlaceDetailResponseDto> 매칭된_커플을_위한_장소_컨텐츠_추천(User user, Long user1, Long user2) {
+    List<String> keywords = 주요_매칭_키워드_조회(user1, user2);
+    List<Place> places = 키워드_기반_장소_컨텐츠_조회(keywords);
+    if (places.size() < 5) places = 추천_장소가_너무_적을경우_링고_추천_장소_조회();
+    return 장소_컨텐츠_상세_정보_생성(places, user);
   }
 
-  @Scheduled(cron = "0 30 23 * * *")
-  public void cacheIndividualUserPlaces() {
-    userQueryUseCase.findAll().forEach(this::buildPlaceDtoAndCache);
+  @Scheduled(cron = "0 30 0 * * *")
+  public void 개인화된_장소_컨텐츠_cache() {
+    userQueryUseCase.findAll().forEach(this::개인화된_장소_컨텐츠_응답_dto_생성_및_cache);
   }
 
   public List<GetPlaceDetailResponseDto> getIndividualUserPlaces(User user) {
-    String key = "individual-place::";
-    List<GetPlaceDetailResponseDto> cached = getCachedUserPlaces(key, user.getId());
+    String cacheKey = "individual-place::";
+    List<GetPlaceDetailResponseDto> cached = 캐시된_장소_컨텐츠_조회(cacheKey, user.getId());
     if (cached != null) return cached;
 
-    List<Place> places = placeRepository.getPlaceOrderByClickCountLimitFive();
-    List<GetPlaceDetailResponseDto> result = buildPlaceDetailInfo(places, user);
+    List<Place> 인기_컨텐츠 = placeRepository.가장_많이_클릭한_컨텐츠_상위_5개만_조회();
+    List<GetPlaceDetailResponseDto> 상세정보 = 장소_컨텐츠_상세_정보_생성(인기_컨텐츠, user);
 
-    cacheUserPlace(key, user.getId(), result);
-    return result;
+    장소_컨텐츠_cache(cacheKey, user.getId(), 상세정보);
+    return 상세정보;
   }
 
-  public List<GetPlaceDetailResponseDto> getRandomlySelectedPlaces(User user) {
-    String key = "random-place::";
-    List<GetPlaceDetailResponseDto> cached = getCachedUserPlaces(key, user.getId());
+  public List<GetPlaceDetailResponseDto> 랜덤으로_장소_컨텐츠_조회(User user) {
+    String cacheKey = "random-place::";
+    List<GetPlaceDetailResponseDto> cached = 캐시된_장소_컨텐츠_조회(cacheKey, user.getId());
     if (cached != null) return cached;
 
     List<Place> places = placeRepository.findAllByTypeNotNull();
     Collections.shuffle(places);
-    List<GetPlaceDetailResponseDto> result = buildPlaceDetailInfo(
+    List<GetPlaceDetailResponseDto> result = 장소_컨텐츠_상세_정보_생성(
         places.subList(0, Math.min(places.size(), 50)), user
     );
-    cacheUserPlace(key, user.getId(), result);
+    장소_컨텐츠_cache(cacheKey, user.getId(), result);
     return result;
   }
 
   public List<GetPlaceDetailResponseDto> getRankedPagedPlaces(User user, int page, int size) {
     List<Place> places = placeRepository.findAll(PageRequest.of(page, size)).getContent();
-    return buildPlaceDetailInfo(places, user);
+    return 장소_컨텐츠_상세_정보_생성(places, user);
   }
 
-  public List<String> getMatchedKeywords(Long user1, Long user2) {
-    List<SortedAnswerPairWithWeight> pairs = findSortedRelatedAnswerPairs(user1, user2);
+  public List<String> 주요_매칭_키워드_조회(Long user1, Long user2) {
+    List<AnswerWeightPair> 설문_응답_가중치_리스트 = 설문_응답쌍과_연관_가중치_조회(user1, user2);
 
-    List<Long> surveyIds = pairs.stream().map(SortedAnswerPairWithWeight::getSurveyId).distinct().toList();
-    Map<Long, Survey> surveyMap = surveyRepository.findAllById(surveyIds).stream()
+    List<Long> surveyIds = 설문_응답_가중치_리스트.stream().map(AnswerWeightPair::getSurveyId).distinct().toList();
+    Map<Long, Survey> 설문_id_설문_맵 = surveyRepository.findAllById(surveyIds).stream()
         .collect(Collectors.toMap(Survey::getId, Function.identity()));
 
-    Map<String, Long> keywordWeightMap = pairs.stream()
-        .filter(pair -> surveyMap.containsKey(pair.getSurveyId()))
+    Map<String, Long> 키워드_가중치_맵 = 설문_응답_가중치_리스트.stream()
+        .filter(pair -> 설문_id_설문_맵.containsKey(pair.getSurveyId()))
         .flatMap(pair -> {
-          Survey survey = surveyMap.get(pair.getSurveyId());
-          String keyword = POSITIVE_ANSWER_LIST.contains(pair.getAnswer())
-              ? survey.getKeywordForHigherAnswer().strip()
-              : survey.getKeywordForLowerAnswer().strip();
-          return tokenizeKeywords(keyword).stream()
-              .map(s -> Map.entry(s, (long) pair.getOrderWeight()));
+          Survey survey = 설문_id_설문_맵.get(pair.getSurveyId());
+          String 설문_응답과_관련된_키워드 = 높은_응답_리스트.contains(pair.getAnswer())
+              ? survey.getPositiveKeyword().strip()
+              : survey.getNegativeKeyword().strip();
+          return 키워드_토큰화(설문_응답과_관련된_키워드).stream()
+              .map(s -> Map.entry(s, (long) pair.getRelationWeight()));
         })
+        // 동일한 키워드의 가중치는 모두 합한다.
         .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)));
 
-    Map<String, Integer> keywordScoreMap = keywordRepository.findAllByKeywordIn(keywordWeightMap.keySet()).stream()
+    // 키워드에는 고유한 가중치가 존재한다. 키워드_가중치_맵은 설문 응답에 따른 가중치를 계산한 결과라 두 가중치를 구별해야한다.
+    Map<String, Integer> 고유_키워드_가중치_맵 = keywordRepository.findAllByKeywordIn(키워드_가중치_맵.keySet())
+        .stream()
         .collect(Collectors.toMap(Keyword::getKeyword, Keyword::getScore));
 
-    return keywordWeightMap.entrySet().stream()
-        .filter(e -> keywordScoreMap.containsKey(e.getKey()))
-        .map(entry -> Map.entry(entry.getKey(), keywordScoreMap.get(entry.getKey()) * entry.getValue()))
+    return 키워드_가중치_맵.entrySet().stream()
+        .filter(e -> 고유_키워드_가중치_맵.containsKey(e.getKey()))
+        .map(entry -> Map.entry(entry.getKey(), 고유_키워드_가중치_맵.get(entry.getKey()) * entry.getValue()))
         .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
         .map(Map.Entry::getKey)
         .limit(5)
         .toList();
   }
 
-  public List<String> getIndividualSurveyBasedKeywords(User user) {
-    List<AnsweredSurvey> answeredSurveys = answeredSurveyRepository.findAllByUser(user);
+  public List<String> 유저_설문_기반_키워드_추출(User user) {
+    List<AnsweredSurvey> 유저가_응답한_설문들 = answeredSurveyRepository.findAllByUser(user);
 
-    List<Integer> surveyNums = answeredSurveys.stream().map(AnsweredSurvey::getSurveyNum).distinct().toList();
-    Map<Integer, Survey> surveyMap = surveyRepository.findAllBySurveyNumIn(surveyNums).stream()
+    List<Integer> 유저가_응답한_설문_번호 = 유저가_응답한_설문들.stream().map(AnsweredSurvey::getSurveyNum).distinct().toList();
+    Map<Integer, Survey> 설문번호_설문_맵 = surveyRepository.findAllBySurveyNumIn(유저가_응답한_설문_번호).stream()
         .collect(Collectors.toMap(Survey::getSurveyNum, Function.identity()));
 
-    Map<String, Long> keywordWeights = answeredSurveys.stream()
-        .filter(answeredSurvey -> surveyMap.containsKey(answeredSurvey.getSurveyNum()))
+    Map<String, Long> 키워드_가중치_맵 = 유저가_응답한_설문들.stream()
+        .filter(answeredSurvey -> 설문번호_설문_맵.containsKey(answeredSurvey.getSurveyNum()))
         .flatMap(answeredSurvey -> {
-          Survey survey = surveyMap.get(answeredSurvey.getSurveyNum());
-          long answerScore = recommendationDomainService.calculateAnswerScore(answeredSurvey.getAnswer());
-          String keyword = POSITIVE_ANSWER_LIST.contains(answeredSurvey.getAnswer())
-              ? survey.getKeywordForHigherAnswer()
-              : survey.getKeywordForLowerAnswer();
-          return tokenizeKeywords(keyword).stream()
-              .map(key -> Map.entry(key, answerScore));
+          Survey survey = 설문번호_설문_맵.get(answeredSurvey.getSurveyNum());
+          long 응답점수 = recommendationDomainService.응답_점수_계산(answeredSurvey.getAnswer());
+          String 응답과_관련된_키워드 = 높은_응답_리스트.contains(answeredSurvey.getAnswer())
+              ? survey.getPositiveKeyword()
+              : survey.getNegativeKeyword();
+          return 키워드_토큰화(응답과_관련된_키워드).stream()
+              .map(key -> Map.entry(key, 응답점수));
         })
         .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)));
 
-    Map<String, Integer> keywordScoreMap = keywordRepository.findAllByKeywordIn(keywordWeights.keySet()).stream()
+    Map<String, Integer> 키워드_고유_가중치_맵 = keywordRepository.findAllByKeywordIn(키워드_가중치_맵.keySet()).stream()
         .collect(Collectors.toMap(Keyword::getKeyword, Keyword::getScore));
 
-    return keywordWeights.entrySet().stream()
-        .filter(e -> keywordScoreMap.containsKey(e.getKey()))
-        .map(entry -> Map.entry(entry.getKey(), (long) keywordScoreMap.get(entry.getKey()) * entry.getValue()))
+    return 키워드_가중치_맵.entrySet().stream()
+        .filter(e -> 키워드_고유_가중치_맵.containsKey(e.getKey()))
+        .map(entry -> Map.entry(entry.getKey(), (long) 키워드_고유_가중치_맵.get(entry.getKey()) * entry.getValue()))
         .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
         .map(Map.Entry::getKey)
         .limit(5)
         .toList();
   }
 
-  public List<GetPlaceDetailResponseDto> buildPlaceDetailInfo(List<Place> places, User user) {
-    Set<Long> scrappedPlaceIds = userScrapPlaceRepository.findAllByUser(user).stream()
+  public List<GetPlaceDetailResponseDto> 장소_컨텐츠_상세_정보_생성(List<Place> places, User user) {
+    Set<Long> 스크랩된_장소_ids = userScrapPlaceRepository.findAllByUser(user).stream()
         .map(scrap -> scrap.getPlace().getId())
         .collect(Collectors.toSet());
     return places.stream()
-        .map(place -> place.createPlaceDetailDto(scrappedPlaceIds.contains(place.getId())))
+        .map(place -> place.createPlaceDetailDto(스크랩된_장소_ids.contains(place.getId())))
         .toList();
   }
 
-  private void buildPlaceDtoAndCache(User user) {
+  private void 개인화된_장소_컨텐츠_응답_dto_생성_및_cache(User user) {
     String key = "individual-place::";
-    List<String> keywords = getIndividualSurveyBasedKeywords(user);
-    List<Place> places = selectPlacesByKeywords(keywords);
-    if (places.size() < 4) places = dealWithHasFewKeywords();
-    List<GetPlaceDetailResponseDto> result = buildPlaceDetailInfo(places, user);
-    cacheUserPlace(key, user.getId(), result);
+    List<String> keywords = 유저_설문_기반_키워드_추출(user);
+    List<Place> places = 키워드_기반_장소_컨텐츠_조회(keywords);
+    if (places.size() < 5) places = 추천_장소가_너무_적을경우_링고_추천_장소_조회();
+    List<GetPlaceDetailResponseDto> result = 장소_컨텐츠_상세_정보_생성(places, user);
+    장소_컨텐츠_cache(key, user.getId(), result);
   }
 
-  private List<Place> selectPlacesByKeywords(List<String> keywords) {
+  private List<Place> 키워드_기반_장소_컨텐츠_조회(List<String> keywords) {
     List<Place> result = new ArrayList<>();
     for (int index = 0; index < keywords.size(); index++) {
-      List<Long> placeIds = placeSearchRepository.findAllByKeywordContaining(keywords.get(index))
-          .stream().map(PlaceDocument::getId).toList();
-      List<Place> places = placeRepository.findAllByIdIn(placeIds);
-      int max = Math.min(PLACE_SELECTION_COUNT.get(index), places.size());
+      List<Place> places = 키워드가_포함된_장소_검색(keywords.get(index));
+      int max = Math.min(키워드_순서에_따른_장소_컨텐츠_선정_개수.get(index), places.size());
       Collections.shuffle(places);
       result.addAll(places.subList(0, max));
     }
@@ -209,50 +210,52 @@ public class MatchingPlaceUseCase {
     return result;
   }
 
-  private List<Place> dealWithHasFewKeywords() {
-    List<Place> places = placeRepository.findAllByType("RINGO_PICK");
+  private List<Place> 키워드가_포함된_장소_검색(String 키워드){
+    List<Long> placeIds = placeSearchRepository.findAllByKeywordContaining(키워드)
+        .stream().map(PlaceDocument::getId).toList();
+    return placeRepository.findAllByIdIn(placeIds);
+  }
+
+  private List<Place> 추천_장소가_너무_적을경우_링고_추천_장소_조회() {
+    List<Place> places = placeRepository.findAllByType("RINGO");
     Collections.shuffle(places);
     return places.subList(0, Math.min(places.size(), 10));
   }
 
-  private List<SortedAnswerPairWithWeight> findSortedRelatedAnswerPairs(Long user1, Long user2) {
-    return answeredSurveyRepository.getRelatedSurveyAnswerPairs(user1, user2)
+  private List<AnswerWeightPair> 설문_응답쌍과_연관_가중치_조회(Long user1, Long user2) {
+    return answeredSurveyRepository.두_유저가_응답한_문항중_쌍문항만_조회(user1, user2)
         .stream()
         .filter(pair -> Math.abs(pair.getAnswer() - pair.getConfrontAnswer()) <= 2)
-        .sorted((a, b) -> {
-          int scoreA = recommendationDomainService.calculateAnswerPairScore(a.getAnswer(), a.getConfrontAnswer());
-          int scoreB = recommendationDomainService.calculateAnswerPairScore(b.getAnswer(), a.getConfrontAnswer());
-          return scoreB - scoreA;
-        })
         .map(pair -> {
-          int weight = recommendationDomainService.calculateAnswerPairScore(pair.getAnswer(), pair.getConfrontAnswer());
-          return new SortedAnswerPairWithWeight(pair.getAnswer(), pair.getConfrontAnswer(), pair.getSurveyId(), weight);
+          int weight = recommendationDomainService.설문_응답쌍_연관_가중치_계산(pair.getAnswer(), pair.getConfrontAnswer());
+          return new AnswerWeightPair(pair.getAnswer(), pair.getConfrontAnswer(), pair.getSurveyId(), weight);
         })
+        .sorted((a, b) -> b.getRelationWeight() - a.getRelationWeight())
         .toList();
   }
 
-  private List<String> tokenizeKeywords(String keywords) {
+  private List<String> 키워드_토큰화(String keywords) {
     return Arrays.stream(keywords.split(",")).toList();
   }
 
   @SuppressWarnings("unchecked")
-  public List<GetPlaceDetailResponseDto> getCachedUserPlaces(String key, Long userId) {
+  public List<GetPlaceDetailResponseDto> 캐시된_장소_컨텐츠_조회(String key, Long userId) {
     if (redisTemplate.hasKey(key + userId)) {
       return ((ApiListResponseDto<GetPlaceDetailResponseDto>) redisTemplate.opsForValue().get(key + userId)).getList();
     }
     return null;
   }
 
-  private void cacheUserPlace(String key, Long userId, List<GetPlaceDetailResponseDto> list) {
+  private void 장소_컨텐츠_cache(String key, Long userId, List<GetPlaceDetailResponseDto> list) {
     redisUtils.cacheUntilMidnight(key + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), list));
   }
 
   @Getter
   @RequiredArgsConstructor
-  public static class SortedAnswerPairWithWeight {
+  public static class AnswerWeightPair {
     private final int answer;
     private final int confront;
     private final Long surveyId;
-    private final int orderWeight;
+    private final int relationWeight;
   }
 }

@@ -18,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -117,7 +116,7 @@ public class JwtUtil {
    * @return 파싱된 Claims (sub, jti 등 포함)
    * @throws RingoException 토큰이 만료되었거나 유효하지 않을 경우
    */
-  public Claims getClaims(String token){
+  public Claims 토큰에서_claim_추출(String token){
     try{
       return Jwts.parser().verifyWith(getSigningKey())
           .build()

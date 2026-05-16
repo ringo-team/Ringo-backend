@@ -1,6 +1,5 @@
 package com.lingo.lingoproject.shared.domain.model;
 
-import com.lingo.lingoproject.shared.domain.model.SurveyCategory;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -49,8 +48,8 @@ public class Survey {
         .category(category)
         .content(content)
         .purpose(purpose)
-        .keywordForHigherAnswer(positiveKeyword)
-        .keywordForLowerAnswer(negativeKeyword)
+        .positiveKeyword(positiveKeyword)
+        .negativeKeyword(negativeKeyword)
         .build();
   }
 
@@ -73,6 +72,6 @@ public class Survey {
   @Column(length = 100)
   private String matchedReasonForLowerAnswer;
 
-  private String keywordForHigherAnswer;
-  private String keywordForLowerAnswer;
+  private String positiveKeyword;
+  private String negativeKeyword;
 }

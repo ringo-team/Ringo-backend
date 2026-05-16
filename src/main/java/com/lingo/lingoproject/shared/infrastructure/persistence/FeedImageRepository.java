@@ -20,4 +20,6 @@ public interface FeedImageRepository extends JpaRepository<FeedImage, Long> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT COUNT(f) FROM FeedImage f WHERE f.user = :user")
   int countByUserWithLock(@Param("user") User user);
+
+  boolean existsByUser(User user);
 }

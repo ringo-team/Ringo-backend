@@ -25,7 +25,7 @@ public class MatchingAcceptedNotificationHandler {
   public void handle(MatchingAcceptedEvent event) {
     log.info("MatchingAcceptedEvent(알림) 수신: matchingId={}, requestUser={}",
         event.getMatchingId(), event.getRequestUserId());
-    User requestUser = userQueryUseCase.findUserOrThrow(event.getRequestUserId());
+    User requestUser = userQueryUseCase.유저_찾기_혹은_오류(event.getRequestUserId());
     //fcmNotificationUseCase.sendFcmNotification(requestUser, "누군가 요청을 수락했어요", null, NotificationType.MATCHING_ACCEPTED);
   }
 }

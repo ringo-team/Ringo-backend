@@ -61,5 +61,5 @@ public class ChatroomParticipant {
 
   @ColumnDefault(value = "false")
   @Builder.Default
-  private boolean isWithdrawn = false;
+  private boolean 회원탈퇴한_유저인지 = false;
 }

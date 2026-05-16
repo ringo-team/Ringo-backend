@@ -9,7 +9,6 @@ import com.lingo.lingoproject.survey.presentation.dto.GetUserSurveyResponseDto;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -69,7 +68,7 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
           and A.user.id = :user1
           and B.user.id = :user2
   """)
-  List<RelatedSurveyAnswerPairInterface> getRelatedSurveyAnswerPairs(Long user1, Long user2);
+  List<RelatedSurveyAnswerPairInterface> 두_유저가_응답한_문항중_쌍문항만_조회(Long user1, Long user2);
 
   long countByUser(User user);
 
@@ -88,7 +87,7 @@ public interface AnsweredSurveyRepository extends JpaRepository<AnsweredSurvey, 
 
   List<AnsweredSurvey> findAllByUserAndUpdatedAtAfter(User user, LocalDateTime updatedAtAfter);
 
-  List<AnsweredSurvey> findAllByUserIdNotInAndAnswerAndSurveyNumIn(Collection<Long> users, Integer answer, Collection<Integer> surveyNums);
+  List<AnsweredSurvey> findAllByUserIdInAndSurveyNumAndAnswerIn(Collection<Long> users, Integer answer, Collection<Integer> surveyNums);
 
   boolean existsByUserAndSurveyNum(User user, Integer surveyNum);
 

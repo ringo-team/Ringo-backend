@@ -31,7 +31,6 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -99,9 +98,9 @@ public class SurveyService {
     Survey survey = surveyRepository.findById(surveyId)
         .orElseThrow(() -> new RingoException("해당 설문을 찾을 수 없습니다.", ErrorCode.NOT_FOUND));
 
-    GenericUtils.validateAndSetStringValue(dto.purpose(), survey::setPurpose);
-    GenericUtils.validateAndSetStringValue(dto.content(), survey::setContent);
-    GenericUtils.validateAndSetEnum(dto.category(), SurveyCategory.values(), survey::setCategory);
+    GenericUtils.문자열_널_검증_후_set(dto.purpose(), survey::setPurpose);
+    GenericUtils.문자열_널_검증_후_set(dto.content(), survey::setContent);
+    GenericUtils.enum_검증후_set(dto.category(), SurveyCategory.values(), survey::setCategory);
 
     surveyRepository.save(survey);
   }
@@ -203,7 +202,7 @@ public class SurveyService {
 
   /** 엑셀 행 데이터를 {@link Survey} 엔티티로 변환한다. */
   private Survey buildSurveyFromRow(Row row, String categoryValue) {
-    SurveyCategory category = GenericUtils.validateAndReturnEnumValue(SurveyCategory.values(), categoryValue);
+    SurveyCategory category = GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(SurveyCategory.values(), categoryValue);
     String positiveKeyword = row.getCell(10).getStringCellValue().replaceAll(" ", "");
     String negativeKeyword = row.getCell(9).getStringCellValue().replaceAll(" ", "");
     return Survey.of(

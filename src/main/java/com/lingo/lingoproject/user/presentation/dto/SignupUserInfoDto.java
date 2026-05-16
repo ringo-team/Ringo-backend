@@ -37,7 +37,7 @@ public record SignupUserInfoDto(
     String workPlace,
 
     @Schema(description = "학교명", example = "서울대")
-    String schoolName,
+    String school,
 
     @Schema(description = "학력", example = "대학교졸업")
     String degree,

@@ -2,13 +2,10 @@ package com.lingo.lingoproject.matching.domain.service;
 
 import com.lingo.lingoproject.matching.presentation.dto.SurveyScoreResultInterface;
 import com.lingo.lingoproject.shared.domain.model.SurveyCategory;
-import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.infrastructure.persistence.AnsweredSurveyRepository;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,7 +34,7 @@ public class SurveyScoreCalculator {
   @Value("${ringo.config.survey.sharing_weight}")
   private float SURVEY_SHARING_WEIGHT;
 
-  public float calculate(Long user1Id, Long user2Id) {
+  public float 설문_점수_계산(Long user1Id, Long user2Id) {
     List<SurveyScoreResultInterface> list = answeredSurveyRepository.calcSurveyScore(user1Id, user2Id);
     float score = 0;
     for (SurveyScoreResultInterface result : list) {

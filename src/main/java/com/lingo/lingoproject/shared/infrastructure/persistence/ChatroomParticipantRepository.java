@@ -11,12 +11,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface ChatroomParticipantRepository extends JpaRepository<ChatroomParticipant, Long> {
 
-  List<ChatroomParticipant> findAllByChatroom(Chatroom chatroom);
-
   void deleteAllByChatroom(Chatroom chatroom);
 
 
   @Modifying
-  @Query("update ChatroomParticipant cp set cp.participant = null, cp.isWithdrawn = true where cp.participant = :user")
+  @Query("update ChatroomParticipant cp set cp.participant = null, cp.회원탈퇴한_유저인지 = true where cp.participant = :user")
   void disconnectChatroomParticipantWithUser(@Param("user") User user);
 }

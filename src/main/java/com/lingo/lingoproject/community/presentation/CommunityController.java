@@ -8,29 +8,28 @@ import com.lingo.lingoproject.community.presentation.dto.GetCommentResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPlaceResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.InputStatusResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.ScrapPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SearchPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto;
+import com.lingo.lingoproject.community.presentation.dto.UpdatePlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
 import com.lingo.lingoproject.matching.application.MatchingPlaceUseCase;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
-import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.checkerframework.checker.units.qual.A;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -166,7 +165,7 @@ public class CommunityController implements CommunityApi {
   @Override
   public ResponseEntity<GetPlaceResponseDto> getIndividualRecommendationPlaces(User user){
     List<GetPlaceDetailResponseDto> individual = matchingPlaceUseCase.getIndividualUserPlaces(user);
-    List<GetPlaceDetailResponseDto> common = matchingPlaceUseCase.getRandomlySelectedPlaces(user);
+    List<GetPlaceDetailResponseDto> common = matchingPlaceUseCase.랜덤으로_장소_컨텐츠_조회(user);
 
     GetPlaceResponseDto response = new GetPlaceResponseDto(individual, common, ErrorCode.SUCCESS.getCode());
 
@@ -211,5 +210,23 @@ public class CommunityController implements CommunityApi {
             ErrorCode.SUCCESS.getCode(),
             response
         ));
+  }
+
+  @Override
+  public ResponseEntity<PlaceSummaryRequestDto> getPlaceSummary(Long placeId) {
+    PlaceSummaryRequestDto response = communityService.getPlaceSummary(placeId);
+    return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
+  public ResponseEntity<ResultMessageResponseDto> updatePlace(Long placeId, UpdatePlaceRequestDto dto) {
+    communityService.updatePlace(dto);
+    return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 업데이트 되었습니다."));
+  }
+
+  @Override
+  public ResponseEntity<Map<String, InputStatusResponseDto>> getPlaceInputStatus() {
+    Map<String, InputStatusResponseDto> response = communityService.getInputStatus();
+    return ResponseEntity.status(HttpStatus.OK).body(response);
   }
 }

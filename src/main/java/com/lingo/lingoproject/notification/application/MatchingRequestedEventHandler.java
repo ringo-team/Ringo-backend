@@ -25,7 +25,7 @@ public class MatchingRequestedEventHandler {
   public void handle(MatchingRequestedEvent event) {
     log.info("MatchingRequestedEvent 수신: matchingId={}, requestUser={}, requestedUser={}",
         event.getMatchingId(), event.getRequestUserId(), event.getRequestedUserId());
-    User requestedUser = userQueryUseCase.findUserOrThrow(event.getRequestedUserId());
+    User requestedUser = userQueryUseCase.유저_찾기_혹은_오류(event.getRequestedUserId());
     //fcmNotificationUseCase.sendFcmNotification(requestedUser, "누군가 매칭 요청을 했어요!", null, NotificationType.MATCHING_REQUEST);
   }
 }

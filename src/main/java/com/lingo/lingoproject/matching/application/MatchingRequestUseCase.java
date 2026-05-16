@@ -13,7 +13,6 @@ import com.lingo.lingoproject.shared.domain.model.Hashtag;
 import com.lingo.lingoproject.shared.domain.model.Matching;
 import com.lingo.lingoproject.shared.domain.model.MatchingStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
-import com.lingo.lingoproject.shared.domain.model.UserMatchingLog;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.HashtagRepository;
@@ -47,15 +46,15 @@ public class MatchingRequestUseCase {
 
   @Transactional
   public Matching requestMatching(MatchingRequestDto dto) {
-    User requestUser = userQueryUseCase.findUserOrThrow(dto.requestId());
-    User requestedUser = userQueryUseCase.findUserOrThrow(dto.requestedId());
+    User requestUser = userQueryUseCase.유저_찾기_혹은_오류(dto.requestId());
+    User requestedUser = userQueryUseCase.유저_찾기_혹은_오류(dto.requestedId());
 
     if (matchQueryUseCase.existsByRequestUserAndRequestedUser(requestUser, requestedUser) ||
         matchQueryUseCase.existsByRequestUserAndRequestedUser(requestedUser, requestUser)) {
       throw new RingoException("이미 매칭된 연결입니다.", ErrorCode.BAD_REQUEST);
     }
 
-    float surveyScore = surveyScoreCalculator.calculate(requestedUser.getId(), requestUser.getId());
+    float surveyScore = surveyScoreCalculator.설문_점수_계산(requestedUser.getId(), requestUser.getId());
 
     Matching matching = Matching.of(
         requestUser,

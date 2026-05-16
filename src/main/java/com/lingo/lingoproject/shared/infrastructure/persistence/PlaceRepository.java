@@ -16,7 +16,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
   void updatePlaceClickCount(Long placeId);
 
   @Query("select p from Place p order by p.clickCount limit 5")
-  List<Place> getPlaceOrderByClickCountLimitFive();
+  List<Place> 가장_많이_클릭한_컨텐츠_상위_5개만_조회();
 
   List<Place> findAllByTypeNotNull();
 

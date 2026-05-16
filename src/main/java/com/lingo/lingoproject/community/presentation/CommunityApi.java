@@ -8,11 +8,14 @@ import com.lingo.lingoproject.community.presentation.dto.GetCommentResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPlaceResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.InputStatusResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.ScrapPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SearchPlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto;
+import com.lingo.lingoproject.community.presentation.dto.UpdatePlaceRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
@@ -28,6 +31,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -196,4 +200,12 @@ public interface CommunityApi {
   @GetMapping(value = "/places/search")
   ResponseEntity<ApiListResponseDto<SearchPlaceRequestDto>> searchPlacesByKeywords(@RequestParam String keyword);
 
+  @GetMapping(value = "/api/restaurants/{place-id}")
+  ResponseEntity<PlaceSummaryRequestDto> getPlaceSummary(@PathVariable(value = "place-id") Long placeId);
+
+  @PostMapping(value = "/api/restaurants/{place-id}")
+  ResponseEntity<ResultMessageResponseDto> updatePlace(@PathVariable(value = "place-id") Long placeId, @RequestBody UpdatePlaceRequestDto dto);
+
+  @GetMapping(value = "/api/restaurants/status")
+  ResponseEntity<Map<String, InputStatusResponseDto>> getPlaceInputStatus();
 }

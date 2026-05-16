@@ -4,11 +4,11 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.security.jwt.JwtUtil;
+import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -53,6 +53,7 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
   private final ChatService chatService;
   private final JwtUtil jwtUtil;
   private final RedisTemplate<String, Object> redisTemplate;
+  private final UserQueryUseCase userQueryUseCase;
 
   /**
    * STOMP 메시지가 채널로 전송되기 전에 호출됩니다.
@@ -67,11 +68,11 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
 
     StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-    log.info("message={}, command={}, dest={}", accessor.getMessage(), accessor.getCommand(), accessor.getDestination());
-
     if (accessor == null) {
       return message;
     }
+
+    log.info("message={}, command={}, dest={}", accessor.getMessage(), accessor.getCommand(), accessor.getDestination());
 
     // DISCONNECT 명령어는 인증 검사 없이 통과
     if (StompCommand.DISCONNECT.equals(accessor.getCommand())){
@@ -79,14 +80,12 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     }
 
     String token = accessor.getFirstNativeHeader("Authorization");
-    log.info("token={}", token);
     User user;
     /*------------------------------------토큰 검증-----------------------------------------*/
     if (token == null || !token.startsWith("Bearer ")) {
       // 토큰이 없는 경우: 이미 CONNECT 단계에서 Principal이 설정된 경우 재사용
       if (accessor.getUser() != null) {
-        log.info("accessor user = {}", accessor.getUser().getName());
-        user = chatService.findUserByLoginIdOrThrow(accessor.getUser().getName());
+        user = userQueryUseCase.로그인_아이디로_유저_조회_혹은_오류_발생(accessor.getUser().getName());
       }
       else throw new RingoException("토큰이 없습니다.", ErrorCode.TOKEN_INVALID);
     }
@@ -94,8 +93,8 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
       // "Bearer " 접두사(7자) 제거 후 JWT 파싱
       token = token.substring(7);
 
-    Claims claims = jwtUtil.getClaims(token);
-    user = chatService.findUserByLoginIdOrThrow(claims.getSubject());
+    Claims claims = jwtUtil.토큰에서_claim_추출(token);
+    user = userQueryUseCase.로그인_아이디로_유저_조회_혹은_오류_발생(claims.getSubject());
     // STOMP 세션의 Principal을 loginId로 설정 (StompConnectionListener에서 유저 조회에 사용)
     accessor.setUser(user::getLoginId);
     }
@@ -117,7 +116,7 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     }
 
     String destination = accessor.getDestination();
-    Long roomId = chatService.extractChatroomIdFromDestination(destination);
+    Long roomId = chatService.웹소켓_경로로부터_채팅방_id_추출_없으면_null_반환(destination);
 
     log.info("command={}, roomId={}", accessor.getCommand(), roomId);
 
@@ -130,13 +129,13 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
     if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())){
       // 구독 시 해당 채팅방 참여자인지 확인
       log.info("subscribe block");
-      chatService.validateParticipant(roomId, user.getId());
+      chatService.채팅방에_속한_유저인지_검증_혹은_오류(roomId, user.getId());
       log.info("connect complete");
       redisTemplate.opsForValue().set("connect::" + user.getId() + "::" + roomId, true);
     }
     else if (StompCommand.SEND.equals(accessor.getCommand())){
       // 메시지 전송 시 해당 채팅방 참여자인지 확인
-      chatService.validateParticipant(roomId, user.getId());
+      chatService.채팅방에_속한_유저인지_검증_혹은_오류(roomId, user.getId());
     }
     log.info("no error");
     return message;

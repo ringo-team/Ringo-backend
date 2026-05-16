@@ -61,7 +61,7 @@ public class MatchQueryUseCase {
     return matchingRepository.existsByRequestUserAndRequestedUser(requestUser, requestedUser);
   }
 
-  public boolean existsByRequestUserAndRequestedUserAndMatchingStatus(
+  public boolean 다음_매칭_요청자_응답자_매칭상태가_이미_존재하는지(
       User requestUser, User requestedUser, MatchingStatus status) {
     return matchingRepository.existsByRequestUserAndRequestedUserAndMatchingStatus(
         requestUser, requestedUser, status);

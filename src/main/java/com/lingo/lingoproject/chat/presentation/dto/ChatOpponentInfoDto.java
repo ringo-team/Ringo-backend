@@ -17,7 +17,7 @@ public record ChatOpponentInfoDto(
     List<String> hashtag
 ) {
 
-  public static ChatOpponentInfoDto from(User opponent) {
+  public static ChatOpponentInfoDto 상대방_유저_dto_생성(User opponent) {
     return ChatOpponentInfoDto.builder()
         .profileUrl(opponent.getProfile().getImageUrl())
         .userId(opponent.getId())
@@ -26,7 +26,7 @@ public record ChatOpponentInfoDto(
         .build();
   }
 
-  public static ChatOpponentInfoDto withdrawn() {
+  public static ChatOpponentInfoDto 회원탈퇴한_유저_dto_생성() {
     return ChatOpponentInfoDto.builder()
         .profileUrl(null)
         .userId(null)

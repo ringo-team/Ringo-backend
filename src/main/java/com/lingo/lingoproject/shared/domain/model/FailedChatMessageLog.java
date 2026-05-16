@@ -22,7 +22,7 @@ import lombok.Setter;
 @Table(name = "FAILED_CHAT_MESSAGE_LOG")
 public class FailedChatMessageLog {
 
-  public static FailedChatMessageLog of(Long roomId, Exception e, String messageId, String destination, String userLoginId) {
+  public static FailedChatMessageLog 메세지_전송_오류_로그_생성(Long roomId, Exception e, String messageId, String destination, String userLoginId) {
     return FailedChatMessageLog.builder()
         .roomId(roomId)
         .errorMessage(e.getMessage())

@@ -1,6 +1,5 @@
 package com.lingo.lingoproject.shared.domain.model;
 
-import com.lingo.lingoproject.shared.domain.model.ChatType;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import jakarta.persistence.Column;
@@ -24,7 +23,6 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import org.springframework.http.HttpStatus;
 
 @Slf4j
 @Entity
@@ -60,7 +58,7 @@ public class Chatroom {
   @Enumerated(value = EnumType.STRING)
   private ChatType type;
 
-  public boolean isParticipant(User user){
+  public boolean 채팅방에_속하는지(User user){
 
     log.info("participant size = {}", participants.size());
 
@@ -70,7 +68,7 @@ public class Chatroom {
     );
 
     boolean result = participants.stream()
-        .filter(p -> !p.isWithdrawn())
+        .filter(p -> !p.is회원탈퇴한_유저인지())
         .map(ChatroomParticipant::getParticipant)
         .map(User::getId)
         .anyMatch(id -> id.equals(user.getId()));
@@ -79,7 +77,7 @@ public class Chatroom {
     return result;
   }
 
-  public ChatroomParticipant getOpponent(User user){
+  public ChatroomParticipant 채팅_상대방_유저_조회(User user){
 
     validateParticipantSize();
 
@@ -99,7 +97,7 @@ public class Chatroom {
     return Objects.equals(cp1.getParticipant().getId(), user.getId()) ? cp1 : cp2;
   }
 
-  public boolean userIsActive(User user){
+  public boolean 유저가_채팅방을_나갔는지(User user){
     return getSelf(user).isActive();
   }
 
@@ -112,7 +110,7 @@ public class Chatroom {
 
   public List<User> getNonWithdrawnParticipant(){
     return participants.stream()
-        .filter(cp -> !cp.isWithdrawn())
+        .filter(cp -> !cp.is회원탈퇴한_유저인지())
         .map(ChatroomParticipant::getParticipant)
         .toList();
   }

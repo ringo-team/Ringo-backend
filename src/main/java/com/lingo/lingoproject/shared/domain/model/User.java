@@ -1,19 +1,15 @@
 package com.lingo.lingoproject.shared.domain.model;
 
 import com.lingo.lingoproject.user.presentation.dto.auth.UserSelfAuthInfo;
-import com.lingo.lingoproject.shared.domain.model.Drinking;
-import com.lingo.lingoproject.shared.domain.model.Gender;
-import com.lingo.lingoproject.shared.domain.model.Nation;
-import com.lingo.lingoproject.shared.domain.model.Religion;
-import com.lingo.lingoproject.shared.domain.model.Role;
-import com.lingo.lingoproject.shared.domain.model.SignupStatus;
-import com.lingo.lingoproject.shared.domain.model.Smoking;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.user.presentation.dto.SignupUserInfoDto;
 import com.lingo.lingoproject.shared.utils.Timestamp;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -24,22 +20,16 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.DynamicInsert;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -162,24 +152,22 @@ public class User extends Timestamp implements UserDetails {
   private String height;
 
   /** 최종 학력 (예: "대졸"). */
-  @Column(length = 10)
+  @Column(length = 25)
   private String degree;
 
-  /** 거주지 도/광역시 (예: "서울특별시"). */
-  @Column(length = 10)
-  private String residenceProvince;
+  @Embedded
+  @AttributeOverrides({
+      @AttributeOverride(name = "province", column = @Column(name = "residence_loc_province")),
+      @AttributeOverride(name = "city", column = @Column(name = "residence_loc_city"))
+  })
+  private Address residenceAddress;
 
-  /** 거주지 시/구 (예: "강남구"). */
-  @Column(length = 10)
-  private String residenceCity;
-
-  /** 활동 지역 도/광역시. */
-  @Column(length = 10)
-  private String activityLocProvince;
-
-  /** 활동 지역 시/구. */
-  @Column(length = 10)
-  private String activityLocCity;
+  @Embedded
+  @AttributeOverrides({
+      @AttributeOverride(name = "province", column = @Column(name = "activity_loc_province")),
+      @AttributeOverride(name = "city", column = @Column(name = "activity_loc_city"))
+  })
+  private Address activityAddress;
 
   /** 흡연 여부 (YES / NO / SOMETIMES). */
   @Enumerated(EnumType.STRING)
@@ -285,13 +273,11 @@ public class User extends Timestamp implements UserDetails {
     this.nickname = dto.nickname();
     this.gender = Gender.valueOf(dto.gender().toUpperCase());
     this.birthday = LocalDate.parse(dto.birthday());
-    this.residenceProvince = dto.address().province();
-    this.residenceCity = dto.address().city();
-    this.activityLocProvince = dto.activeAddress().province();
-    this.activityLocCity = dto.activeAddress().city();
+    this.residenceAddress = new Address(dto.address().province(), dto.address().city());
+    this.activityAddress = new Address(dto.activeAddress().province(), dto.activeAddress().city());
     this.job = dto.job();
     this.workPlace = dto.workPlace();
-    this.schoolName = dto.schoolName();
+    this.schoolName = dto.school();
     this.height = dto.height();
     this.isSmoking = Smoking.valueOf(dto.isSmoking());
     this.isDrinking = Drinking.valueOf(dto.isDrinking());

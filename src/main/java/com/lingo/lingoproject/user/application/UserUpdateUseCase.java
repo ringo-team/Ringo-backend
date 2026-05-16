@@ -19,7 +19,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -46,21 +45,25 @@ public class UserUpdateUseCase {
 
   @Transactional
   public void updateUserInfo(User user, UpdateUserInfoRequestDto dto) {
-    GenericUtils.validateAndSetEnum(dto.isDrinking(), Drinking.values(), user::setIsDrinking);
-    GenericUtils.validateAndSetEnum(dto.isSmoking(), Smoking.values(), user::setIsSmoking);
-    GenericUtils.validateAndSetEnum(dto.religion(), Religion.values(), user::setReligion);
-    GenericUtils.validateAndSetStringValue(dto.job(), user::setJob);
-    GenericUtils.validateAndSetStringValue(dto.height(), user::setHeight);
-    GenericUtils.validateAndSetStringValue(dto.degree(), user::setDegree);
-    GenericUtils.validateAndSetStringValue(dto.biography(), user::setBiography);
-    GenericUtils.validateAndSetStringValue(dto.nickname(), user::setNickname);
+    GenericUtils.enum_검증후_set(dto.isDrinking(), Drinking.values(), user::setIsDrinking);
+    GenericUtils.enum_검증후_set(dto.isSmoking(), Smoking.values(), user::setIsSmoking);
+    GenericUtils.enum_검증후_set(dto.religion(), Religion.values(), user::setReligion);
+    GenericUtils.문자열_널_검증_후_set(dto.job(), user::setJob);
+    GenericUtils.문자열_널_검증_후_set(dto.height(), user::setHeight);
+    GenericUtils.문자열_널_검증_후_set(dto.degree(), user::setDegree);
+    GenericUtils.문자열_널_검증_후_set(dto.biography(), user::setBiography);
+    GenericUtils.문자열_널_검증_후_set(dto.nickname(), user::setNickname);
 
     log.info("[BIO] :{}, {}", user.getBiography(), dto.hashtag());
 
     Address activeAddress = dto.activeAddress();
     if (isValidAddress(activeAddress)) {
-      user.setActivityLocProvince(activeAddress.province());
-      user.setActivityLocCity(activeAddress.city());
+      com.lingo.lingoproject.shared.domain.model.Address activityAddress
+          = new com.lingo.lingoproject.shared.domain.model.Address(
+              activeAddress.province(),
+              activeAddress.city()
+      );
+      user.setActivityAddress(activityAddress);
     }
 
     if (dto.hashtag() != null && !dto.hashtag().isEmpty()) {
@@ -71,8 +74,9 @@ public class UserUpdateUseCase {
       hashtagRepository.saveAll(hashtagEntities);
     }
 
-
+    if (dto.school() != null && !dto.school().isBlank()) user.setSchoolName(dto.school());
     if (dto.mbti() != null) setUserMbti(user, dto.mbti());
+
     userQueryUseCase.save(user);
   }
 

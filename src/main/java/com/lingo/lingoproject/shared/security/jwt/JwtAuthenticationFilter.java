@@ -13,9 +13,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.security.Principal;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +30,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <h2>처리 흐름</h2>
  * <ol>
  *   <li>Authorization 헤더에서 Bearer 토큰 추출</li>
- *   <li>{@link JwtUtil#getClaims}로 서명/만료 검증</li>
+ *   <li>{@link JwtUtil#토큰에서_claim_추출}로 서명/만료 검증</li>
  *   <li>Redis 블랙리스트 확인 — 로그아웃한 유저 차단 ({@code logoutUser::{jti}})</li>
  *   <li>Redis 정지 목록 확인 — 일시 정지된 유저 차단 ({@code suspension::{userId}})</li>
  *   <li>DB 영구 정지 확인 — {@link BlockedUserRepository}</li>
@@ -76,7 +74,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       accessToken = accessToken.substring(7);
 
       // 서명 검증 및 claims 파싱 (만료/위변조 시 RingoException 발생)
-      Claims claims = jwtUtil.getClaims(accessToken);
+      Claims claims = jwtUtil.토큰에서_claim_추출(accessToken);
       User user = userRepository.findByLoginId(claims.getSubject())
           .orElseThrow(() -> new RingoException("유효하지 않은 토큰입니다.", ErrorCode.TOKEN_INVALID));
 

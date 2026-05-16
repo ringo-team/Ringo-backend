@@ -19,7 +19,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
 @RequiredArgsConstructor
@@ -56,14 +55,14 @@ public class ReportRepositoryImpl implements ReportRepositoryCustom {
     // where 문 신고 상태 옵션
     if(validate(dto.reportedUserStatus())
     ){
-      ReportStatus status = GenericUtils.validateAndReturnEnumValue(ReportStatus.values(), dto.reportedUserStatus());
+      ReportStatus status = GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(ReportStatus.values(), dto.reportedUserStatus());
       builder.and(report.reportedUserStatus.eq(status));
     }
 
     // where 문 신고 강도 옵션
     if (validate(dto.reportIntensity())
     ){
-      ReportIntensity intensity = GenericUtils.validateAndReturnEnumValue(ReportIntensity.values(), dto.reportIntensity());
+      ReportIntensity intensity = GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(ReportIntensity.values(), dto.reportIntensity());
       builder.and(report.reportIntensity.eq(intensity));
     }
 
@@ -71,7 +70,7 @@ public class ReportRepositoryImpl implements ReportRepositoryCustom {
     OrderSpecifier<?> ordering = null;
     if (validate(dto.ordering())
     ){
-      ReportOrdering reportOrdering = GenericUtils.validateAndReturnEnumValue(ReportOrdering.values(), dto.ordering());
+      ReportOrdering reportOrdering = GenericUtils.문자열이_enum에_속하는지_검증후_enum_반환(ReportOrdering.values(), dto.ordering());
       ordering = switch (reportOrdering) {
         case ReportOrdering.CREATED_AT_ASC -> report.createdAt.asc();
         case ReportOrdering.CREATED_AT_DESC -> report.createdAt.desc();

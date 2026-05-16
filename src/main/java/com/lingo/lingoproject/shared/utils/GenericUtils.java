@@ -5,12 +5,11 @@ import com.lingo.lingoproject.shared.exception.RingoException;
 import java.util.Arrays;
 import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 
 @Slf4j
 public class GenericUtils {
 
-  public static <T> T validateAndReturnEnumValue(T[] array, String value) {
+  public static <T> T 문자열이_enum에_속하는지_검증후_enum_반환(T[] array, String value) {
     for (T item : array) {
       if (item.toString().equals(value)) {
         log.info("step=ENUM_값_매핑, enum={}, value={}", item, value);
@@ -21,16 +20,16 @@ public class GenericUtils {
     throw new RingoException("적절하지 않은 값이 요청되었습니다.", ErrorCode.BAD_PARAMETER);
   }
 
-  public static <E> void validateAndSetEnum(
+  public static <E> void enum_검증후_set(
       String property,
       E[] values,
       Consumer<E> setter
       ){
     if (property == null) return;
-    setter.accept(validateAndReturnEnumValue(values, property));
+    setter.accept(문자열이_enum에_속하는지_검증후_enum_반환(values, property));
   }
 
-  public static void validateAndSetStringValue(
+  public static void 문자열_널_검증_후_set(
       String property,
       Consumer<String> setter
   ){

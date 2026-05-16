@@ -77,7 +77,7 @@ public class MatchController implements MatchingApi {
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", ErrorCode.NO_AUTH);
     }
     log.info("step=이성_추천_시작, userId={}", userId);
-    List<GetUserProfileResponseDto> rtnList = matchingRecommendationUseCase.getCumulativeSurveyBasedRecommendationProfiles(user);
+    List<GetUserProfileResponseDto> rtnList = matchingRecommendationUseCase.누적_설문_기반_추천(user);
     log.info("step=이성_추천_완료, userId={}", userId);
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), rtnList));
@@ -89,7 +89,7 @@ public class MatchController implements MatchingApi {
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", ErrorCode.NO_AUTH);
     }
     log.info("step=설문_기반_이성_추천_시작, userId={}", user.getId());
-    List<GetUserProfileResponseDto> rtnList = matchingRecommendationUseCase.getDailySurveyBasedRecommendationProfiles(user);
+    List<GetUserProfileResponseDto> rtnList = matchingRecommendationUseCase.일일_설문_기반_유저_추천(user);
     log.info("step=설문_기반_이성_추천_완료, userId={}", user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), rtnList));

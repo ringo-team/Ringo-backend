@@ -67,7 +67,7 @@ public class GetChatMessageResponseDto {
         .build();
   }
 
-  public static GetChatMessageResponseDto forAppointment(Appointment appointment) {
+  public static GetChatMessageResponseDto 약속_등록_메세지_dto_생성(Appointment appointment) {
     return GetChatMessageResponseDto.builder()
         .content("일정이 등록되었어요")
         .appointmentTime(appointment.getAppointmentTime())
@@ -76,7 +76,7 @@ public class GetChatMessageResponseDto {
         .build();
   }
 
-  public static GetChatMessageResponseDto forAppointmentAlert(Appointment appointment) {
+  public static GetChatMessageResponseDto 약속_예정_알림_메세지_dto_생성(Appointment appointment) {
     return GetChatMessageResponseDto.builder()
         .content("오늘 약속이 예정되어 있어요")
         .appointmentTime(appointment.getAppointmentTime())

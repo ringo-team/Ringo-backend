@@ -62,7 +62,8 @@ public class Place {
   private String neighbor; // 동
 
   private String detailAddress;
-
+  private String addressCategory;
+  private String addressSubcategory;
   private String type;
 
   @Builder.Default

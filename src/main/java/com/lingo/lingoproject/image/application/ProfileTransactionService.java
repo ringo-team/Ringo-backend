@@ -25,7 +25,7 @@ public class ProfileTransactionService {
   private final UserQueryUseCase userQueryUseCase;
   private final FeedImageRepository feedImageRepository;
 
-  private static final int MAX_FEED_IMAGE_COUNT = 9;
+  private static final int 최대_피드사진_업로드_개수 = 9;
 
 
   public ProfileTransactionService(ProfileRepository profileRepository,
@@ -36,9 +36,9 @@ public class ProfileTransactionService {
   }
 
   @Transactional
-  public GetImageUrlResponseDto saveProfileAndComplete(String imageUrl, User user){
-    Profile savedProfile = saveProfile(user, imageUrl);
-    completeSignupStatus(user);
+  public GetImageUrlResponseDto 프로필_url_저장과_회원가입_완료로_상태변경(String imageUrl, User user){
+    Profile savedProfile = 프로필_url_저장(user, imageUrl);
+    회원가입_상태_완료로_변경(user);
 
     log.info("userId={}, profileUrl={}, status={}", user.getId(), savedProfile.getImageUrl(), user.getStatus());
 
@@ -46,35 +46,35 @@ public class ProfileTransactionService {
         ErrorCode.SUCCESS.getCode(), savedProfile.getImageUrl(), savedProfile.getId());
   }
 
-  private Profile saveProfile(User user, String imageUrl) {
-    Profile profile = Profile.of(user, imageUrl);
+  private Profile 프로필_url_저장(User user, String imageUrl) {
+    Profile profile = Profile.프로필_객체_생성(user, imageUrl);
     Profile saved = profileRepository.save(profile);
     user.setProfile(saved);
     userQueryUseCase.save(user);
     return saved;
   }
 
-  public void completeSignupStatus(User user) {
+  public void 회원가입_상태_완료로_변경(User user) {
     user.setStatus(SignupStatus.COMPLETED);
     userQueryUseCase.save(user);
   }
 
   @Transactional
-  public void updateProfileImageUrl(Profile profile, String newImageUrl){
+  public void 프로필_이미지_업데이트(Profile profile, String newImageUrl){
     profile.setImageUrl(newImageUrl);
     profileRepository.save(profile);
   }
 
   @Transactional
-  public void deleteProfile(Profile profile){
+  public void 프로필_이미지_삭제(Profile profile){
     profileRepository.delete(profile);
   }
 
   @Transactional
-  public List<GetImageUrlResponseDto> uploadFeedImages(User user, List<String> feedImageUrl, List<FeedImageDataRequestDto> requests){
+  public List<GetImageUrlResponseDto> 피드_이미지_업로드(User user, List<String> feedImageUrl, List<FeedImageDataRequestDto> requests){
 
-    int existingCount = feedImageRepository.countByUserWithLock(user);
-    if (existingCount + requests.size() > MAX_FEED_IMAGE_COUNT) {
+    int 이미_존재하는_피드사진_개수 = feedImageRepository.countByUserWithLock(user);
+    if (이미_존재하는_피드사진_개수 + requests.size() > 최대_피드사진_업로드_개수) {
       throw new RingoException("최대 업로드 개수를 초과하였습니다.", ErrorCode.OVERFLOW);
     }
 
@@ -85,7 +85,13 @@ public class ProfileTransactionService {
     return feedImageRepository.saveAll(feedImages)
         .stream()
         .map(img -> new GetImageUrlResponseDto(
-            ErrorCode.SUCCESS.getCode(), img.getImageUrl(), img.getId()))
+            ErrorCode.SUCCESS.getCode(), img.getImageUrl(), img.getId())
+        )
         .toList();
+  }
+
+  @Transactional
+  public FeedImage 피드_이미지_업데이트(FeedImage 피드_이미지){
+    return feedImageRepository.save(피드_이미지);
   }
 }
