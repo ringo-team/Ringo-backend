@@ -40,6 +40,8 @@ jobs:
 
       - name: Build & Push image
         run: |
+          aws ecr get-login-password --region ${{ env.ECR_REGISTRY }} \
+              | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
           docker build --platform linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY:1.9 .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:1.9
 
