@@ -4,6 +4,7 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,9 @@ import org.springframework.core.io.ClassPathResource;
 @Slf4j
 @Configuration
 public class FirebaseMessagingConfig {
+
+  private static final String FIREBASE_KEY_PATH = "/app/firebase/key.json";
+
   @PostConstruct
   public void refreshFcmCredentialsAndInitializeApp() throws IOException {
 
@@ -31,7 +35,7 @@ public class FirebaseMessagingConfig {
 
     try {
       GoogleCredentials googleCredentials = GoogleCredentials
-          .fromStream(new ClassPathResource("firebase/ringo-bdd26-firebase-adminsdk-fbsvc-107cc408f2.json").getInputStream())
+          .fromStream(new FileInputStream(FIREBASE_KEY_PATH))
           .createScoped(List.of("https://www.googleapis.com/auth/firebase.messaging"));
       log.info("step=FIREBASE_자격증명_갱신_성공, accessToken_존재={}", googleCredentials.getAccessToken() != null);
       FirebaseOptions options = FirebaseOptions.builder()
