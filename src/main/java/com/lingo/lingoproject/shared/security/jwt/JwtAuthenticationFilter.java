@@ -7,6 +7,7 @@ import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.BlockedUserRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -64,7 +65,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     // /login 요청은 CustomAuthenticationFilter가 처리하므로 이 필터에서는 건너뜀
     if (request.getRequestURI().startsWith("/login")  ||
-        request.getRequestURI().startsWith("/signup") ){
+        request.getRequestURI().startsWith("/signup") ||
+        request.getRequestURI().startsWith("/refresh")
+    ){
       filterChain.doFilter(request, response);
       return;
     }
@@ -112,12 +115,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
       // 활동 시간 추적: 기존 키가 있으면 TTL을 30분으로 갱신, 없으면 새 키 생성
       // 키 만료 시 RedisExpireListener가 UserActivityLog를 DB에 저장
-      Set<String> keys = redisTemplate.keys("connect-app::" + user.getId() + "*");
-      if (!keys.isEmpty()){
-        String value = keys.iterator().next();
-        redisTemplate.opsForValue().set(value, true, 30, TimeUnit.MINUTES);
+      if (!redisTemplate.hasKey(RedisKey.접속_유저_레디스_키 + user.getId())){
+        redisTemplate.opsForValue().set(RedisKey.접속_유저_레디스_키 + user.getId(), true, 5, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(RedisKey.접속_시간_레디스_키 + user.getId(), LocalDateTime.now().toString(), 10, TimeUnit.MINUTES);
       }
-      else redisTemplate.opsForValue().set("connect-app::" + user.getId() + "::" + LocalDateTime.now(), true, 30, TimeUnit.MINUTES);
+      else {
+        redisTemplate.expire(RedisKey.접속_유저_레디스_키 + user.getId(), 5, TimeUnit.MINUTES);
+        redisTemplate.expire(RedisKey.접속_시간_레디스_키 + user.getId(), 10, TimeUnit.MINUTES);
+      }
 
       // SecurityContext에 인증 객체 등록 → 이후 컨트롤러에서 @AuthenticationPrincipal로 주입 가능
       SecurityContextHolder.getContext().setAuthentication(

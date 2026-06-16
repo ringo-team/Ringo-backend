@@ -57,7 +57,7 @@ public class SurveyScoreCalculator {
     return score;
   }
 
-  public Map<Long, Float> batchCalculate(Long userId, List<Long> selectedUserIds){
+  public Map<Long, Float> 설문점수_배치_계산(Long userId, List<Long> selectedUserIds){
     List<SurveyScoreResultInterface> list = answeredSurveyRepository.batchCalcSurveyScore(userId, selectedUserIds);
     return list.stream()
         .collect(Collectors.toMap(

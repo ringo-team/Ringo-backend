@@ -37,7 +37,7 @@ public class AuthTokenUseCase {
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
     boolean isComplete = Objects.equals(SignupStatus.COMPLETED, user.getStatus());
 
-    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refresh, 30, TimeUnit.DAYS);
+    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refresh, 1, TimeUnit.HOURS);
     return new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), access, refresh, isComplete);
   }
 
@@ -74,7 +74,7 @@ public class AuthTokenUseCase {
         .orElseThrow(() -> new RingoException("유저를 찾을 수 없습니다.", ErrorCode.BAD_REQUEST));
     String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
-    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refresh, 30, TimeUnit.DAYS);
+    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refresh, 1, TimeUnit.HOURS);
     return new RegenerateTokenResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refresh);
   }
 }

@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.notification.application;
 
 import com.lingo.lingoproject.matching.domain.event.MatchingRequestedEvent;
+import com.lingo.lingoproject.shared.domain.model.NotificationType;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,16 @@ public class MatchingRequestedEventHandler {
   public void handle(MatchingRequestedEvent event) {
     log.info("MatchingRequestedEvent 수신: matchingId={}, requestUser={}, requestedUser={}",
         event.getMatchingId(), event.getRequestUserId(), event.getRequestedUserId());
-    User requestedUser = userQueryUseCase.유저_찾기_혹은_오류(event.getRequestedUserId());
-    //fcmNotificationUseCase.sendFcmNotification(requestedUser, "누군가 매칭 요청을 했어요!", null, NotificationType.MATCHING_REQUEST);
+    User 매칭_요청_유저 = userQueryUseCase.유저_찾기_혹은_오류(event.getRequestUserId());
+    User 매칭_수신_유저 = userQueryUseCase.유저_찾기_혹은_오류(event.getRequestedUserId());
+    fcmNotificationUseCase.sendFcmNotification(
+        매칭_수신_유저,
+        매칭_요청_유저.getProfile() != null ? 매칭_요청_유저.getProfile().getImageUrl() : null,
+        매칭_요청_유저.getNickname() + "(이)가 매칭 요청을 했어요!",
+        null,
+        NotificationType.MATCHING_REQUEST,
+        "/(tabs)/like",
+        null
+    );
   }
 }

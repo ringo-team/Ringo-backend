@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.shared.utils;
 
+import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
 import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

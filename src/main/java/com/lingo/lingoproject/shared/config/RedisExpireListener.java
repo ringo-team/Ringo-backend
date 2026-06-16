@@ -3,12 +3,14 @@ package com.lingo.lingoproject.shared.config;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.domain.model.UserActivityLog;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserActivityLogRepository;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -47,11 +49,14 @@ public class RedisExpireListener implements MessageListener {
 
   private final UserQueryUseCase userQueryUseCase;
   private final UserActivityLogRepository userActivityLogRepository;
+  private final RedisTemplate<String, Object> redisTemplate;
 
   public RedisExpireListener(UserQueryUseCase userQueryUseCase,
-      UserActivityLogRepository userActivityLogRepository) {
+      UserActivityLogRepository userActivityLogRepository,
+      RedisTemplate<String, Object> redisTemplate) {
     this.userQueryUseCase = userQueryUseCase;
     this.userActivityLogRepository = userActivityLogRepository;
+    this.redisTemplate = redisTemplate;
   }
 
   /**
@@ -66,24 +71,27 @@ public class RedisExpireListener implements MessageListener {
     String expiredKey = message.toString();
 
     // 유저 앱 활동 추적 키만 처리 (다른 키의 만료 이벤트는 무시)
-    if (expiredKey.startsWith("connect-app::")){
+    if (expiredKey.startsWith(RedisKey.접속_유저_레디스_키)){
       // 키 형식: "connect-app::{userId}::{LocalDateTime}"
       String[] parts = expiredKey.split("::");
 
       Long userId = Long.parseLong(parts[1]);
 
+      Object time = redisTemplate.opsForValue().get(RedisKey.접속_시간_레디스_키 + userId);
+      if (time == null) return;
+
       User user = userQueryUseCase.유저_찾기_혹은_오류(userId);
 
       // 활동 시작 시간: 키 생성 시 함께 저장한 LocalDateTime
-      LocalDateTime startTime = LocalDateTime.parse(parts[2]);
+      LocalDateTime startTime = LocalDateTime.parse(time.toString());
       // 활동 종료 시간: 만료 시점 기준 29분 전 (30분 TTL 근사값)
-      LocalDateTime endTime = LocalDateTime.now().minusMinutes(29);
+      LocalDateTime endTime = LocalDateTime.now().minusMinutes(4);
 
       long minutes = ChronoUnit.MINUTES.between(startTime, endTime);
 
       log.info("step=유저_활동_기록, userId={}, minutes={}", userId, minutes);
 
-      userActivityLogRepository.save(UserActivityLog.of(user, startTime, endTime,(int) minutes));
+      userActivityLogRepository.save(UserActivityLog.of(user.getId(), startTime, endTime,(int) minutes));
     }
 
   }

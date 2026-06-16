@@ -1,5 +1,7 @@
 package com.lingo.lingoproject.notification.application;
 
+import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidNotification;
 import com.google.firebase.messaging.ApnsConfig;
 import com.google.firebase.messaging.Aps;
 import com.google.firebase.messaging.FirebaseMessaging;
@@ -50,7 +52,9 @@ public class FcmNotificationUseCase {
       String senderImageUrl,
       String title,
       String body,
-      NotificationType type
+      NotificationType type,
+      String path,
+      String params
   ) {
 
     log.info("fcm message sending start");
@@ -77,12 +81,24 @@ public class FcmNotificationUseCase {
                 .setImage(senderImageUrl)
                 .build()
         )
-        .setApnsConfig(  // ✅ iOS용 APNs 설정 추가
+        .putData("screen", path)
+        .putData("params", params)
+        .setApnsConfig(
             ApnsConfig.builder()
                 .setAps(
                     Aps.builder()
                         .setSound("default")  // 알림음
                         .setBadge(1)          // 앱 뱃지
+                        .setMutableContent(true)
+                        .build()
+                )
+                .build()
+        )
+        .setAndroidConfig(
+            AndroidConfig.builder()
+                .setNotification(
+                    AndroidNotification.builder()
+                        .setChannelId("default")
                         .build()
                 )
                 .build()

@@ -38,7 +38,7 @@ public class GoogleLoginController {
     String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);
     boolean isComplete = Objects.equals(SignupStatus.COMPLETED, user.getStatus());
 
-    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refreshToken, 30, TimeUnit.DAYS);
+    redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refreshToken, 1, TimeUnit.HOURS);
 
     log.info("step=구글_로그인_콜백_완료, userId={}", user.getId());
     return ResponseEntity.ok(new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), accessToken, refreshToken, isComplete));

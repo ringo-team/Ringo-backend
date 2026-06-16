@@ -10,7 +10,8 @@ import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseD
 import com.lingo.lingoproject.community.presentation.dto.GetPostImageResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.InputStatusResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryRequestDto;
+import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.SaveParsedPlaceRequest;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SearchPlaceRequestDto;
@@ -49,15 +50,20 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.UserScrapPlaceRe
 import com.lingo.lingoproject.image.application.S3ImageStorageService;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import jakarta.transaction.Transactional;
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +77,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -119,6 +126,7 @@ public class CommunityService {
   private final RedisTemplate<String, Object> redisTemplate;
   private final MatchingPlaceUseCase matchingPlaceUseCase;
   private final RedisUtils redisUtils;
+  private final RestTemplate restTemplate;
 
   /**
    * 게시물을 생성한다.
@@ -286,7 +294,13 @@ public class CommunityService {
     Post post = findPostOrThrow(dto.postId());
     postRepository.increaseCommentCount(dto.postId());
     Comment savedComment = commentRepository.save(Comment.of(post, user, dto.content()));
-    eventPublisher.publish(new CommentCreatedEvent(savedComment.getId(), post.getId(), user.getId()));
+    eventPublisher.publish(new CommentCreatedEvent(
+        savedComment.getId(),
+        savedComment.getContent(),
+        post.getId(),
+        post.getAuthor(),
+        user)
+    );
     return new CommentResponseDto(savedComment.getId(), ErrorCode.SUCCESS.getCode());
   }
 
@@ -387,6 +401,13 @@ public class CommunityService {
     validateCreateSubComment(comment);
     postRepository.increaseCommentCount(comment.getPost().getId());
     Comment savedComment = commentRepository.save(Comment.of(comment.getPost(), comment, user, dto.content()));
+    eventPublisher.publish(new CommentCreatedEvent(
+        savedComment.getId(),
+        savedComment.getContent(),
+        comment.getPost().getId(),
+        comment.getUser(),
+        savedComment.getUser()
+    ));
     return savedComment.getId();
   }
 
@@ -550,32 +571,32 @@ public class CommunityService {
     return places;
   }
 
-  private Place buildPlaceFromRow(Row row) {
-    List<PlaceImage> images = List.of(
-        PlaceImage.builder()
-            .image(row.getCell(10).getStringCellValue().strip())
-            .build(),
-        PlaceImage.builder()
-            .image(row.getCell(11).getStringCellValue().strip())
-            .build(),
-        PlaceImage.builder()
-            .image(row.getCell(12).getStringCellValue().strip())
-            .build(),
-        PlaceImage.builder()
-            .image(row.getCell(13).getStringCellValue().strip())
-            .build()
-    );
+  private Place buildPlaceFromRow(Row row) throws Exception{
+    LocalDate today = LocalDate.now();
+    List<String> images = new ArrayList<>();
+    List<PlaceImage> imageObjectList = new ArrayList<>();
+    String image1 = row.getCell(9).getStringCellValue().strip();
+    String image2 = row.getCell(10).getStringCellValue().strip();
+    String image3 = row.getCell(11).getStringCellValue().strip();
+    String image4 = row.getCell(12).getStringCellValue().strip();
+    if (image1 != null && !image1.isBlank()) images.add(image1);
+    if (image2 != null && !image2.isBlank()) images.add(image2);
+    if (image3 != null && !image3.isBlank()) images.add(image3);
+    if (image4 != null && !image4.isBlank()) images.add(image4);
+    for (String image : images){
+      byte[] imageByte = restTemplate.getForObject(image, byte[].class);
+      String path = "/place/" + today.getYear() + "/" + today.getYear() + "-" + today.getMonthValue() + "/" + today + "/";
+      String filename = path + UUID.randomUUID() + "_image.jpg";
+      imageService.이미지_byte를_S3에_업로드(filename, "image/jpeg", imageByte);
+      String imageUrl = imageService.이미지_url_생성(filename);
+      PlaceImage imageObject = PlaceImage.builder().image(imageUrl).build();
+      imageObjectList.add(imageObject);
+    }
     return Place.builder()
         .name(row.getCell(1).getStringCellValue().strip())
-        .category(categoryMap.get(row.getCell(3).getStringCellValue().strip()))
         .phoneNumber(row.getCell(4).getStringCellValue().strip())
         .detailAddress(row.getCell(2).getStringCellValue().strip())
-        .description(null)
-        .keyword(modifyKeyword(row.getCell(9).getStringCellValue().strip()))
-        .images(images)
-        .city("성남시")
-        .district("분당구")
-        .neighbor("판교동")
+        .images(imageObjectList)
         .build();
   }
 
@@ -596,7 +617,7 @@ public class CommunityService {
   }
 
   private Place findPlaceOrThrow(Long placeId){
-    return placeRepository.findById(placeId)
+    return placeRepository.findByIdWithImages(placeId)
         .orElseThrow(() -> new RingoException("장소 id를 찾을 수 없습니다.", ErrorCode.BAD_REQUEST));
   }
 
@@ -604,31 +625,26 @@ public class CommunityService {
   public void scrapPlace(Long placeId, User user){
     Place place = findPlaceOrThrow(placeId);
     updatePlaceCache(placeId, user.getId());
+    if (userScrapPlaceRepository.existsByUserAndPlace(user, place)){
+      userScrapPlaceRepository.deleteByUserAndPlace(user, place);
+      return;
+    }
     UserScrapPlace scrap = UserScrapPlace.of(place, user);
     userScrapPlaceRepository.save(scrap);
   }
 
   private void updatePlaceCache(Long placeId, Long userId){
-    List<GetPlaceDetailResponseDto> individualCache = matchingPlaceUseCase.캐시된_장소_컨텐츠_조회("individual-place::", userId);
-    List<GetPlaceDetailResponseDto> randomCache = matchingPlaceUseCase.캐시된_장소_컨텐츠_조회("random-place::", userId);
+    List<GetPlaceDetailResponseDto> individualCache = matchingPlaceUseCase.캐시된_장소_컨텐츠_조회(RedisKey.개인_장소_추천_레디스_키, userId);
     for (GetPlaceDetailResponseDto place : individualCache){
       if (place.getId().equals(placeId)){
-        if (place.getIsScrap() == true) place.setIsScrap(false);
-        else place.setIsScrap(true);
+        place.setIsScrap(!place.getIsScrap());
       }
     }
-    redisUtils.cacheUntilMidnight("individual-place::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), individualCache));
-    for (GetPlaceDetailResponseDto place : randomCache){
-      if (place.getId().equals(placeId)){
-        if (place.getIsScrap() == true) place.setIsScrap(false);
-        else place.setIsScrap(true);
-      }
-    }
-    redisUtils.cacheUntilMidnight("random-place::" + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), randomCache));
+    redisUtils.cacheUntilMidnight(RedisKey.개인_장소_추천_레디스_키 + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), individualCache));
   }
 
   public List<GetPlaceDetailResponseDto> getScrappedPlace(User user){
-    List<Place> userScrapPlaces = userScrapPlaceRepository.findAllByUser(user)
+    List<Place> userScrapPlaces = userScrapPlaceRepository.findAllByUserWithImages(user)
         .stream()
         .map(UserScrapPlace::getPlace)
         .toList();
@@ -650,40 +666,51 @@ public class CommunityService {
     return place.createPlaceDetailDto(isScrap);
   }
 
-  public PlaceSummaryRequestDto getPlaceSummary(Long placeId){
+  public PlaceSummaryResponseDto getPlaceSummary(Long placeId){
     Place place = placeRepository.findById(placeId).orElse(null);
-    if (place == null) return new PlaceSummaryRequestDto(null, null);
-    return new PlaceSummaryRequestDto(place.getName(), place.getDetailAddress());
+    List<PlaceImage> images = placeImageRepository.findAllByPlace(place);
+    if (place == null) return null;
+    return PlaceSummaryResponseDto.builder()
+        .name(place.getName())
+        .address(place.getDetailAddress())
+        .district(place.getDistrict())
+        .neighbor(place.getNeighbor())
+        .addressCategory(place.getAddressCategory())
+        .addressSubcategory(place.getAddressSubcategory())
+        .category(place.getCategory() != null ? place.getCategory().toString() : null)
+        .imageUrls(images.stream().map(PlaceImage::getImage).toList())
+        .keyword(place.getKeyword() != null ? Arrays.stream(place.getKeyword().split(",")).map(String::strip).toList() : null)
+        .type(place.getType())
+        .build();
   }
 
   @Transactional
   public void updatePlace(UpdatePlaceRequestDto dto){
     Place place = placeRepository.findById(dto.id()).orElse(null);
     if (place == null) return;
-    if (dto.modifiedName() != null && !dto.modifiedName().isBlank()){
-      place.setName(dto.modifiedName());
-    }
+    if (dto.modifiedName() != null && !dto.modifiedName().isBlank()) place.setName(dto.modifiedName());
     place.setCity("서울");
-    place.setDistrict(dto.sigungu());
-    place.setNeighbor(dto.dong());
-    place.setKeyword(String.join(", ", dto.keywords()));
-    place.setAddressCategory(dto.hotplaceCategory());
-    place.setAddressSubcategory(dto.hotplaceSubCategory());
-    place.setType(dto.type());
+    if (dto.sigungu() != null && !dto.sigungu().isBlank()) place.setDistrict(dto.sigungu());
+    if (dto.dong() != null && !dto.dong().isBlank()) place.setNeighbor(dto.dong());
+    if (dto.keywords() != null && dto.keywords().length != 0) place.setKeyword(String.join(", ", dto.keywords()));
+    if (dto.hotplaceCategory() != null && !dto.hotplaceCategory().isBlank()) place.setAddressCategory(dto.hotplaceCategory());
+    if (dto.hotplaceSubCategory() != null && !dto.hotplaceSubCategory().isBlank()) place.setAddressSubcategory(dto.hotplaceSubCategory());
+    if (dto.type() != null && !dto.type().isBlank()) place.setType(dto.type());
+    if (dto.category() != null && !dto.category().isBlank()) place.setCategory(PostCategory.valueOf(dto.category()));
     placeRepository.save(place);
   }
 
   private final Map<String, int[]> userRanges = new LinkedHashMap<>() {{
-    put("정재윤", new int[]{1339, 1473});
-    put("박주성", new int[]{1474, 1607});
-    put("유효선", new int[]{1608, 1741});
-    put("권가은", new int[]{1742, 1875});
-    put("주민재", new int[]{1876, 2007});
+    put("정재윤", new int[]{2008, 2128});
+    put("박주성", new int[]{2129, 2248});
+    put("유효선", new int[]{2249, 2368});
+    put("권가은", new int[]{2369, 2488});
+    put("주민재", new int[]{2489, 2612});
   }};
 
   public Map<String, InputStatusResponseDto> getInputStatus() {
     Map<String, InputStatusResponseDto> result = new HashMap<>();
-    Map<Long, Place> places = placeRepository.findAll()
+    Map<Long, Place> places = placeRepository.findAllPlaces()
         .stream()
         .collect(Collectors.toMap(Place::getId, Function.identity()));
 
@@ -695,6 +722,7 @@ public class CommunityService {
 
       for (long i = range[0]; i <= range[1]; i++) {
         Place place = places.get(i);
+        if (place == null) continue;
         if (place.getAddressCategory() != null &&
             !place.getAddressCategory().isBlank()) {
           count++;
@@ -707,6 +735,35 @@ public class CommunityService {
     }
 
     return result;
+  }
+
+  public void updatePlaceDetail(List<SaveParsedPlaceRequest> requests) {
+    Map<Long, SaveParsedPlaceRequest> map = requests.stream()
+        .filter(s -> Objects.nonNull(s.id()))
+        .collect(Collectors.toMap(
+            SaveParsedPlaceRequest::id,
+            Function.identity()
+        ));
+    List<Place> result = placeRepository.findAll()
+        .stream()
+        .peek(p ->{
+          SaveParsedPlaceRequest r = map.get(p.getId());
+          if (r == null) {
+            log.info(p.getName());
+            return;
+          }
+          if (p.getAddressSubcategory() == null || p.getAddressSubcategory().isBlank())
+            log.info("null ----> {}", r.address_subcategory());
+          p.setCity(r.city());
+          p.setDistrict(r.district());
+          p.setKeyword(r.keyword());
+          p.setName(r.name());
+          p.setNeighbor(r.neighbor());
+          p.setType(r.type());
+          p.setAddressCategory(r.address_category());
+          p.setAddressSubcategory(r.address_subcategory());
+        }).toList();
+    placeRepository.saveAll(result);
   }
 
 }

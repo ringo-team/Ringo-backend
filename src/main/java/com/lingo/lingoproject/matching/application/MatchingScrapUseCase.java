@@ -1,13 +1,18 @@
 package com.lingo.lingoproject.matching.application;
 
+import com.lingo.lingoproject.matching.domain.event.UserScrapEvent;
 import com.lingo.lingoproject.matching.presentation.dto.GetScrappedUserResponseDto;
 import com.lingo.lingoproject.matching.presentation.dto.GetUserProfileResponseDto;
+import com.lingo.lingoproject.shared.domain.event.DomainEventPublisher;
 import com.lingo.lingoproject.shared.domain.model.FaceVerify;
 import com.lingo.lingoproject.shared.domain.model.Profile;
+import com.lingo.lingoproject.shared.domain.model.ScrapStatus;
 import com.lingo.lingoproject.shared.domain.model.ScrappedUser;
 import com.lingo.lingoproject.shared.domain.model.User;
+import com.lingo.lingoproject.shared.domain.model.UserScrapLog;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ScrappedUserRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.UserScrapLogRepository;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.RedisKey;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
@@ -28,59 +33,31 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MatchingScrapUseCase {
 
-  private final MatchingRecommendationUseCase matchingRecommendationUseCase;
   private final ScrappedUserRepository scrappedUserRepository;
   private final UserQueryUseCase userQueryUseCase;
-  private final RedisUtils redisUtils;
+  private final DomainEventPublisher domainEventPublisher;
+  private final UserScrapLogRepository userScrapLogRepository;
 
 
   @Transactional
   public void scrapUser(Long recommendedUserId, User user) {
-    Long userId = user.getId();
-
-    List<GetUserProfileResponseDto> cumulativeCachedProfile = matchingRecommendationUseCase.캐시된_누적_설문_기반_추천_프로필_조회(user);
-    updateScrapCache(cumulativeCachedProfile, userId, recommendedUserId, RedisKey.누적_설문_기반_추천_프로필_캐시_키);
-    List<Long> cumulativeRecommendedIds = extractIdFromProfileDtos(cumulativeCachedProfile);
-    log.info("step=스크랩_누적설문_추천목록, recommendedIds={}", cumulativeRecommendedIds);
-
-
-    List<GetUserProfileResponseDto> dailyCachedProfile = matchingRecommendationUseCase.캐시된_일일_설문_기반_추천_프로필_조회(user);
-    updateScrapCache(dailyCachedProfile, userId, recommendedUserId, RedisKey.일일_설문_기반_추천_캐시_레디스_키);
-    List<Long> dailyRecommendedIds = extractIdFromProfileDtos(dailyCachedProfile);
-    log.info("step=스크랩_일일설문_추천목록, recommendedIds={}", dailyRecommendedIds);
-
-    List<Long> allUserIds = new ArrayList<>();
-    allUserIds.addAll(cumulativeRecommendedIds);
-    allUserIds.addAll(dailyRecommendedIds);
-
-    if (!allUserIds.contains(recommendedUserId)){
-      log.warn("추천되지 않은 유저는 스크랩할 수 없습니다.");
-      return;
-    }
-
     User recommendedUser = userQueryUseCase.유저_찾기_혹은_오류(recommendedUserId);
 
+    UserScrapLog scraplog = UserScrapLog.builder()
+        .user(user)
+        .scrappedUser(recommendedUser)
+        .build();
+
     if (scrappedUserRepository.existsByUserAndScrappedUser(user, recommendedUser)) {
+      scraplog.setStatus(ScrapStatus.CANCEL);
       scrappedUserRepository.deleteByUserAndScrappedUser(user, recommendedUser);
+      userScrapLogRepository.save(scraplog);
       return;
     }
+    scraplog.setStatus(ScrapStatus.SCRAP);
     scrappedUserRepository.save(ScrappedUser.of(user, recommendedUser));
-  }
-
-  private void updateScrapCache(
-      List<GetUserProfileResponseDto> profiles,
-      Long userId,
-      Long recommendedUserId,
-      String keyPrefix
-  ){
-    for (GetUserProfileResponseDto profile : profiles){
-      if(profile.getUserId().equals(recommendedUserId)){
-        if (profile.getIsScrap() == true) profile.setIsScrap(false);
-        else profile.setIsScrap(true);
-        break;
-      }
-    }
-    redisUtils.cacheUntilMidnight(keyPrefix + userId, new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), profiles));
+    userScrapLogRepository.save(scraplog);
+    domainEventPublisher.publish(new UserScrapEvent(user, recommendedUser));
   }
 
   public List<GetScrappedUserResponseDto> getScrappedUsers(User user) {
@@ -93,18 +70,10 @@ public class MatchingScrapUseCase {
               scrappedUser.getId(),
               scrappedUser.getNickname(),
               LocalDate.now().getYear() - scrappedUser.getBirthday().getYear(),
-              profile.getImageUrl(),
-              FaceVerify.PASS == profile.getFaceVerify() ? 1 : 0
+              profile != null ? profile.getImageUrl() : null,
+              profile != null ? (FaceVerify.PASS == profile.getFaceVerify() ? 1 : 0) : 0
           );
         })
-        .toList();
-  }
-
-  private List<Long> extractIdFromProfileDtos(List<GetUserProfileResponseDto> profiles) {
-    return Optional.ofNullable(profiles)
-        .orElseGet(Collections::emptyList)
-        .stream()
-        .map(GetUserProfileResponseDto::getUserId)
         .toList();
   }
 }

@@ -96,7 +96,7 @@ public interface ChatApi {
    * 클라이언트가 메세지를 보낼 경로(/app/{roomId})를 적는다.
    * prefix인 app이 빠져있음
    */
-  @MessageMapping("/{roomId}")
+  @MessageMapping("/{채팅방_id}")
   void sendMessage(@DestinationVariable Long roomId, GetChatMessageResponseDto chatMessageDto);
 
   @Operation(summary = "약속잡기", description = "채팅방에서 유저들의 약속 잡기")

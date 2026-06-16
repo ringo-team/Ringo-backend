@@ -1,4 +1,4 @@
-package com.lingo.lingoproject.user.application;
+package com.lingo.lingoproject.user.presentation.dto;
 
 public record KakaoValidationRequest(
     String providerId,

@@ -9,7 +9,8 @@ import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseD
 import com.lingo.lingoproject.community.presentation.dto.GetPlaceResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.InputStatusResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryRequestDto;
+import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryResponseDto;
+import com.lingo.lingoproject.community.presentation.dto.SaveParsedPlaceRequest;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.ScrapPlaceRequestDto;
@@ -20,6 +21,7 @@ import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
 import com.lingo.lingoproject.matching.application.MatchingPlaceUseCase;
+import com.lingo.lingoproject.matching.presentation.dto.GetTypePlaceRequestDto;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
@@ -30,6 +32,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -165,11 +169,17 @@ public class CommunityController implements CommunityApi {
   @Override
   public ResponseEntity<GetPlaceResponseDto> getIndividualRecommendationPlaces(User user){
     List<GetPlaceDetailResponseDto> individual = matchingPlaceUseCase.getIndividualUserPlaces(user);
-    List<GetPlaceDetailResponseDto> common = matchingPlaceUseCase.랜덤으로_장소_컨텐츠_조회(user);
+    List<GetTypePlaceRequestDto> common = matchingPlaceUseCase.주제별_장소_컨텐츠_추천(user);
 
     GetPlaceResponseDto response = new GetPlaceResponseDto(individual, common, ErrorCode.SUCCESS.getCode());
 
     return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
+  public ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getMatchedRecommendationPlaces(User user, Long userId) {
+    List<GetPlaceDetailResponseDto> result = matchingPlaceUseCase.매칭된_커플을_위한_장소_컨텐츠_추천(user, userId);
+    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result));
   }
 
   @Override
@@ -213,8 +223,8 @@ public class CommunityController implements CommunityApi {
   }
 
   @Override
-  public ResponseEntity<PlaceSummaryRequestDto> getPlaceSummary(Long placeId) {
-    PlaceSummaryRequestDto response = communityService.getPlaceSummary(placeId);
+  public ResponseEntity<PlaceSummaryResponseDto> getPlaceSummary(Long placeId) {
+    PlaceSummaryResponseDto response = communityService.getPlaceSummary(placeId);
     return ResponseEntity.status(HttpStatus.OK).body(response);
   }
 
@@ -228,5 +238,11 @@ public class CommunityController implements CommunityApi {
   public ResponseEntity<Map<String, InputStatusResponseDto>> getPlaceInputStatus() {
     Map<String, InputStatusResponseDto> response = communityService.getInputStatus();
     return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @PostMapping("/api/place")
+  public ResponseEntity<?> saveParsedExcelData(@RequestBody List<SaveParsedPlaceRequest> dto){
+    communityService.updatePlaceDetail(dto);
+    return ResponseEntity.status(HttpStatus.OK).body("yes");
   }
 }

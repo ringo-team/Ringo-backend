@@ -11,12 +11,20 @@ public class ChatNotificationEvent extends DomainEvent {
   private User sender;
   private String message;
   private String imageUrl;
+  private Long roomId;
 
-  public ChatNotificationEvent(User user, User sender, String message, String imageUrl){
+  public ChatNotificationEvent(
+      User user,
+      User sender,
+      String message,
+      String imageUrl,
+      Long roomId
+  ){
     super(DomainEventType.CHAT);
     this.member = user;
     this.sender = sender;
     this.message = message;
     this.imageUrl = imageUrl;
+    this.roomId = roomId;
   }
 }

@@ -2,14 +2,15 @@ package com.lingo.lingoproject.chat.presentation.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public record SaveAppointmentRequestDto(
     @Schema(example = "1", description = "약속을 잡으려는 유저의 id")
-    @NotBlank
+    @NotNull
     Long registerId,
 
     @Schema(example = "1", description = "채팅방 id")
-    @NotBlank
+    @NotNull
     Long chatroomId,
 
     @Schema(example = "00포차", description = "약속 장소")
@@ -25,7 +26,7 @@ public record SaveAppointmentRequestDto(
     String alertTime,
 
     @Schema(example = "1", description = "1이면 알림가도록, 아니면 0")
-    @NotBlank
+    @NotNull
     Integer isAlert
 ) {
 

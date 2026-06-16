@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -56,7 +57,7 @@ public class RingoRepositoryTest {
     placeImageRepository.saveAll(images);
   }
 
-  public String getUrl(PlaceImage image, String path){
+  public String getUrl(PlaceImage image, String path) {
     try {
       byte[] imageByte = restTemplate.getForObject(image.getImage(), byte[].class);
       String filename = path + UUID.randomUUID() + "_image.jpg";
@@ -67,6 +68,10 @@ public class RingoRepositoryTest {
     }
   }
 
+  @Test
+  public void deleteElasticCache(){
+    placeSearchRepository.deleteAll();
+  }
 
   @Test
   public void getSuspendedUserTest(){

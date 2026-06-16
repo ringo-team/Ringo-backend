@@ -9,7 +9,7 @@ import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseD
 import com.lingo.lingoproject.community.presentation.dto.GetPlaceResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.InputStatusResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryRequestDto;
+import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
 import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
 import com.lingo.lingoproject.community.presentation.dto.ScrapPlaceRequestDto;
@@ -23,7 +23,6 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -182,6 +181,9 @@ public interface CommunityApi {
   @GetMapping(value = "/places")
   ResponseEntity<GetPlaceResponseDto> getIndividualRecommendationPlaces(@AuthenticationPrincipal User user);
 
+  @GetMapping(value = "/places/match")
+  ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getMatchedRecommendationPlaces(@AuthenticationPrincipal User user, @RequestParam(value = "userId") Long userId);
+
   @GetMapping(value = "/places/rank")
   ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getRankedPagedPlaces(@AuthenticationPrincipal User user, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
 
@@ -201,7 +203,7 @@ public interface CommunityApi {
   ResponseEntity<ApiListResponseDto<SearchPlaceRequestDto>> searchPlacesByKeywords(@RequestParam String keyword);
 
   @GetMapping(value = "/api/restaurants/{place-id}")
-  ResponseEntity<PlaceSummaryRequestDto> getPlaceSummary(@PathVariable(value = "place-id") Long placeId);
+  ResponseEntity<PlaceSummaryResponseDto> getPlaceSummary(@PathVariable(value = "place-id") Long placeId);
 
   @PostMapping(value = "/api/restaurants/{place-id}")
   ResponseEntity<ResultMessageResponseDto> updatePlace(@PathVariable(value = "place-id") Long placeId, @RequestBody UpdatePlaceRequestDto dto);

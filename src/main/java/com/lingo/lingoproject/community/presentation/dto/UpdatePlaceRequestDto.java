@@ -8,7 +8,8 @@ public record UpdatePlaceRequestDto(
     String hotplaceCategory,
     String hotplaceSubCategory,
     String[] keywords,
-    String type
+    String type,
+    String category
 ) {
 
 }

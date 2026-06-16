@@ -29,6 +29,9 @@ public class Message {
         .content(messageDto.getContent())
         .readerIds(messageDto.getReaderIds())
         .createdAt(LocalDateTime.now())
+        .place(messageDto.getPlace())
+        .appointmentTime(messageDto.getAppointmentTime())
+        .type(messageDto.getType())
         .build();
   }
 
@@ -44,4 +47,10 @@ public class Message {
   private String content;
 
   private LocalDateTime createdAt;
+
+  private String place;
+
+  private String appointmentTime;
+
+  private String type;
 }

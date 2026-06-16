@@ -3,8 +3,8 @@ package com.lingo.lingoproject.shared.utils;
 import com.lingo.lingoproject.user.presentation.dto.auth.DecryptKeyObject;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
-import com.lingo.lingoproject.matching.presentation.dto.GetUserProfileResponseDto;
 import com.lingo.lingoproject.survey.presentation.dto.GetSurveyResponseDto;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -73,10 +73,11 @@ public class RedisUtils {
    * @param key 유저 ID (문자열)
    * @return 캐시된 추천 유저 목록 (없으면 null)
    */
-  public List<GetUserProfileResponseDto> 캐시된_누적_설문_기반_추천_프로필_조회(String key){
+  public List<Long> 캐시된_누적_설문_기반_추천_프로필_조회(String key){
     try {
 
-      ApiListResponseDto<GetUserProfileResponseDto> savedRecommendUserList = (ApiListResponseDto<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend::" + key);
+      ApiListResponseDto<Long> savedRecommendUserList =
+          (ApiListResponseDto<Long>) redisTemplate.opsForValue().get(RedisKey.누적_설문_기반_추천_레디스_키 + key);
       return savedRecommendUserList != null ? savedRecommendUserList.getList() : null;
 
     } catch (Exception e) {
@@ -92,10 +93,11 @@ public class RedisUtils {
    * @param key 유저 ID (문자열)
    * @return 캐시된 추천 유저 목록 (없으면 null)
    */
-  public List<GetUserProfileResponseDto> 캐시된_일일_설문_기반_추천_프로필_조회(String key){
+  public List<Long> 캐시된_일일_설문_기반_추천_프로필_조회(String key){
     try {
 
-      ApiListResponseDto<GetUserProfileResponseDto> savedRecommendUserList = (ApiListResponseDto<GetUserProfileResponseDto>) redisTemplate.opsForValue().get("recommend-for-daily-survey::" + key);
+      ApiListResponseDto<Long> savedRecommendUserList =
+          (ApiListResponseDto<Long>) redisTemplate.opsForValue().get(RedisKey.일일_설문_기반_추천_레디스_키 + key);
       return savedRecommendUserList != null ? savedRecommendUserList.getList() : null;
 
     } catch (Exception e) {
@@ -114,7 +116,8 @@ public class RedisUtils {
   public List<GetSurveyResponseDto> getUserDailySurvey(String key){
     try {
 
-      ApiListResponseDto<GetSurveyResponseDto> savedUserDailySurveyList = (ApiListResponseDto<GetSurveyResponseDto>) redisTemplate.opsForValue().get("dailySurvey::" + key);
+      ApiListResponseDto<GetSurveyResponseDto> savedUserDailySurveyList =
+          (ApiListResponseDto<GetSurveyResponseDto>) redisTemplate.opsForValue().get(RedisKey.일일_설문_조회_레디스_키 + key);
       return savedUserDailySurveyList != null ? savedUserDailySurveyList.getList() : null;
 
     }catch (Exception e){
@@ -144,7 +147,8 @@ public class RedisUtils {
     log.info("{} 값 caching 유지 기간: {} 까지", value, expireAt);
 
     // 캐시 저장 + 만료 시각 지정
-    redisTemplate.opsForValue().set(key, value);
-    redisTemplate.expireAt(key, expireAt);
+    Duration ttl = Duration.between(Instant.now(), expireAt);
+
+    redisTemplate.opsForValue().set(key, value, ttl);
   }
 }

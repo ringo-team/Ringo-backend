@@ -2,20 +2,26 @@ package com.lingo.lingoproject.matching.application;
 
 import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
 import com.lingo.lingoproject.matching.domain.service.RecommendationDomainService;
+import com.lingo.lingoproject.matching.presentation.dto.GetTypePlaceRequestDto;
 import com.lingo.lingoproject.shared.domain.elastic.PlaceDocument;
 import com.lingo.lingoproject.shared.domain.model.AnsweredSurvey;
 import com.lingo.lingoproject.shared.domain.model.Keyword;
 import com.lingo.lingoproject.shared.domain.model.Place;
+import com.lingo.lingoproject.shared.domain.model.PlaceType;
+import com.lingo.lingoproject.shared.domain.model.PlaceTypeEntity;
 import com.lingo.lingoproject.shared.domain.model.Survey;
 import com.lingo.lingoproject.shared.domain.model.User;
+import com.lingo.lingoproject.shared.domain.model.UserScrapPlace;
 import com.lingo.lingoproject.shared.infrastructure.elastic.PlaceSearchRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.AnsweredSurveyRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.KeywordRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceRepository;
+import com.lingo.lingoproject.shared.infrastructure.persistence.PlaceTypeRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.SurveyRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserScrapPlaceRepository;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import java.util.ArrayList;
@@ -29,6 +35,7 @@ import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -52,6 +59,9 @@ public class MatchingPlaceUseCase {
 
   private static final List<Integer> 키워드_순서에_따른_장소_컨텐츠_선정_개수 = List.of(7, 4, 3, 2, 1);
   private static final List<Integer> 높은_응답_리스트 = List.of(3, 4, 5);
+  private static final int 최대_추천_크기 = 5;
+  private final PlaceTypeRepository placeTypeRepository;
+  private final MatchQueryUseCase matchQueryUseCase;
 
   public List<String> getMatchReasons(Long user1, Long user2) {
     List<AnswerWeightPair> pairs = 설문_응답쌍과_연관_가중치_조회(user1, user2);
@@ -71,11 +81,13 @@ public class MatchingPlaceUseCase {
         .toList();
   }
 
-  public List<GetPlaceDetailResponseDto> 매칭된_커플을_위한_장소_컨텐츠_추천(User user, Long user1, Long user2) {
-    List<String> keywords = 주요_매칭_키워드_조회(user1, user2);
+  public List<GetPlaceDetailResponseDto> 매칭된_커플을_위한_장소_컨텐츠_추천(User user1, Long matchedUserId) {
+    User user2 = userQueryUseCase.유저_찾기_혹은_오류(matchedUserId);
+    matchQueryUseCase.매칭된_유저들인지_검증(user1, user2);
+    List<String> keywords = 주요_매칭_키워드_조회(user1.getId(), user2.getId());
     List<Place> places = 키워드_기반_장소_컨텐츠_조회(keywords);
     if (places.size() < 5) places = 추천_장소가_너무_적을경우_링고_추천_장소_조회();
-    return 장소_컨텐츠_상세_정보_생성(places, user);
+    return 장소_컨텐츠_상세_정보_생성(places, user1);
   }
 
   @Scheduled(cron = "0 30 0 * * *")
@@ -84,7 +96,7 @@ public class MatchingPlaceUseCase {
   }
 
   public List<GetPlaceDetailResponseDto> getIndividualUserPlaces(User user) {
-    String cacheKey = "individual-place::";
+    String cacheKey = RedisKey.개인_장소_추천_레디스_키;
     List<GetPlaceDetailResponseDto> cached = 캐시된_장소_컨텐츠_조회(cacheKey, user.getId());
     if (cached != null) return cached;
 
@@ -95,23 +107,42 @@ public class MatchingPlaceUseCase {
     return 상세정보;
   }
 
-  public List<GetPlaceDetailResponseDto> 랜덤으로_장소_컨텐츠_조회(User user) {
-    String cacheKey = "random-place::";
-    List<GetPlaceDetailResponseDto> cached = 캐시된_장소_컨텐츠_조회(cacheKey, user.getId());
-    if (cached != null) return cached;
+  public List<GetTypePlaceRequestDto> 주제별_장소_컨텐츠_추천(User 유저){
 
-    List<Place> places = placeRepository.findAllByTypeNotNull();
-    Collections.shuffle(places);
-    List<GetPlaceDetailResponseDto> result = 장소_컨텐츠_상세_정보_생성(
-        places.subList(0, Math.min(places.size(), 50)), user
-    );
-    장소_컨텐츠_cache(cacheKey, user.getId(), result);
-    return result;
+    List<PlaceTypeEntity> 타입_리스트 = placeTypeRepository.findAll();
+    if (타입_리스트.size() < 2) return null;
+
+    PlaceType 타입1 = 타입_리스트.get(0).getType();
+    PlaceType 타입2 = 타입_리스트.get(1).getType();
+
+    List<GetPlaceDetailResponseDto> 타입1_장소_정보 = 타입_기반_장소_컨텐츠_추천(타입1.toString(), 유저);
+    List<GetPlaceDetailResponseDto> 타입2_장소_정보 = 타입_기반_장소_컨텐츠_추천(타입2.toString(), 유저);
+
+    타입1_장소_정보 = 타입1_장소_정보.subList(0, Math.min(최대_추천_크기, 타입1_장소_정보.size()));
+    타입2_장소_정보 = 타입2_장소_정보.subList(0, Math.min(최대_추천_크기, 타입2_장소_정보.size()));
+
+    GetTypePlaceRequestDto dto1 = new GetTypePlaceRequestDto(타입1.getDescription(), 타입1_장소_정보);
+    GetTypePlaceRequestDto dto2 = new GetTypePlaceRequestDto(타입2.getDescription(), 타입2_장소_정보);
+
+    return List.of(dto1, dto2);
+  }
+
+  public List<GetPlaceDetailResponseDto> 타입_기반_장소_컨텐츠_추천(String 타입, User 유저){
+    List<Place> 장소_리스트 = placeRepository.findAllByTypeWithImages(타입)
+        .stream()
+        .sorted((a, b) -> Math.toIntExact(b.getClickCount() - a.getClickCount()))
+        .toList();
+    return 장소_컨텐츠_상세_정보_생성(장소_리스트, 유저);
   }
 
   public List<GetPlaceDetailResponseDto> getRankedPagedPlaces(User user, int page, int size) {
-    List<Place> places = placeRepository.findAll(PageRequest.of(page, size)).getContent();
-    return 장소_컨텐츠_상세_정보_생성(places, user);
+    Page<Long> placeIds = placeRepository.findPlaceIdOrderByClickCount(PageRequest.of(page, size));
+
+    List<Place> places = placeRepository.findPlaceByIdsWithImages(placeIds.stream().toList());
+    Map<Long, Place> placeIdMap = places.stream().collect(Collectors.toMap(Place::getId, Function.identity()));
+    List<Place> result = placeIds.stream().map(placeIdMap::get).toList();
+
+    return 장소_컨텐츠_상세_정보_생성(result, user);
   }
 
   public List<String> 주요_매칭_키워드_조회(Long user1, Long user2) {
@@ -181,16 +212,17 @@ public class MatchingPlaceUseCase {
   }
 
   public List<GetPlaceDetailResponseDto> 장소_컨텐츠_상세_정보_생성(List<Place> places, User user) {
-    Set<Long> 스크랩된_장소_ids = userScrapPlaceRepository.findAllByUser(user).stream()
-        .map(scrap -> scrap.getPlace().getId())
+    Set<Long> 스크랩된_장소_ids = userScrapPlaceRepository.findAllByUserWithImages(user).stream()
+        .map(UserScrapPlace::getPlace)
+        .map(Place::getId)
         .collect(Collectors.toSet());
     return places.stream()
         .map(place -> place.createPlaceDetailDto(스크랩된_장소_ids.contains(place.getId())))
         .toList();
   }
 
-  private void 개인화된_장소_컨텐츠_응답_dto_생성_및_cache(User user) {
-    String key = "individual-place::";
+  void 개인화된_장소_컨텐츠_응답_dto_생성_및_cache(User user) {
+    String key = RedisKey.개인_장소_추천_레디스_키;
     List<String> keywords = 유저_설문_기반_키워드_추출(user);
     List<Place> places = 키워드_기반_장소_컨텐츠_조회(keywords);
     if (places.size() < 5) places = 추천_장소가_너무_적을경우_링고_추천_장소_조회();
@@ -213,11 +245,11 @@ public class MatchingPlaceUseCase {
   private List<Place> 키워드가_포함된_장소_검색(String 키워드){
     List<Long> placeIds = placeSearchRepository.findAllByKeywordContaining(키워드)
         .stream().map(PlaceDocument::getId).toList();
-    return placeRepository.findAllByIdIn(placeIds);
+    return placeRepository.findAllByIdInWithImages(placeIds);
   }
 
   private List<Place> 추천_장소가_너무_적을경우_링고_추천_장소_조회() {
-    List<Place> places = placeRepository.findAllByType("RINGO");
+    List<Place> places = placeRepository.findAllByTypeWithImages("RINGO");
     Collections.shuffle(places);
     return places.subList(0, Math.min(places.size(), 10));
   }
@@ -243,7 +275,7 @@ public class MatchingPlaceUseCase {
     if (redisTemplate.hasKey(key + userId)) {
       return ((ApiListResponseDto<GetPlaceDetailResponseDto>) redisTemplate.opsForValue().get(key + userId)).getList();
     }
-    return null;
+    return new ArrayList<>();
   }
 
   private void 장소_컨텐츠_cache(String key, Long userId, List<GetPlaceDetailResponseDto> list) {

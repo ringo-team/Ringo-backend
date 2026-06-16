@@ -163,6 +163,6 @@ public interface MatchingApi {
       @AuthenticationPrincipal User user
   );
 
-  @PatchMapping("/users/click")
-  ResponseEntity<ResultMessageResponseDto> updateProfileClickCount(@AuthenticationPrincipal User user);
+  @PatchMapping("/users/{user-id}/click")
+  ResponseEntity<ResultMessageResponseDto> updateProfileClickCount(@PathVariable(value = "user-id") Long userId, @AuthenticationPrincipal User user);
 }

@@ -5,7 +5,6 @@ import com.lingo.lingoproject.shared.domain.model.MemberShipType;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.infrastructure.persistence.MemberShipLogRepository;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;

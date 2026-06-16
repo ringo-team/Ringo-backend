@@ -20,5 +20,9 @@ public enum DomainEventType {
   POST_CREATED,
   COMMENT_CREATED,
 
-  CHAT
+  CHAT,
+
+  PROFILE_CLICK,
+
+  USER_SCRAP
 }

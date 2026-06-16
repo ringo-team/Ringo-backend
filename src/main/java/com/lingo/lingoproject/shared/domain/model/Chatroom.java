@@ -108,7 +108,7 @@ public class Chatroom {
     );
   }
 
-  public List<User> getNonWithdrawnParticipant(){
+  public List<User> 회원탈퇴하지_않고_채팅방_참여자인_유저_조회(){
     return participants.stream()
         .filter(cp -> !cp.is회원탈퇴한_유저인지())
         .map(ChatroomParticipant::getParticipant)

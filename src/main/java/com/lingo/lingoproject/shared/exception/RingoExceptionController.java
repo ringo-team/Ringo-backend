@@ -28,28 +28,8 @@ public class RingoExceptionController {
     } else {
       log.warn(e.getMessage(), e);
     }
-    HttpStatus httpStatus = switch (e.getErrorCode()){
-      case ErrorCode.BAD_REQUEST,
-           ErrorCode.BAD_PARAMETER,
-           ErrorCode.NOT_FOUND,
-           ErrorCode.ADMIN_NOT_FOUND,
-           ErrorCode.USER_NOT_FOUND,
-           ErrorCode.PROFILE_DUPLICATED,
-           ErrorCode.INADEQUATE,
-           ErrorCode.FACE_NOT_FOUND,
-           ErrorCode.OVERFLOW -> HttpStatus.BAD_REQUEST;
-      case ErrorCode.FORBIDDEN,
-           ErrorCode.BLOCKED ,
-           ErrorCode.BEFORE_SIGNUP,
-           ErrorCode.LOGOUT,
-           ErrorCode.NO_AUTH,
-           ErrorCode.NOT_ADULT,
-           ErrorCode.TOKEN_INVALID,
-           ErrorCode.TOKEN_EXPIRED -> HttpStatus.FORBIDDEN;
-      default -> HttpStatus.INTERNAL_SERVER_ERROR;
-    };
-    exceptionMessageRepository.save(new ExceptionMessage(e.getMessage(), httpStatus.toString()));
-    return ResponseEntity.status(httpStatus).body(new ResultMessageResponseDto(e.getErrorCode().getCode(), "오류가 발생했습니다."));
+    exceptionMessageRepository.save(new ExceptionMessage(e.getMessage(), e.getHttpStatus().toString()));
+    return ResponseEntity.status(e.getHttpStatus()).body(new ResultMessageResponseDto(e.getErrorCode().getCode(), "오류가 발생했습니다."));
   }
 
   @ExceptionHandler(Exception.class)

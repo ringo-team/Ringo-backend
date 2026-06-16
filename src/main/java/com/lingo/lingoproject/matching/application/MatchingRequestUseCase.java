@@ -105,6 +105,7 @@ public class MatchingRequestUseCase {
 
     log.info("step=매칭_삭제_요청, matchingId={}, requestorId={}", matchingId, user.getId());
     matchingValidationService.validateMatchingDeletePermission(match, user);
+    // matching log 남기기
     matchQueryUseCase.deleteById(matchingId);
   }
 

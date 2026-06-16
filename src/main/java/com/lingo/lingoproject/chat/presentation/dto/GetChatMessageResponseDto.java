@@ -51,7 +51,7 @@ public class GetChatMessageResponseDto {
   @NotBlank
   String type;
 
-  LocalDateTime appointmentTime;
+  String appointmentTime;
 
   String place;
 
@@ -61,16 +61,21 @@ public class GetChatMessageResponseDto {
         .chatroomId(m.getChatroomId())
         .senderId(m.getSenderId())
         .content(m.getContent())
-        .createdAt(m.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+        .createdAt(m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
         .readerIds(m.getReaderIds())
-        .type("PLAIN")
+        .place(m.getPlace())
+        .appointmentTime(m.getAppointmentTime())
+        .type(m.getType())
         .build();
   }
 
   public static GetChatMessageResponseDto 약속_등록_메세지_dto_생성(Appointment appointment) {
     return GetChatMessageResponseDto.builder()
         .content("일정이 등록되었어요")
-        .appointmentTime(appointment.getAppointmentTime())
+        .senderId(appointment.getRegister().getId())
+        .appointmentTime(appointment.getAppointmentTime() != null ?
+            appointment.getAppointmentTime().toString() : null
+        )
         .place(appointment.getPlace())
         .type("APPOINTMENT")
         .build();
@@ -79,7 +84,10 @@ public class GetChatMessageResponseDto {
   public static GetChatMessageResponseDto 약속_예정_알림_메세지_dto_생성(Appointment appointment) {
     return GetChatMessageResponseDto.builder()
         .content("오늘 약속이 예정되어 있어요")
-        .appointmentTime(appointment.getAppointmentTime())
+        .senderId(appointment.getRegister().getId())
+        .appointmentTime(appointment.getAppointmentTime() != null ?
+            appointment.getAppointmentTime().toString() : null
+        )
         .place(appointment.getPlace())
         .type("APPOINTMENT")
         .build();

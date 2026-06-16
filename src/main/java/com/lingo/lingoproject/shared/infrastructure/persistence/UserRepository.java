@@ -3,6 +3,7 @@ package com.lingo.lingoproject.shared.infrastructure.persistence;
 import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -31,4 +32,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
   List<Long> findByUserIdNotInExcludedUserIds(List<Long> excludedUserIds);
 
   List<User> findAllByStatusNot(SignupStatus status);
+
+  @Query("select count(u.id) from User u where cast(u.createdAt as localdate) = :date")
+  int 해당_날짜에_가입한_사람_수_조회(LocalDate date);
 }

@@ -150,8 +150,8 @@ public class MatchController implements MatchingApi {
   }
 
   @Override
-  public ResponseEntity<ResultMessageResponseDto> updateProfileClickCount(User user) {
-    matchingRecommendationUseCase.updateProfileClickCount(user);
+  public ResponseEntity<ResultMessageResponseDto> updateProfileClickCount(Long userId, User user) {
+    matchingRecommendationUseCase.updateProfileClickCount(userId, user);
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "성공적으로 프로필 click-count를 업데이트 하였습니다."));
   }
 }

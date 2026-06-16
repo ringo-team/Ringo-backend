@@ -22,7 +22,6 @@ import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -90,56 +89,45 @@ public class ChatController implements ChatApi {
   {
 
     Long 발신자_id = 채팅_메세지_dto.getSenderId();
+    User 발신자    = userQueryUseCase.유저_찾기_혹은_오류(발신자_id);
     chatService.채팅방에_속한_유저인지_검증_혹은_오류(채팅방_id, 발신자_id);
 
-    Map<User, Boolean> 채팅방_접속_유저_매핑 = chatService.채팅_접속_유저_매핑_가져오기(채팅방_id);
-    List<Long> 채팅방_접속_유저_ids = 채팅방_접속_유저_매핑.keySet().stream().map(User::getId).toList();
-    if (채팅방_접속_유저_ids.contains(발신자_id)) {
-      throw new RingoException("레디스에 채팅방에 존재하는 유저 id가 없습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
+    List<User> 채팅방_접속_유저_리스트 = chatService.채팅_접속_유저_리스트_가져오기(채팅방_id);
+    List<Long> 채팅방_접속_유저_ids  = 채팅방_접속_유저_리스트.stream().map(User::getId).toList();
+
+    String 채팅_타입     = 채팅_메세지_dto.getType();
+    Message 저장된_메세지 = null;
+
+    switch (채팅_타입.toUpperCase()){
+      case "DISCONNECT" -> chatService.유저_접속_세션_삭제(발신자_id);
+      case "CONNECT" -> {}
+      default -> 저장된_메세지 = chatService.saveMessage(채팅_메세지_dto, 채팅방_접속_유저_ids, 채팅방_id);
     }
 
-    User 발신자 = userQueryUseCase.유저_찾기_혹은_오류(발신자_id);
-    채팅_메세지_dto.setReaderIds(채팅방_접속_유저_ids);
-    채팅_메세지_dto.setCreatedAt(
-        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now())
-    );
+    if (채팅_타입.equalsIgnoreCase("DISCONNECT") || 저장된_메세지 == null) return;
 
-    Message savedMessage = null;
-    String 채팅_타입 = 채팅_메세지_dto.getType();
-    if (채팅_타입.equalsIgnoreCase("DISCONNECT")){
-      Set<String> keyset = redisTemplate.keys("connect::" + 발신자_id + "*");
-
-      for (String key : keyset) {
-        log.info("step=WebSocket_연결_키_삭제, key={}", key);
-        redisTemplate.delete(key);
-      }
-      return;
-    }
-    if (!채팅_타입.equalsIgnoreCase("CONNECT")) {
-      savedMessage = chatService.saveMessage(채팅_메세지_dto, 채팅방_id);
-      if (savedMessage == null) return;
-    }
-
-    for (User 유저 : 채팅방_접속_유저_매핑.keySet()) {
+    Chatroom 채팅방 = chatService.채팅방_찾기_혹은_에러(채팅방_id);
+    for (User 유저 : 채팅방.회원탈퇴하지_않고_채팅방_참여자인_유저_조회()) {
       try {
         log.info("step=메세지_전송, senderId={}, receiverId={}", 채팅_메세지_dto.getSenderId(), 유저.getId());
         simpMessagingTemplate.convertAndSendToUser(유저.getLoginId(), "/topic/" + 채팅방_id, 채팅_메세지_dto);
       } catch (Exception e) {
-        chatService.메세지_전송_오류시_기록(e, savedMessage, 유저.getLoginId(), "/topic/" + 채팅방_id);
+        chatService.메세지_전송_오류시_기록(e, 저장된_메세지, 유저.getLoginId(), "/topic/" + 채팅방_id);
       }
       try {
         log.info("step=채팅_미리보기_전송, chatroomId={}, userLoginId={}", 채팅방_id, 유저.getLoginId());
         simpMessagingTemplate.convertAndSendToUser(유저.getLoginId(), "/room-list", 채팅_메세지_dto);
       } catch (Exception e) {
-        chatService.메세지_전송_오류시_기록(e, savedMessage, 유저.getLoginId(), "/room-list/" + 채팅방_id);
+        chatService.메세지_전송_오류시_기록(e, 저장된_메세지, 유저.getLoginId(), "/room-list/" + 채팅방_id);
       }
 
-      if (!채팅방_접속_유저_ids.contains(유저.getId()) && savedMessage != null) {
+      if (!채팅방_접속_유저_ids.contains(유저.getId())) {
         ChatNotificationEvent event = new ChatNotificationEvent(
             유저,
             발신자,
             채팅_메세지_dto.getContent(),
-            발신자.getProfile() != null ? 발신자.getProfile().getImageUrl() : null
+            발신자.getProfile() != null ? 발신자.getProfile().getImageUrl() : null,
+            채팅방_id
         );
         domainEventPublisher.publish(event);
       }
@@ -149,7 +137,7 @@ public class ChatController implements ChatApi {
   @Transactional
   public ResponseEntity<ResultMessageResponseDto> 약속_잡기(SaveAppointmentRequestDto dto, User user) {
     GetChatMessageResponseDto response = chatService.약속_잡기(user, dto);
-    sendMessage(response.getChatroomId(), response);
+    sendMessage(dto.chatroomId(), response);
 
     return ResponseEntity.status(HttpStatus.OK).body(new ResultMessageResponseDto(ErrorCode.SUCCESS.getCode(), "약속을 성공적으로 등록하였습니다."));
   }
@@ -160,7 +148,7 @@ public class ChatController implements ChatApi {
     List<Appointment> 예정된_약속들 = chatService.현재_이전에_처리되지_않은_약속_알림_가져오기();
     for (Appointment 약속 : 예정된_약속들) {
       Chatroom 채팅방 = 약속.getChatroom();
-      if (채팅방 == null) return;
+      if (채팅방 == null) continue;
       GetChatMessageResponseDto dto = GetChatMessageResponseDto.약속_예정_알림_메세지_dto_생성(약속);
       sendMessage(채팅방.getId(), dto);
       약속.setAlert(false);

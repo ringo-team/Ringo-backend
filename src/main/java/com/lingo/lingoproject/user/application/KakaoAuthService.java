@@ -4,6 +4,7 @@ import com.google.common.net.HttpHeaders;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
+import com.lingo.lingoproject.user.presentation.dto.KakaoValidationRequest;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;

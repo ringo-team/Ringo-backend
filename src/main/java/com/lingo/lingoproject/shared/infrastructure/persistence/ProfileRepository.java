@@ -18,7 +18,7 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
   @Query("select p.user from Profile p where p.user.id not in :excludedUserIds order by p.clickCount desc limit 5")
   List<User> findUsersOrderByProfileClickCountLimitFive(List<Long> excludedUserIds);
 
-  @Query("select p from Profile p join User u where u.id in :list")
+  @Query("select p from Profile p join p.user u where u.id in :list")
   List<Profile> findProfileByUserIdIn(@Param("list") Set<Long> list);
 
   @Query("""

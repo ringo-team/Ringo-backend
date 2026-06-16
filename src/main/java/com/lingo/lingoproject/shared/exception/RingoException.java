@@ -56,11 +56,24 @@ public class RingoException extends RuntimeException{
   public HttpStatus getHttpStatus() {
     if (errorCode == null) return HttpStatus.INTERNAL_SERVER_ERROR;
     return switch (errorCode) {
-      case BAD_REQUEST, BAD_PARAMETER, NOT_FOUND, ADMIN_NOT_FOUND,
-           USER_NOT_FOUND, PROFILE_DUPLICATED, INADEQUATE, FACE_NOT_FOUND, OVERFLOW -> HttpStatus.BAD_REQUEST;
-      case FORBIDDEN, BLOCKED, BEFORE_SIGNUP, LOGOUT, NO_AUTH,
-           NOT_ADULT, TOKEN_INVALID, TOKEN_EXPIRED -> HttpStatus.FORBIDDEN;
+      case BAD_REQUEST,
+          BAD_PARAMETER,
+          NOT_FOUND,
+          ADMIN_NOT_FOUND,
+          USER_NOT_FOUND,
+          PROFILE_DUPLICATED,
+          INADEQUATE,
+          FACE_NOT_FOUND,
+          OVERFLOW -> HttpStatus.BAD_REQUEST;
+      case FORBIDDEN,
+           BLOCKED,
+           BEFORE_SIGNUP,
+           LOGOUT,
+           NO_AUTH,
+           NOT_ADULT -> HttpStatus.FORBIDDEN;
       case UNMODERATE -> HttpStatus.NOT_ACCEPTABLE;
+      case TOKEN_INVALID,
+           TOKEN_EXPIRED -> HttpStatus.UNAUTHORIZED;
       default -> HttpStatus.INTERNAL_SERVER_ERROR;
     };
   }

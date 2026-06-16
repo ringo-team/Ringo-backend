@@ -5,6 +5,7 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.domain.model.UserActivityLog;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserActivityLogRepository;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -172,20 +173,17 @@ public class RecommendationDomainService {
 
   private int todayLoggedMinutes(User user) {
     return userActivityLogRepository
-        .findByUserAndCreateAtAfter(user, LocalDate.now().atStartOfDay())
+        .findByUserAndCreateAtAfter(user.getId(), LocalDate.now().atStartOfDay())
         .stream()
         .mapToInt(UserActivityLog::getActivityMinuteDuration)
         .sum();
   }
 
   private int currentSessionMinutes(User user) {
-    return redisTemplate.keys("connect-app::" + user.getId() + "*")
-        .stream()
-        .findFirst()
-        .map(key -> key.split("::")[2])
-        .map(LocalDateTime::parse)
-        .map(connectedAt -> (int) ChronoUnit.MINUTES.between(connectedAt, LocalDateTime.now()))
-        .orElse(0);
+    Object value = redisTemplate.opsForValue().get(RedisKey.접속_시간_레디스_키 + user.getId());
+    if (value == null) return 0;
+    LocalDateTime start = LocalDateTime.parse(value.toString());
+    return (int) ChronoUnit.MINUTES.between(start, LocalDateTime.now());
   }
 
 

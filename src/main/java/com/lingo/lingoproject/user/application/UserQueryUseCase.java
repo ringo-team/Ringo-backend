@@ -44,9 +44,6 @@ public class UserQueryUseCase {
 
   private final UserRepository userRepository;
   private final HashtagRepository hashtagRepository;
-  private final RedisUtils redisUtils;
-  private final RedisTemplate<String, Object> redisTemplate;
-  private final MatchQueryUseCase matchQueryUseCase;
   private final DormantAccountUseCase dormantAccountUseCase;
   private final NotificationOptionOutUserRepository notificationOptionOutUserRepository;
   private final FeedImageRepository feedImageRepository;
@@ -55,46 +52,7 @@ public class UserQueryUseCase {
     throw new RingoException("아이디를 얻을 권한이 없습니다.", ErrorCode.NO_AUTH);
   }
 
-  private List<Long> 캐시된_누적_설문_기반_추천_유저_id_리스트(User user){
-    return Optional.ofNullable(redisUtils.캐시된_누적_설문_기반_추천_프로필_조회(user.getId().toString()))
-        .orElseGet(Collections::emptyList)
-        .stream().map(GetUserProfileResponseDto::getUserId).toList();
-  }
-  private List<Long> 캐시된_일일_설문_기반_추천_유저_id_리스트(User user){
-    return Optional.ofNullable(redisUtils.캐시된_일일_설문_기반_추천_프로필_조회(user.getId().toString()))
-        .orElseGet(Collections::emptyList)
-        .stream().map(GetUserProfileResponseDto::getUserId).toList();
-  }
-
-  private List<Long> 매칭_요청을_보내거나_받은_유저_id_리스트(User user){
-    return matchQueryUseCase.findAllByRequestUserOrRequestedUser(user, user)
-        .stream()
-        .map(m -> {
-          User requestUser = m.getRequestUser();
-          User requestedUser = m.getRequestedUser();
-          return requestUser.getId().equals(user.getId()) ? requestedUser.getId() : requestUser.getId();
-        })
-        .toList();
-  }
   public GetUserInfoResponseDto getUserInfo(Long findUserId, User user) {
-    List<Long> cumulativeList = 캐시된_누적_설문_기반_추천_유저_id_리스트(user);
-    List<Long> dailyList      = 캐시된_일일_설문_기반_추천_유저_id_리스트(user);
-    List<Long> matchingList   = 매칭_요청을_보내거나_받은_유저_id_리스트(user);
-
-    List<Long> userIdList = new ArrayList<>();
-    userIdList.addAll(cumulativeList);
-    userIdList.addAll(dailyList);
-    userIdList.addAll(matchingList);
-
-    log.info("cumulative-recommended: {}, daily-recommended: {}, find-user-id: {}",
-        cumulativeList, dailyList, findUserId);
-
-    boolean hasCommunityPass = redisTemplate.hasKey("membership::" + user.getId());
-
-    if (!(userIdList.contains(findUserId) || findUserId.equals(user.getId()) || hasCommunityPass)) {
-      throw new RingoException("유저를 조회할 권한이 없습니다.", ErrorCode.NO_AUTH);
-    }
-
     User findUser             = 유저_찾기_혹은_오류(findUserId);
     Profile profile           = findUser.getProfile();
     List<String> hashtags     = 유저_해시태그_조회(findUser);
@@ -146,9 +104,7 @@ public class UserQueryUseCase {
 
   public User 유저_찾기_혹은_오류(Long userId) {
     return userRepository.findById(userId)
-        .orElseThrow(() -> new RingoException(
-            "해당 id의 유저를 찾을 수 없습니다.",
-            ErrorCode.USER_NOT_FOUND));
+        .orElseThrow(() -> new RingoException("해당 id의 유저를 찾을 수 없습니다.", ErrorCode.USER_NOT_FOUND));
   }
 
   private List<String> 유저_해시태그_조회(User user) {
@@ -177,10 +133,6 @@ public class UserQueryUseCase {
 
   public List<User> findAll() {
     return userRepository.findAll();
-  }
-
-  public List<Long> findByUserIdNotInExcludedUserIds(List<Long> excludedUserIds) {
-    return userRepository.findByUserIdNotInExcludedUserIds(excludedUserIds);
   }
 
   public List<User> findAllByStatusNot(SignupStatus status) {

@@ -6,8 +6,6 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,9 +22,9 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @EntityListeners(AuditingEntityListener.class)
 public class UserActivityLog {
 
-  public static UserActivityLog of(User user, LocalDateTime start, LocalDateTime end, int activityMinuteDuration) {
+  public static UserActivityLog of(Long userId, LocalDateTime start, LocalDateTime end, int activityMinuteDuration) {
     return UserActivityLog.builder()
-        .user(user)
+        .userId(userId)
         .start(start)
         .end(end)
         .activityMinuteDuration(activityMinuteDuration)
@@ -37,9 +35,7 @@ public class UserActivityLog {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @ManyToOne
-  @JoinColumn(name = "user_id")
-  private User user;
+  private Long userId;
 
   @Column(updatable = false)
   private int activityMinuteDuration;
@@ -51,6 +47,6 @@ public class UserActivityLog {
 
   @CreationTimestamp
   @Column(updatable = false)
-  private LocalDateTime createAt;
+  private LocalDateTime createdAt;
 
 }

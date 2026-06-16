@@ -81,7 +81,7 @@ public class SecurityConfig {
       "/login/**", "/signup/**", "/users/access", "/health",
       "/swagger-ui/**", "/v3/api-docs/**",
       "/ws", "/stomp/**", "/stomp-test.html",
-      "/actuator/**", "/api/**"
+      "/actuator/**", "/api/**", "/refresh/**"
   };
 
   /**

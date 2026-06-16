@@ -10,6 +10,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.AnsweredSurveyRe
 import com.lingo.lingoproject.shared.infrastructure.persistence.SurveyRepository;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import com.lingo.lingoproject.survey.presentation.dto.GetSurveyResponseDto;
 import com.lingo.lingoproject.survey.presentation.dto.GetUserSurveyResponseDto;
@@ -246,7 +247,7 @@ public class SurveyService {
 
   /** Redis에서 캐싱된 일일 설문을 가져온다. 캐시가 없으면 null을 반환한다. */
   private List<GetSurveyResponseDto> getCachedDailySurveys(Long userId) {
-    if (redisTemplate.hasKey("dailySurvey::" + userId)) {
+    if (redisTemplate.hasKey(RedisKey.일일_설문_조회_레디스_키 + userId)) {
       return redisUtils.getUserDailySurvey(userId.toString());
     }
     return null;
