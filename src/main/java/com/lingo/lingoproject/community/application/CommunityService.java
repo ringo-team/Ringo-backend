@@ -253,7 +253,7 @@ public class CommunityService {
 
     log.info("placeId={}, category={}", placeId, postCategory);
 
-    Page<Post> posts = postRepository.findByPlaceAndCategory(placeId, postCategory, pageable);
+    Page<Post> posts = postRepository.findByPlaceAndCategoryOrderByDesc(placeId, postCategory, pageable);
 
     return buildPostResponseDto(posts.stream().toList(), user);
   }
