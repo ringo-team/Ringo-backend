@@ -32,14 +32,7 @@ public class KakaoLoginController {
   @PostMapping("/login/kakao")
   public ResponseEntity<?> callback(@RequestBody KakaoAuthRequestDto dto){
     log.info("step=카카오_로그인_콜백_시작");
-    User user = null;
-    try {
-      user = kakaoAuthService.login(dto.accessToken());
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-
-    if (user == null) return null;
+    User user = kakaoAuthService.login(dto.accessToken());
 
     String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);

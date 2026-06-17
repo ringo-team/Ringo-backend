@@ -6,6 +6,8 @@ import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.user.presentation.dto.KakaoValidationRequest;
+import com.lingo.lingoproject.user.presentation.dto.oauth.kakao.KakaoTokenResponseDto;
+import com.lingo.lingoproject.user.presentation.dto.oauth.kakao.KakaoUserInfoResponseDto;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,14 +25,13 @@ public class KakaoAuthService {
 
   private final UserQueryUseCase userQueryUseCase;
   private final WebClient webClient;
-  private final ObjectMapper objectMapper;
 
   @Value("${oauth.kakao.api}")
   private String kakaoAuthUrl;
 
-  public User login(String token) throws Exception{
+  public User login(String token){
 
-    Object response = webClient.get()
+    KakaoUserInfoResponseDto response = webClient.get()
         .uri(kakaoAuthUrl)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -39,27 +40,24 @@ public class KakaoAuthService {
             HttpStatusCode::is4xxClientError,
             res -> Mono.error(new RingoException("유효하지 않은 Kakao 토큰입니다.", ErrorCode.BAD_REQUEST))
         )
-        .bodyToMono(Object.class)
+        .bodyToMono(KakaoUserInfoResponseDto.class)
         .timeout(Duration.ofSeconds(5))
         .block();
 
-    log.info(objectMapper.writeValueAsString(response));
-    return null;
+    if (response.id() == null) throw new RingoException("kakao에서 전달받은 id값이 null입니다.", ErrorCode.INTERNAL_SERVER_ERROR);
 
-    /*
-    User user = userQueryUseCase.findByLoginId(response.email()).orElse(null);
+    User user = userQueryUseCase.findByLoginId(response.id().toString()).orElse(null);
 
     if (user != null) return user;
 
     User user1 = User.builder()
-        .loginId(response.email())
+        .loginId(response.id().toString())
         .password(String.valueOf(token.hashCode()))
         .build();
 
     User savedUser = userQueryUseCase.save(user1);
 
     return savedUser;
-    */
   }
 
 }
