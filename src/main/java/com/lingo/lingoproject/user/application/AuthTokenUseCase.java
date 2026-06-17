@@ -47,7 +47,7 @@ public class AuthTokenUseCase {
     String token = redisToken != null ? redisToken.toString() : null;
 
     if (token == null)
-      throw new RingoException("로그인하지 않은 유저입니다.", ErrorCode.FORBIDDEN);
+      throw new RingoException("로그인하지 않은 유저입니다.", ErrorCode.TOKEN_EXPIRED);
 
     log.info("redisRefreshToken: {}, requestRefreshToken: {}", token, refreshToken);
 
