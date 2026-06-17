@@ -21,14 +21,14 @@ public class ChatNotificationEventHandler {
   @Async
   public void handle(ChatNotificationEvent event) throws Exception{
     Profile senderProfile = event.getSender().getProfile();
-    String params = objectMapper.writeValueAsString(Map.of("roomId", String.valueOf(event.getRoomId())));
+    String params = objectMapper.writeValueAsString(Map.of("chatroomId", String.valueOf(event.getRoomId())));
     fcmNotificationUseCase.sendFcmNotification(
         event.getMember(),
         senderProfile != null ? senderProfile.getImageUrl() : null,
         event.getSender().getNickname(),
         event.getMessage(),
         NotificationType.MESSAGE,
-        "/(tabs)/chat/room",
+        "/chat/room",
         params
     );
   }
