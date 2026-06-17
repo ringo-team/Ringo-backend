@@ -81,8 +81,8 @@ public class FcmNotificationUseCase {
                 .setImage(senderImageUrl)
                 .build()
         )
-        .putData("screen", path)
-        .putData("params", params)
+        .putData("screen", path != null ? path : "")
+        .putData("params", params != null ? params : "")
         .setApnsConfig(
             ApnsConfig.builder()
                 .setAps(
