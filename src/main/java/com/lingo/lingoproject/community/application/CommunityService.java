@@ -255,7 +255,16 @@ public class CommunityService {
 
     Page<Post> posts = postRepository.findByPlaceAndCategoryOrderByDesc(placeId, postCategory, pageable);
 
-    return buildPostResponseDto(posts.stream().toList(), user);
+    return buildPostListResponseDto(posts.stream().toList(), user);
+  }
+
+  public GetPostResponseDto getPostById(Long postId, User user){
+    Post post = findPostByIdOrThrow(postId);
+    return buildPostResponse(post, user);
+  }
+
+  public Post findPostByIdOrThrow(Long postId){
+    return postRepository.findById(postId).orElseThrow(() -> new RingoException("해당 id의 게시물을 찾을 수 없습니다.", ErrorCode.BAD_REQUEST));
   }
 
   public List<GetPostResponseDto> searchPostsByKeywordOrPlace(User user, String keyword, String place, int page, int size){
@@ -269,10 +278,10 @@ public class CommunityService {
 
     List<Post> posts = postRepository.findAllByIdIn(postIds);
 
-    return buildPostResponseDto(posts, user);
+    return buildPostListResponseDto(posts, user);
   }
 
-  private List<GetPostResponseDto> buildPostResponseDto(Collection<Post> posts, User user){
+  private List<GetPostResponseDto> buildPostListResponseDto(Collection<Post> posts, User user){
     List<GetPostResponseDto> result = new ArrayList<>();
     for (Post post : posts){
       GetPostResponseDto dto = buildPostResponse(post, user);
@@ -518,15 +527,19 @@ public class CommunityService {
   /** 게시물 엔티티와 이미지 DTO 목록으로 응답 DTO를 생성한다. */
   private GetPostResponseDto buildPostResponse(Post post, User user) {
     boolean isLike = postLikeUserMappingRepository.existsByPostAndUser(post, user);
-    return GetPostResponseDto.from(post, isLike,  buildPostImageDtos(post));
+    return GetPostResponseDto.from(post, isLike,  findPostImages(post));
   }
 
   /** 게시물에 연결된 이미지를 조회해 응답 DTO 목록으로 변환한다. */
-  private List<GetPostImageResponseDto> buildPostImageDtos(Post post) {
+  private List<GetPostImageResponseDto> findPostImages(Post post) {
     return postImageRepository.findAllByPost(post)
         .stream()
-        .map(postImage -> new GetPostImageResponseDto(postImage.getId(), postImage.getImageUrl()))
+        .map(this::buildPostImageDto)
         .toList();
+  }
+
+  private GetPostImageResponseDto buildPostImageDto(PostImage postImage){
+    return new GetPostImageResponseDto(postImage.getId(), postImage.getImageUrl());
   }
 
   @Transactional

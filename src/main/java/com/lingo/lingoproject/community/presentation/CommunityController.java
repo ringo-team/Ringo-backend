@@ -54,6 +54,12 @@ public class CommunityController implements CommunityApi {
   }
 
   @Override
+  public ResponseEntity<GetPostResponseDto> getPostById(Long postId, User user) {
+    GetPostResponseDto response = communityService.getPostById(postId, user);
+    return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
   public ResponseEntity<SavePostResponseDto> post(SavePostRequestDto dto, List<MultipartFile> images, User user) {
     log.info("step=게시물_게시_시작, userId={}", user.getId());
     SavePostResponseDto response = communityService.createPost(dto, images, user);

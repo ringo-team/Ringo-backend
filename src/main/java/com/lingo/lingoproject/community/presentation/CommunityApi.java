@@ -55,6 +55,9 @@ public interface CommunityApi {
   @GetMapping("/posts")
   ResponseEntity<ApiListResponseDto<GetPostResponseDto>> getPost(@RequestParam(value = "category") String category, @RequestParam(value = "place") Long placeId, @RequestParam(value = "page") int page, @RequestParam(value = "size") int size, @AuthenticationPrincipal User user);
 
+  @GetMapping("/posts/{post-id}")
+  ResponseEntity<GetPostResponseDto> getPostById(@PathVariable(value = "post-id") Long postId, @AuthenticationPrincipal User user);
+
   @Operation(summary = "게시물 업로드")
   @ApiResponses(value = {
       @ApiResponse(responseCode = "0000", description = "성공"),
