@@ -58,6 +58,7 @@ public class SelfAuthUseCase {
   private final UserQueryUseCase userQueryUseCase;
   private final RedisUtils redisUtils;
   private final RedisTemplate<String, Object> redisTemplate;
+  private final WebClient webClient;
 
   @Value("${self-auth.client_id}")
   private String clientId;
@@ -81,8 +82,6 @@ public class SelfAuthUseCase {
     MultiValueMap<String, Object> params = new LinkedMultiValueMap<>();
     params.add("grant_type", "client_credentials");
     params.add("scope", "default");
-
-    WebClient webClient = WebClient.create();
 
     /*
      *  Authorization : Basic + Base64(clientId:clientSecret)
@@ -172,7 +171,6 @@ public class SelfAuthUseCase {
 
     String uriPath = "digital/niceid/api/v1.0/common/crypto/token";
 
-    WebClient webClient = WebClient.create();
     try{
       log.info("step=암호화_토큰_요청_시작, uri={}", uriPath);
       return webClient

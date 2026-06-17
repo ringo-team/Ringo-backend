@@ -23,6 +23,10 @@ public class WebConfig {
         .build();
   }
 
+  @Bean
+  public WebClient webClient(){
+    return WebClient.create();
+  }
 
   @Bean
   public ObjectMapper objectMapper(){

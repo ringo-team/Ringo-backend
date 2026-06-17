@@ -14,13 +14,13 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class DiscordService {
 
   private final RedisQueueService redisQueueService;
+  private final WebClient discordWebClient;
 
   @Value("${discord.webhook.alert.url}")
   private String discordWebhookAlertUrl;
 
   public void sendMessageToDiscordChannel(String content){
     DiscordWebhookPayload discordWebhookPayload = DiscordWebhookPayload.of(content);
-    WebClient discordWebClient = WebClient.create();
     try{
       discordWebClient.post()
           .uri(discordWebhookAlertUrl)
