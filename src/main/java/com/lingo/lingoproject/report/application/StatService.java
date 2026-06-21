@@ -133,10 +133,15 @@ public class StatService {
                 set -> (long) set.size()
             )
         ));
+    for (LocalDate i = start; i.isBefore(end) || i.equals(end); i = i.plusDays(1)){
+      날짜_유저_맵.putIfAbsent(i.toString(), 0L);
+    }
     List<GetDetailStatResponseDto> data = 날짜_유저_맵.entrySet()
         .stream()
-        .map(value -> new GetDetailStatResponseDto(value.getKey(),
-            Math.toIntExact(value.getValue())))
+        .map(value -> new GetDetailStatResponseDto(
+            value.getKey(),
+            Math.toIntExact(value.getValue()))
+        )
         .toList();
     return GetActiveUserStatResponseDto.builder()
         .metric("dau")
