@@ -93,10 +93,10 @@ public class WebsocketAuthorizationInterceptor implements ChannelInterceptor {
       // "Bearer " 접두사(7자) 제거 후 JWT 파싱
       token = token.substring(7);
 
-    Claims claims = jwtUtil.토큰에서_claim_추출(token);
-    user = userQueryUseCase.로그인_아이디로_유저_조회_혹은_오류_발생(claims.getSubject());
-    // STOMP 세션의 Principal을 loginId로 설정 (StompConnectionListener에서 유저 조회에 사용)
-    accessor.setUser(user::getLoginId);
+      Claims claims = jwtUtil.토큰에서_claim_추출(token);
+      user = userQueryUseCase.로그인_아이디로_유저_조회_혹은_오류_발생(claims.getSubject());
+      // STOMP 세션의 Principal을 loginId로 설정 (StompConnectionListener에서 유저 조회에 사용)
+      accessor.setUser(user::getLoginId);
     }
 
     /*-------------------------------------------------------------------------------------*/
