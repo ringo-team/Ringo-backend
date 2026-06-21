@@ -218,7 +218,7 @@ public class StatService {
         .filter(u -> Objects.equals(Gender.MALE, u.getGender()))
         .count();
     float malePct = Math.round((activeMaleCount / (float) currentDau) * 1000) / 10.0f;
-    float femalePct = 100 - malePct;
+    float femalePct = activeMaleCount != 0 ? 100 - malePct : 0;
 
     GetStatOverviewResponseDto dto = GetStatOverviewResponseDto.builder()
         .date(date)
