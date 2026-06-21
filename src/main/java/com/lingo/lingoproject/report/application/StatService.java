@@ -207,6 +207,8 @@ public class StatService {
 
     Double currentAvgSessionDurationSeconds = userActivityLogRepository.해당_날짜의_세션_기간_평균_조회(currentDate);
     Double preAvgSessionDurationSeconds = userActivityLogRepository.해당_날짜의_세션_기간_평균_조회(preDate);
+    currentAvgSessionDurationSeconds = currentAvgSessionDurationSeconds != null ? currentAvgSessionDurationSeconds : 0;
+    preAvgSessionDurationSeconds = preAvgSessionDurationSeconds != null ? preAvgSessionDurationSeconds : 0;
     Double avgAvgSessionDurationDelta = currentAvgSessionDurationSeconds - preAvgSessionDurationSeconds;
     int avgSessionDurationSeconds = (int) Math.round(currentAvgSessionDurationSeconds);
 
