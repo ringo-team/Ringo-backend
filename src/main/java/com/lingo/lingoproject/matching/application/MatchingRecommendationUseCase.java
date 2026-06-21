@@ -88,14 +88,14 @@ public class MatchingRecommendationUseCase {
       return 다수_추천_프로필_생성(user, cached);
     }
 
-    List<GetUserProfileResponseDto> result = 처음_접속한_유저를_위한_추천(user);
+    List<Long> result = 처음_접속한_유저를_위한_추천(user);
 
     redisUtils.cacheUntilMidnight(
         RedisKey.누적_설문_기반_추천_레디스_키 + userId,
         new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result)
     );
 
-    return result;
+    return 다수_추천_프로필_생성(user, result);
   }
 
   @Scheduled(cron = "0 40 0 * * *")
@@ -121,12 +121,12 @@ public class MatchingRecommendationUseCase {
   }
 
   @Transactional
-  List<GetUserProfileResponseDto> 처음_접속한_유저를_위한_추천(User user) {
+  List<Long> 처음_접속한_유저를_위한_추천(User user) {
 
     List<Long> 활성_유저 = 활성_유저_조회(user);
     List<Long> 랜덤_유저_ids = recommendationDomainService.랜덤_유저_선택(활성_유저, 누적_설문_기반_추천_크기);
 
-    return 다수_추천_프로필_생성(user, 랜덤_유저_ids);
+    return 랜덤_유저_ids;
   }
 
   @Transactional
