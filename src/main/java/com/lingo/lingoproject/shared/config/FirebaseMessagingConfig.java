@@ -8,6 +8,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +19,7 @@ import org.springframework.core.io.ClassPathResource;
 public class FirebaseMessagingConfig {
 
   @Value("${firebase.key.url}")
-  private final String FIREBASE_KEY_PATH = null;
+  private String FIREBASE_KEY_PATH;
 
   @PostConstruct
   public void refreshFcmCredentialsAndInitializeApp() throws IOException {
