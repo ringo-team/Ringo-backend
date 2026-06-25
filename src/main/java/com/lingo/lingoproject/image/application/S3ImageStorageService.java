@@ -4,6 +4,7 @@ import com.lingo.lingoproject.shared.domain.model.FeedImage;
 import com.lingo.lingoproject.shared.domain.model.PhotographerImage;
 import com.lingo.lingoproject.shared.domain.model.Profile;
 import com.lingo.lingoproject.shared.domain.model.Role;
+import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -132,6 +133,10 @@ public class S3ImageStorageService {
     S3_버킷_이미지_삭제(기존_이미지_url);
 
     log.info("userId={}, newProfileUrl={}", user.getId(), 새_이미지_url);
+
+    sendDiscordNotifForProfileReview(user);
+    user.setStatus(SignupStatus.SUBMITTED);
+    userQueryUseCase.save(user);
 
     return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), 새_이미지_url, profileId);
   }
