@@ -35,7 +35,8 @@ public class AuthTokenUseCase {
   public LoginResponseDto login(User user) {
     String access = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refresh = jwtUtil.generateToken(TokenType.REFRESH, user);
-    boolean isComplete = Objects.equals(SignupStatus.COMPLETED, user.getStatus());
+    // signup-status 가 submitted || completed 이면 회원가입 완료로 간주
+    boolean isComplete = !Objects.equals(SignupStatus.BEFORE, user.getStatus());
 
     redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refresh, 1, TimeUnit.HOURS);
     return new LoginResponseDto(ErrorCode.SUCCESS.getCode(), user.getId(), access, refresh, isComplete);

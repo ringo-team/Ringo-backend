@@ -1,5 +1,6 @@
 package com.lingo.lingoproject.matching.presentation;
 
+import com.lingo.lingoproject.matching.presentation.dto.UserRecommendListResponseDto;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.matching.presentation.dto.GetMatchingRequestMessageResponseDto;
 import com.lingo.lingoproject.matching.presentation.dto.GetScrappedUserResponseDto;
@@ -80,7 +81,7 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의")
   })
   @GetMapping("/users/{user-id}/recommendations")
-  ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>>  recommendByCumulativeSurveys(
+  ResponseEntity<UserRecommendListResponseDto<GetUserProfileResponseDto>>  recommendByCumulativeSurveys(
       @Parameter(description = "유저id", example = "5") @PathVariable(value = "user-id") Long userId,
       @AuthenticationPrincipal User user);
 
@@ -90,7 +91,7 @@ public interface MatchingApi {
           @ApiResponse(responseCode = "E1000", description = "내부 오류, 기타 문의", content = @Content(schema = @Schema(implementation = ResultMessageResponseDto.class)))
   })
   @GetMapping("/users/{user-id}/recommendations/daily-survey")
-  ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> recommendByDailySurvey(
+  ResponseEntity<UserRecommendListResponseDto<GetUserProfileResponseDto>> recommendByDailySurvey(
       @PathVariable(value = "user-id") Long userId, @AuthenticationPrincipal User user);
 
   @Operation(summary = "매칭 삭제")

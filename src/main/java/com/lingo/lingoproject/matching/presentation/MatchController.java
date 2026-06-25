@@ -3,7 +3,10 @@ package com.lingo.lingoproject.matching.presentation;
 import com.lingo.lingoproject.matching.application.MatchingRecommendationUseCase;
 import com.lingo.lingoproject.matching.application.MatchingRequestUseCase;
 import com.lingo.lingoproject.matching.application.MatchingScrapUseCase;
+import com.lingo.lingoproject.matching.presentation.dto.UserRecommendListResponseDto;
 import com.lingo.lingoproject.shared.domain.model.Matching;
+import com.lingo.lingoproject.shared.domain.model.Profile;
+import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -71,7 +74,7 @@ public class MatchController implements MatchingApi {
   }
 
   @Override
-  public ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> recommendByCumulativeSurveys(Long userId, User user) {
+  public ResponseEntity<UserRecommendListResponseDto<GetUserProfileResponseDto>> recommendByCumulativeSurveys(Long userId, User user) {
     if (!userId.equals(user.getId())) {
       log.error("step=잘못된_유저_요청, authUserId={}, userId={}, status=FAILED", user.getId(), userId);
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", ErrorCode.NO_AUTH);
@@ -80,10 +83,10 @@ public class MatchController implements MatchingApi {
     List<GetUserProfileResponseDto> rtnList = matchingRecommendationUseCase.누적_설문_기반_추천(user);
     log.info("step=이성_추천_완료, userId={}", userId);
 
-    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), rtnList));
+    return ResponseEntity.status(HttpStatus.OK).body(new UserRecommendListResponseDto<>(ErrorCode.SUCCESS.getCode(), user.getStatus() == SignupStatus.COMPLETED,  rtnList));
   }
 
-  public ResponseEntity<ApiListResponseDto<GetUserProfileResponseDto>> recommendByDailySurvey(Long userId, User user) {
+  public ResponseEntity<UserRecommendListResponseDto<GetUserProfileResponseDto>> recommendByDailySurvey(Long userId, User user) {
     if (!userId.equals(user.getId())) {
       log.error("step=잘못된_유저_요청, authUserId={}, userId={}, status=FAILED", user.getId(), userId);
       throw new RingoException("본인의 이성 추천만 확인할 수 있습니다.", ErrorCode.NO_AUTH);
@@ -92,7 +95,7 @@ public class MatchController implements MatchingApi {
     List<GetUserProfileResponseDto> rtnList = matchingRecommendationUseCase.일일_설문_기반_유저_추천(user);
     log.info("step=설문_기반_이성_추천_완료, userId={}", user.getId());
 
-    return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), rtnList));
+    return ResponseEntity.status(HttpStatus.OK).body(new UserRecommendListResponseDto<>(ErrorCode.SUCCESS.getCode(), user.getStatus() == SignupStatus.COMPLETED, rtnList));
   }
 
   public ResponseEntity<ResultMessageResponseDto> deleteMatching(Long matchingId, User user) {

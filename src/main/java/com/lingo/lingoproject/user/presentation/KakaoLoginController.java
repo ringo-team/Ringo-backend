@@ -36,7 +36,7 @@ public class KakaoLoginController {
 
     String accessToken = jwtUtil.generateToken(TokenType.ACCESS, user);
     String refreshToken = jwtUtil.generateToken(TokenType.REFRESH, user);
-    boolean isComplete = Objects.equals(SignupStatus.COMPLETED, user.getStatus());
+    boolean isComplete = !Objects.equals(SignupStatus.BEFORE, user.getStatus());
 
     redisTemplate.opsForValue().set("redis::refresh::" + user.getLoginId(), refreshToken, 1, TimeUnit.HOURS);
 

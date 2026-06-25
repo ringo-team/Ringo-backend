@@ -243,7 +243,7 @@ public class User extends Timestamp implements UserDetails {
         .loginId(loginId)
         .password(encodedPassword)
         .role(Role.USER)
-        .status(SignupStatus.IN_PROGRESS)
+        .status(SignupStatus.BEFORE)
         .isMarketingReceptionConsent(isMarketingReceptionConsent)
         .build();
   }
@@ -284,7 +284,7 @@ public class User extends Timestamp implements UserDetails {
     this.religion = Religion.valueOf(dto.religion());
     this.biography = dto.biography();
     if (this.status != SignupStatus.COMPLETED) {
-      this.status = SignupStatus.IN_PROGRESS;
+      this.status = SignupStatus.BEFORE;
     }
     this.mbti = dto.mbti();
   }
