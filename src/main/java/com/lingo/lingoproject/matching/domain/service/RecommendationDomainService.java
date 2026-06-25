@@ -9,6 +9,7 @@ import com.lingo.lingoproject.shared.utils.RedisKey;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,7 @@ public class RecommendationDomainService {
       int j = random.nextInt(i, candidates.size());
       Collections.swap(candidates, i, j);
     }
-    return candidates.subList(0, n);
+    return new ArrayList<>(candidates.subList(0, n));
   }
 
   /**
