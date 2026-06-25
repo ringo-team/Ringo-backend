@@ -6,8 +6,10 @@ import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
@@ -15,7 +17,8 @@ import org.springframework.core.io.ClassPathResource;
 @Configuration
 public class FirebaseMessagingConfig {
 
-  private static final String FIREBASE_KEY_PATH = "/app/firebase/key.json";
+  @Value("${firebase.key.url}")
+  private final String FIREBASE_KEY_PATH = null;
 
   @PostConstruct
   public void refreshFcmCredentialsAndInitializeApp() throws IOException {
@@ -35,7 +38,8 @@ public class FirebaseMessagingConfig {
 
     try {
       GoogleCredentials googleCredentials = GoogleCredentials
-          .fromStream(new FileInputStream(FIREBASE_KEY_PATH))
+          //.fromStream(new FileInputStream(FIREBASE_KEY_PATH))
+          .fromStream(new ClassPathResource("firebase/ringo-bdd26-firebase-adminsdk-fbsvc-107cc408f2.json").getInputStream())
           .createScoped(List.of("https://www.googleapis.com/auth/firebase.messaging"));
       log.info("step=FIREBASE_자격증명_갱신_성공, accessToken_존재={}", googleCredentials.getAccessToken() != null);
       FirebaseOptions options = FirebaseOptions.builder()
@@ -47,5 +51,16 @@ public class FirebaseMessagingConfig {
       log.error("step=FIREBASE_초기화_실패", e);
       throw e;
     }
+  }
+
+  private InputStream getFirebaseCredentials() throws IOException {
+    if (FIREBASE_KEY_PATH != null && !FIREBASE_KEY_PATH.isBlank()) {
+      // prod: EFS 등 파일 경로
+      return new FileInputStream(FIREBASE_KEY_PATH);
+    }
+    // dev: classpath 리소스
+    return new ClassPathResource(
+        "firebase/ringo-bdd26-firebase-adminsdk-fbsvc-107cc408f2.json")
+        .getInputStream();
   }
 }
