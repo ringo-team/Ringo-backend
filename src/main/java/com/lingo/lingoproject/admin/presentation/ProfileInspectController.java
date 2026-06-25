@@ -1,6 +1,7 @@
 package com.lingo.lingoproject.admin.presentation;
 
 import com.lingo.lingoproject.admin.application.ProfileInspectUseCase;
+import com.lingo.lingoproject.admin.presentation.dto.PostProfileReviewRequestDto;
 import com.lingo.lingoproject.admin.presentation.dto.ProfileReviewListResponseDto;
 import com.lingo.lingoproject.admin.presentation.dto.ProfileReviewResponseDto;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -9,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,15 +29,16 @@ public class ProfileInspectController {
       @RequestParam(value = "page", defaultValue = "0") int page,
       @RequestParam(value = "size", defaultValue = "10") int size
   ){
-    List<ProfileReviewResponseDto> response = profileInspectUseCase.getProfileReviews(status, page, size);
-    return ResponseEntity.status(HttpStatus.OK).body(
-        ProfileReviewListResponseDto.builder()
-            .content(response)
-            .page(page)
-            .size(size)
-            .totalElements(response.size())
-            .totalPages(size != 0 ? response.size() / size + (int) Math.ceil(response.size()) / size : 0)
-            .build()
-        );
+    ProfileReviewListResponseDto response = profileInspectUseCase.getProfileReviews(status, page, size);
+    return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @PostMapping(value = "/api/profile-reviews/{id}/decision")
+  public ResponseEntity<?> postProfileReviews(
+      @PathVariable(value = "id") Long id,
+      @RequestBody PostProfileReviewRequestDto request
+  ){
+    profileInspectUseCase.postProfileReview(id, request);
+    return ResponseEntity.status(HttpStatus.OK).body("success");
   }
 }

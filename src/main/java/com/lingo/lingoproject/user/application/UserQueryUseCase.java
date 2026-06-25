@@ -170,4 +170,12 @@ public class UserQueryUseCase {
   public Optional<User> findByLoginIdAndPhoneNumber(String loginId, String phoneNumber) {
     return userRepository.findByLoginIdAndPhoneNumber(loginId, phoneNumber);
   }
+
+  public Page<User> findAllByStatus(SignupStatus value, Pageable pageable){
+    return userRepository.findAllByStatus(value, pageable);
+  }
+
+  public long countByStatus(SignupStatus status){
+    return userRepository.countByStatus(status);
+  }
 }

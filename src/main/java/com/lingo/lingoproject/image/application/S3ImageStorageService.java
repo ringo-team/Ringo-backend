@@ -7,6 +7,7 @@ import com.lingo.lingoproject.shared.domain.model.Role;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
+import com.lingo.lingoproject.shared.infrastructure.discord.DiscordService;
 import com.lingo.lingoproject.shared.infrastructure.persistence.FeedImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PhotographerImageRepository;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
@@ -15,6 +16,7 @@ import com.lingo.lingoproject.image.dto.GetFeedImageInfoResponseDto;
 import com.lingo.lingoproject.image.dto.GetImageUrlResponseDto;
 import com.lingo.lingoproject.image.dto.UpdateFeedImageDescriptionRequestDto;
 import jakarta.transaction.Transactional;
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -67,6 +69,7 @@ public class S3ImageStorageService {
   private final S3Client amazonS3Client;
   private final RekognitionClient amazonRekognition;
   private final ProfileTransactionService profileTransactionService;
+  private final DiscordService discordService;
 
   @Value("${aws.s3.bucket}")
   private String bucket;
@@ -89,7 +92,16 @@ public class S3ImageStorageService {
 
     String imageUrl = S3_버킷에_이미지_업로드(file, "profiles");
 
-    return profileTransactionService.프로필_url_저장과_프로필_제출로_상태변경(imageUrl, user);
+    GetImageUrlResponseDto response = profileTransactionService.프로필_url_저장과_프로필_제출로_상태변경(imageUrl, user);
+
+    sendDiscordNotifForProfileReview(user);
+
+    return response;
+  }
+
+  @Async
+  public void sendDiscordNotifForProfileReview(User user){
+    discordService.sendMessageToDiscordChannel(user.getNickname() + "이 프로필 검수를 요청했어요!");
   }
 
   public GetImageUrlResponseDto fetchProfileImageUrl(Long userId) {
@@ -145,7 +157,8 @@ public class S3ImageStorageService {
 
     List<String> feedImageUrl = new ArrayList<>();
     for (FeedImageDataRequestDto request : requests) {
-      if (이미지에_부적절한_부분이_있는지_검증(request.getImage()))
+      byte[] imageBytes = 파일을_이미지_byte로_변환(request.getImage());
+      if (이미지에_부적절한_부분이_있는지_검증(imageBytes))
         throw new RingoException("부적절한 사진이 검출되었습니다.", ErrorCode.INADEQUATE);
     }
 
@@ -186,7 +199,9 @@ public class S3ImageStorageService {
 
     해당_유저의_이미지_권한_검증(기존_피드_이미지, userId);
 
-    if (이미지에_부적절한_부분이_있는지_검증(file))
+    byte[] imageBytes = 파일을_이미지_byte로_변환(file);
+
+    if (이미지에_부적절한_부분이_있는지_검증(imageBytes))
       throw new RingoException("이미지에 부적절한 부분이 검출되었습니다.", ErrorCode.BAD_REQUEST);
 
     String 기존_이미지_url = 기존_피드_이미지.getImageUrl();
@@ -346,14 +361,13 @@ public class S3ImageStorageService {
     }
   }
 
-  public boolean 사진에_얼굴이_검출되는지(MultipartFile file) {
+  public boolean 사진에_얼굴이_검출되는지(byte[] imageBytes) {
     Image rekognitionImage;
     try {
-      byte[] imageBytes = 파일을_이미지_byte로_변환(file);
       imageBytes  = 만약_사진의_용량이_크면_크기_줄이기(imageBytes);
       rekognitionImage = Image.builder().bytes(SdkBytes.fromByteArray(imageBytes)).build();
     } catch (Exception e) {
-      log.error("filename={}, step=얼굴_검출_전처리_실패", file.getOriginalFilename(), e);
+      log.error("step=얼굴_검출_전처리_실패",  e);
       throw new RingoException("파일을 바이트로 변환하는데 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
     try {
@@ -362,25 +376,23 @@ public class S3ImageStorageService {
       List<FaceDetail> faceDetails = response.faceDetails();
       return !faceDetails.isEmpty();
     } catch (Exception e) {
-      log.error("filename={}, step=얼굴_검출_실패", file.getOriginalFilename(), e);
+      log.error("step=얼굴_검출_실패", e);
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
-  public boolean 이미지에_부적절한_부분이_있는지_검증(MultipartFile file) {
-    byte[] imageBytes;
+  public boolean 이미지에_부적절한_부분이_있는지_검증(byte[] imageBytes) {
     try {
-      imageBytes = 파일을_이미지_byte로_변환(file);
       imageBytes = 만약_사진의_용량이_크면_크기_줄이기(imageBytes);
     } catch (Exception e) {
-      log.error("filename={}, step=선정성_검사_전처리_실패", file.getOriginalFilename(), e);
+      log.error("step=선정성_검사_전처리_실패", e);
       throw new RingoException("선정성 검사 중 파일을 바이트로 변환하지 못하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
     try {
       List<ModerationLabel> moderationLabels = detectModerationLabels(imageBytes);
       return moderationLabels.stream().anyMatch(this::isSensitiveLabel);
     } catch (Exception e) {
-      log.error("filename={}, step=선정성_검사_실패", file.getOriginalFilename(), e);
+      log.error("step=선정성_검사_실패", e);
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
@@ -397,7 +409,9 @@ public class S3ImageStorageService {
       return HEIC포맷을_JPG포맷으로_변환(file);
     }
     try {
-      return file.getBytes();
+      byte[] bytes = file.getBytes();
+      log.info(String.valueOf(bytes.length));
+      return bytes;
     } catch (Exception e) {
       throw new RingoException(e.getMessage(), ErrorCode.INTERNAL_SERVER_ERROR);
     }
@@ -495,9 +509,19 @@ public class S3ImageStorageService {
     if (original.getWidth() <= MAX_IMAGE_SIZE) return image;
 
     BufferedImage resized = Scalr.resize(original, MAX_IMAGE_SIZE);
+    // 알파채널 제거
+    BufferedImage rgb = new BufferedImage(
+        resized.getWidth(), resized.getHeight(), BufferedImage.TYPE_INT_RGB
+    );
+    rgb.createGraphics().drawImage(resized, 0, 0, Color.WHITE, null);
+
     ByteArrayOutputStream out  = new ByteArrayOutputStream();
-    ImageIO.write(resized, "jpg", out);
-    return out.toByteArray();
+    boolean ok = ImageIO.write(rgb, "jpg", out);
+    if (!ok) throw new RingoException("JPG 인코딩 실패", ErrorCode.INTERNAL_SERVER_ERROR);
+
+    byte[] result = out.toByteArray();
+    if (result.length == 0) throw new RingoException("리사이징 실패", ErrorCode.INTERNAL_SERVER_ERROR);
+    return result;
   }
 
   public String 이미지_url_생성(String objectKey) {
@@ -536,11 +560,12 @@ public class S3ImageStorageService {
   }
 
   private void 프로필_사진_검증(MultipartFile file, User user) {
-    if (!사진에_얼굴이_검출되는지(file)) {
+    byte[] imageBytes = 파일을_이미지_byte로_변환(file);
+    if (!사진에_얼굴이_검출되는지(imageBytes)) {
       log.warn("userId={}, step=얼굴_없는_프로필_업로드", user.getId());
       throw new RingoException("프로필에 얼굴이 존재하지 않습니다.", ErrorCode.FACE_NOT_FOUND);
     }
-    if (이미지에_부적절한_부분이_있는지_검증(file)) {
+    if (이미지에_부적절한_부분이_있는지_검증(imageBytes)) {
       log.error("userId={}, step=부적절한_이미지_업로드", user.getId());
       throw new RingoException("적절하지 않은 사진을 업로드 하였습니다.", ErrorCode.UNMODERATE);
     }

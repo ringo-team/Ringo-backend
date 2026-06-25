@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -58,6 +59,9 @@ public class Profile extends Timestamp implements Image{
 
   @Builder.Default
   private int impressionCount = 0;
+
+  @Lob
+  private String reason;
 
   @Enumerated(EnumType.STRING)
   @ColumnDefault("'PENDING'")

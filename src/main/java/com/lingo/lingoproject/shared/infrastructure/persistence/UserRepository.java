@@ -39,4 +39,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
   int 해당_날짜에_가입한_사람_수_조회(LocalDate date);
 
   Page<User> findAllByStatus(SignupStatus status, Pageable pageable);
+
+  long countByStatus(SignupStatus status);
 }

@@ -8,8 +8,8 @@ public record ProfileReviewListResponseDto(
     List<ProfileReviewResponseDto> content,
     int page,
     int size,
-    int totalElements,
-    int totalPages
+    long totalElements,
+    long totalPages
 ) {
 
 }
