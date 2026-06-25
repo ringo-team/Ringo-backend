@@ -39,8 +39,7 @@ public class FirebaseMessagingConfig {
 
     try {
       GoogleCredentials googleCredentials = GoogleCredentials
-          //.fromStream(new FileInputStream(FIREBASE_KEY_PATH))
-          .fromStream(new ClassPathResource("firebase/ringo-bdd26-firebase-adminsdk-fbsvc-107cc408f2.json").getInputStream())
+          .fromStream(getFirebaseCredentials())
           .createScoped(List.of("https://www.googleapis.com/auth/firebase.messaging"));
       log.info("step=FIREBASE_자격증명_갱신_성공, accessToken_존재={}", googleCredentials.getAccessToken() != null);
       FirebaseOptions options = FirebaseOptions.builder()
