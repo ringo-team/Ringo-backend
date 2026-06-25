@@ -172,7 +172,7 @@ public class UserQueryUseCase {
   }
 
   public Page<User> findAllByStatus(SignupStatus value, Pageable pageable){
-    return userRepository.findAllByStatus(value, pageable);
+    return userRepository.findAllByStatusOrderByIdDesc(value, pageable);
   }
 
   public long countByStatus(SignupStatus status){

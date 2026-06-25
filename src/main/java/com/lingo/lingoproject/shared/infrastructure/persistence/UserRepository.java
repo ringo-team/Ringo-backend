@@ -41,4 +41,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
   Page<User> findAllByStatus(SignupStatus status, Pageable pageable);
 
   long countByStatus(SignupStatus status);
+
+  Page<User> findAllByStatusOrderByIdDesc(SignupStatus status, Pageable pageable);
 }
