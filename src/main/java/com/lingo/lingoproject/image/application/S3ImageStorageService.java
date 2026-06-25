@@ -4,13 +4,11 @@ import com.lingo.lingoproject.shared.domain.model.FeedImage;
 import com.lingo.lingoproject.shared.domain.model.PhotographerImage;
 import com.lingo.lingoproject.shared.domain.model.Profile;
 import com.lingo.lingoproject.shared.domain.model.Role;
-import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.FeedImageRepository;
 import com.lingo.lingoproject.shared.infrastructure.persistence.PhotographerImageRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepository;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import com.lingo.lingoproject.image.dto.FeedImageDataRequestDto;
 import com.lingo.lingoproject.image.dto.GetFeedImageInfoResponseDto;
@@ -91,7 +89,7 @@ public class S3ImageStorageService {
 
     String imageUrl = S3_버킷에_이미지_업로드(file, "profiles");
 
-    return profileTransactionService.프로필_url_저장과_회원가입_완료로_상태변경(imageUrl, user);
+    return profileTransactionService.프로필_url_저장과_프로필_제출로_상태변경(imageUrl, user);
   }
 
   public GetImageUrlResponseDto fetchProfileImageUrl(Long userId) {

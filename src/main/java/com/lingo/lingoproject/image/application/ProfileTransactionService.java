@@ -36,9 +36,9 @@ public class ProfileTransactionService {
   }
 
   @Transactional
-  public GetImageUrlResponseDto 프로필_url_저장과_회원가입_완료로_상태변경(String imageUrl, User user){
+  public GetImageUrlResponseDto 프로필_url_저장과_프로필_제출로_상태변경(String imageUrl, User user){
     Profile savedProfile = 프로필_url_저장(user, imageUrl);
-    회원가입_상태_완료로_변경(user);
+    프로필_제출로_상태_변경(user);
 
     log.info("userId={}, profileUrl={}, status={}", user.getId(), savedProfile.getImageUrl(), user.getStatus());
 
@@ -54,8 +54,8 @@ public class ProfileTransactionService {
     return saved;
   }
 
-  public void 회원가입_상태_완료로_변경(User user) {
-    user.setStatus(SignupStatus.COMPLETED);
+  public void 프로필_제출로_상태_변경(User user) {
+    user.setStatus(SignupStatus.SUBMITTED);
     userQueryUseCase.save(user);
   }
 
