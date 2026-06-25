@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -35,4 +37,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   @Query("select count(u.id) from User u where cast(u.createdAt as localdate) = :date")
   int 해당_날짜에_가입한_사람_수_조회(LocalDate date);
+
+  Page<User> findAllByStatus(SignupStatus status, Pageable pageable);
 }
