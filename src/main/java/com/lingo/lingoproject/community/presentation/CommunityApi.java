@@ -190,6 +190,14 @@ public interface CommunityApi {
   @GetMapping(value = "/places/rank")
   ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getRankedPagedPlaces(@AuthenticationPrincipal User user, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size);
 
+  @GetMapping(value = "/places/type")
+  ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getPlacesByType(
+          @AuthenticationPrincipal User user,
+          @RequestParam String type,
+          @RequestParam(defaultValue = "0") int page,
+          @RequestParam(defaultValue = "20") int size
+  );
+
   @GetMapping(value = "/places/{place-id}")
   ResponseEntity<GetPlaceDetailResponseDto> getDetailPlaceInfo(@AuthenticationPrincipal User user, @PathVariable(value = "place-id") Long placeId);
 

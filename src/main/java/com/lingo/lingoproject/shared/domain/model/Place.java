@@ -77,7 +77,7 @@ public class Place {
     return GetPlaceDetailResponseDto.builder()
         .id(this.id)
         .placeName(this.name)
-        .category(this.category.toString())
+        .category(this.category != null ? this.category.toString() : PostCategory.ETC.name())
         .profileUrl(profileUrls)
         .description(this.description)
         .keyword(keywords)

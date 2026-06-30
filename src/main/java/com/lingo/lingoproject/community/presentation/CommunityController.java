@@ -1,33 +1,13 @@
 package com.lingo.lingoproject.community.presentation;
+
 import com.lingo.lingoproject.community.application.CommunityService;
-import com.lingo.lingoproject.community.presentation.dto.CommentRequestDto;
-import com.lingo.lingoproject.community.presentation.dto.CommentResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.CreateSubCommentRequestDto;
-import com.lingo.lingoproject.community.presentation.dto.CreateSubCommentResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.GetCommentResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.GetPlaceDetailResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.GetPlaceResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.GetPostResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.InputStatusResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.PlaceSummaryResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.SaveParsedPlaceRequest;
-import com.lingo.lingoproject.community.presentation.dto.SavePostRequestDto;
-import com.lingo.lingoproject.community.presentation.dto.SavePostResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.ScrapPlaceRequestDto;
-import com.lingo.lingoproject.community.presentation.dto.SearchPlaceRequestDto;
-import com.lingo.lingoproject.community.presentation.dto.UpdateCommentRequestDto;
-import com.lingo.lingoproject.community.presentation.dto.UpdatePlaceRequestDto;
-import com.lingo.lingoproject.community.presentation.dto.UpdatePostRequestDto;
-import com.lingo.lingoproject.community.presentation.dto.UpdatePostResponseDto;
-import com.lingo.lingoproject.community.presentation.dto.UpdateSubCommentRequestDto;
+import com.lingo.lingoproject.community.presentation.dto.*;
 import com.lingo.lingoproject.matching.application.MatchingPlaceUseCase;
 import com.lingo.lingoproject.matching.presentation.dto.GetTypePlaceRequestDto;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.utils.ApiListResponseDto;
 import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
-import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -36,6 +16,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController()
@@ -198,6 +181,12 @@ public class CommunityController implements CommunityApi {
   public ResponseEntity<GetPlaceDetailResponseDto> getDetailPlaceInfo(User user, Long placeId) {
     GetPlaceDetailResponseDto response = communityService.getDetailPlaceInfo(user, placeId);
     return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
+  public ResponseEntity<ApiListResponseDto<GetPlaceDetailResponseDto>> getPlacesByType(User user, String type, int page, int size) {
+      List<GetPlaceDetailResponseDto> result = matchingPlaceUseCase.타입_기반_장소_컨텐츠_추천(type, user);
+      return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), result));
   }
 
   @Override
