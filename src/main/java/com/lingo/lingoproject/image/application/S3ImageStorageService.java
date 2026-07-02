@@ -91,13 +91,26 @@ public class S3ImageStorageService {
 
     프로필_사진_검증(file, user);
 
+    GetImageUrlResponseDto response = 회원가입_중_프로필_재업로드_케이스(file, user);
+    if (response != null) {
+      sendDiscordNotifForProfileReview(user);
+      return response;
+    }
+
     String imageUrl = S3_버킷에_이미지_업로드(file, "profiles");
 
-    GetImageUrlResponseDto response = profileTransactionService.프로필_url_저장과_프로필_제출로_상태변경(imageUrl, user);
+    response = profileTransactionService.프로필_url_저장과_프로필_제출로_상태변경(imageUrl, user);
 
     sendDiscordNotifForProfileReview(user);
 
     return response;
+  }
+
+  public GetImageUrlResponseDto 회원가입_중_프로필_재업로드_케이스(MultipartFile file, User user){
+    if (profileTransactionService.프로필_사진이_존재하는지(user)){
+      return updateProfileImage(file, user.getId());
+    }
+    return null;
   }
 
   @Async
@@ -112,10 +125,11 @@ public class S3ImageStorageService {
         ErrorCode.SUCCESS.getCode(), profile.getImageUrl(), profile.getId());
   }
 
-  @Transactional
-  public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long profileId, Long userId) {
+  public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long userId) {
     User user = userQueryUseCase.유저_찾기_혹은_오류(userId);
     Profile profile = user.getProfile();
+
+    if (profile == null) throw new RingoException("프로필 사진이 없습니다", ErrorCode.BAD_REQUEST);
 
     프로필_사진_검증(file, user);
     해당_유저의_이미지_권한_검증(profile, userId);
@@ -135,10 +149,9 @@ public class S3ImageStorageService {
     log.info("userId={}, newProfileUrl={}", user.getId(), 새_이미지_url);
 
     sendDiscordNotifForProfileReview(user);
-    user.setStatus(SignupStatus.SUBMITTED);
-    userQueryUseCase.save(user);
+    userQueryUseCase.유저_프로필_상태_변경(user, SignupStatus.SUBMITTED);
 
-    return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), 새_이미지_url, profileId);
+    return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), 새_이미지_url, profile.getId());
   }
 
   public void deleteProfileImage(User user) {
