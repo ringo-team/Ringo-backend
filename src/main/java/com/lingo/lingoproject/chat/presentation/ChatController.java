@@ -19,10 +19,7 @@ import com.lingo.lingoproject.shared.utils.ResultMessageResponseDto;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -67,7 +64,7 @@ public class ChatController implements ChatApi {
     }
 
     log.info("step=채팅방_조회_시작, userId={}", user.getId());
-    List<GetChatroomResponseDto> dtos = chatService.getChatroomsByUser(user);
+    List<GetChatroomResponseDto> dtos = chatService.채팅방_목록_리스트_조회(user);
     log.info("step=채팅방_조회_완료, userId={}", user.getId());
 
     return ResponseEntity.status(HttpStatus.OK).body(new ApiListResponseDto<>(ErrorCode.SUCCESS.getCode(), dtos));

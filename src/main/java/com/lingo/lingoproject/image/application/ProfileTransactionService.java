@@ -35,6 +35,10 @@ public class ProfileTransactionService {
     this.feedImageRepository = feedImageRepository;
   }
 
+  public boolean 프로필_사진이_존재하는지(User user){
+    return profileRepository.existsByUser(user);
+  }
+
   @Transactional
   public GetImageUrlResponseDto 프로필_url_저장과_프로필_제출로_상태변경(String imageUrl, User user){
     Profile savedProfile = 프로필_url_저장(user, imageUrl);

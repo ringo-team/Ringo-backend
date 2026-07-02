@@ -8,5 +8,4 @@ public interface ChatroomSummaryProjection {
   String getContent();
   LocalDateTime getCreatedAt();
   int getUnreadCount();
-
 }

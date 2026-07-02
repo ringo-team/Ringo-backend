@@ -38,4 +38,8 @@ public class BlockUserUseCase {
 
     blockedUserRepository.save(blockedUser);
   }
+
+  public boolean 해당_유저가_블락되었는지_판별(User user){
+    return blockedUserRepository.existsByBlockedUserId(user.getId());
+  }
 }

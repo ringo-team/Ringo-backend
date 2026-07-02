@@ -11,8 +11,6 @@ import com.lingo.lingoproject.shared.domain.model.ChatType;
 import com.lingo.lingoproject.shared.domain.model.Chatroom;
 import com.lingo.lingoproject.shared.domain.model.ChatroomParticipant;
 import com.lingo.lingoproject.shared.domain.model.FailedChatMessageLog;
-import com.lingo.lingoproject.shared.domain.model.Matching;
-import com.lingo.lingoproject.shared.domain.model.MatchingStatus;
 import com.lingo.lingoproject.shared.domain.model.Message;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
@@ -23,6 +21,9 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.ChatroomReposito
 import com.lingo.lingoproject.shared.infrastructure.persistence.FailedChatMessageLogRepository;
 import com.lingo.lingoproject.matching.application.MatchQueryUseCase;
 import com.lingo.lingoproject.shared.infrastructure.persistence.MessageRepository;
+import com.lingo.lingoproject.shared.utils.RedisKey;
+import com.lingo.lingoproject.user.application.BlockUserUseCase;
+import com.lingo.lingoproject.user.application.DormantAccountUseCase;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import com.lingo.lingoproject.shared.utils.GenericUtils;
 import jakarta.transaction.Transactional;
@@ -30,7 +31,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -80,6 +80,8 @@ public class ChatService {
   private final RedisTemplate<String, Object> redisTemplate;
   private final FailedChatMessageLogRepository failedChatMessageLogRepository;
   private final AppointmentRepository appointmentRepository;
+  private final BlockUserUseCase blockUserUseCase;
+  private final DormantAccountUseCase dormantAccountUseCase;
 
   // ============================================================
   // Public API — 채팅 메시지
@@ -185,7 +187,7 @@ public class ChatService {
   // Public API — 채팅방 관리
   // ============================================================
 
-  public List<GetChatroomResponseDto> getChatroomsByUser(User 유저) {
+  public List<GetChatroomResponseDto> 채팅방_목록_리스트_조회(User 유저) {
     List<Chatroom> 유저의_채팅방_목록 = chatroomRepository.findAllByUser(유저);
     List<Long> 채팅방_ids = 채팅방_id_추출(유저의_채팅방_목록);
 
@@ -211,7 +213,21 @@ public class ChatService {
     if (participant.is회원탈퇴한_유저인지()) opponent = null;
     else opponent = participant.getParticipant();
 
-    return GetChatroomResponseDto.of(chatroom, opponent, summary);
+    String userStatus = 채팅_상대방_유저_상태_조회(participant);
+
+    return GetChatroomResponseDto.of(chatroom, opponent, userStatus, summary);
+  }
+
+  // SIGNOUT, BLOCK, DORMANT, LEAVE
+  private String 채팅_상대방_유저_상태_조회(ChatroomParticipant participant){
+    User user = participant.getParticipant();
+    if (participant.is회원탈퇴한_유저인지()) return "SIGNOUT";
+    if (!participant.isActive()) return "LEAVE";
+    if (redisTemplate.hasKey(RedisKey.계정_정지_레디스_키 + user.getId()) || blockUserUseCase.해당_유저가_블락되었는지_판별(user)){
+      return "BLOCK";
+    }
+    if (dormantAccountUseCase.isDormant(user)) return "DORMANT";
+    return "NORMAL";
   }
 
   private List<Long> 채팅방_id_추출(List<Chatroom> chatrooms){

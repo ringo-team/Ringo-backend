@@ -53,7 +53,7 @@ public class ImageController implements ImageApi {
 
   public ResponseEntity<GetImageUrlResponseDto> updateProfileImage(MultipartFile image, Long profileId, User user) {
     log.info("step=프로필_업데이트_시작, userId={}, profileId={}", user.getId(), profileId);
-    GetImageUrlResponseDto dto = imageService.updateProfileImage(image, profileId, user.getId());
+    GetImageUrlResponseDto dto = imageService.updateProfileImage(image, user.getId());
     log.info("step=프로필_업데이트_완료, userId={}, profileId={}", user.getId(), profileId);
     return ResponseEntity.status(HttpStatus.OK).body(dto);
   }

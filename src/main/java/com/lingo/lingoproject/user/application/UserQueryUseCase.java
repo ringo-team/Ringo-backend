@@ -17,6 +17,7 @@ import com.lingo.lingoproject.shared.infrastructure.persistence.NotificationOpti
 import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import com.lingo.lingoproject.user.presentation.dto.GetUserInfoResponseDto;
+import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -77,6 +78,12 @@ public class UserQueryUseCase {
     if (user.getMbti() != null && !user.getMbti().isBlank()) score += 5;
     if (user.getDegree() != null && !user.getDegree().isBlank()) score += 5;
     return score;
+  }
+
+  @Transactional
+  public void 유저_프로필_상태_변경(User user, SignupStatus status){
+    user.setStatus(status);
+    userRepository.save(user);
   }
 
   private Map<String, Boolean> 알림_설정_여부_조회(User user){
