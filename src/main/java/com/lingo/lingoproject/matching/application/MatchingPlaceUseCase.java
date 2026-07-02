@@ -251,7 +251,7 @@ public class MatchingPlaceUseCase {
   private List<Place> 추천_장소가_너무_적을경우_링고_추천_장소_조회() {
     List<Place> places = placeRepository.findAllByTypeWithImages("RINGO");
     Collections.shuffle(places);
-    return places.subList(0, Math.min(places.size(), 10));
+    return new ArrayList<>(places.subList(0, Math.min(places.size(), 10)));
   }
 
   private List<AnswerWeightPair> 설문_응답쌍과_연관_가중치_조회(Long user1, Long user2) {

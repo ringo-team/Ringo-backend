@@ -48,6 +48,7 @@ public class ProfileInspectUseCase {
         .build();
     return response;
   }
+
   public ProfileReviewResponseDto buildProfileReviewResponseDto(User user){
     Profile profile = user.getProfile();
     List<String> imageUrls = List.of(profile != null ? profile.getImageUrl() : null);
