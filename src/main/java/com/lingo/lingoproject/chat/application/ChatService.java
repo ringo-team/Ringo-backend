@@ -215,7 +215,7 @@ public class ChatService {
 
     String userStatus = 채팅_상대방_유저_상태_조회(participant);
 
-    return GetChatroomResponseDto.of(chatroom, opponent, status, summary);
+    return GetChatroomResponseDto.of(chatroom, opponent, userStatus, summary);
   }
 
   // SIGNOUT, BLOCK, DORMANT, LEAVE
