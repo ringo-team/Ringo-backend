@@ -19,6 +19,8 @@ public record GetChatroomResponseDto(
     Integer chatroomSize,
     @Schema(description = "채팅방 참여자 닉네임 리스트", example = "불타는 망고")
     String chatOpponent,
+    @Schema(description = "채팅 상대방 상태", example = "NORMAL")
+    String opponentStatus,
     @Schema(description = "채팅 상대방 프로필 url")
     String chatOpponentProfileUrl,
     @Schema(description = "읽지 않은 메세지 개수", example = "5")
@@ -29,7 +31,7 @@ public record GetChatroomResponseDto(
     String lastSendDateTime
 ) {
 
-  public static GetChatroomResponseDto of(Chatroom chatroom, User opponent, ChatroomSummaryProjection summary) {
+  public static GetChatroomResponseDto of(Chatroom chatroom, User opponent, String status, ChatroomSummaryProjection summary) {
 
     if (summary == null){
       log.info("projection is null");
@@ -37,6 +39,7 @@ public record GetChatroomResponseDto(
           .chatroomId(chatroom.getId())
           .chatOpponent(Optional.ofNullable(opponent).map(User::getNickname).orElse(null))
           .chatOpponentProfileUrl(Optional.ofNullable(opponent).map(User::getProfile).map(Profile::getImageUrl).orElse(null))
+          .opponentStatus(status)
           .lastChatMessage(null)
           .numberOfNotReadMessages(null)
           .lastSendDateTime(null)
@@ -44,16 +47,15 @@ public record GetChatroomResponseDto(
           .build();
     }
 
-
     return GetChatroomResponseDto.builder()
         .chatroomId(chatroom.getId())
         .chatOpponent(Optional.ofNullable(opponent).map(User::getNickname).orElse(null))
         .chatOpponentProfileUrl(Optional.ofNullable(opponent).map(User::getProfile).map(Profile::getImageUrl).orElse(null))
+        .opponentStatus(status)
         .lastChatMessage(summary.getContent())
         .numberOfNotReadMessages(summary.getUnreadCount())
         .lastSendDateTime(summary.getCreatedAt() != null ?
-            summary.getCreatedAt().toString()
-            : null)
+            summary.getCreatedAt().toString() : null)
         .chatroomSize(2)
         .build();
   }

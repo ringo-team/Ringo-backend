@@ -8,6 +8,7 @@ import com.lingo.lingoproject.shared.security.TokenType;
 import com.lingo.lingoproject.shared.security.dto.LoginResponseDto;
 import com.lingo.lingoproject.shared.security.dto.RegenerateTokenResponseDto;
 import com.lingo.lingoproject.shared.security.jwt.JwtUtil;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Objects;
@@ -67,7 +68,7 @@ public class AuthTokenUseCase {
     Claims claims = jwtUtil.토큰에서_claim_추출(accessToken);
 
     redisTemplate.delete("redis::refresh::" + claims.getSubject());
-    redisTemplate.opsForValue().set("logoutUser::" + claims.getId(), accessToken, 1, TimeUnit.DAYS);
+    redisTemplate.opsForValue().set(RedisKey.로그아웃_레디스_키 + claims.getId(), accessToken, 1, TimeUnit.DAYS);
   }
 
   private RegenerateTokenResponseDto generateTokenAndSaveRefreshTokenInRedis(String loginId) {

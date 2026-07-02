@@ -90,13 +90,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       }
       // 로그아웃한 유저가 기존 토큰으로 접근하려고 할때 접근을 차단함
       // 로그아웃 시 해당 토큰의 jti를 Redis에 등록 (TTL = 토큰 잔여 만료 시간)
-      if(redisTemplate.hasKey("logoutUser::" + claims.getId())){
+      if(redisTemplate.hasKey(RedisKey.로그아웃_레디스_키 + claims.getId())){
         throw new RingoException("유효하지 않은 토큰 입니다.", ErrorCode.LOGOUT);
       }
 
       // 계정 정지된 사람일 경우 접근을 차단함
       // ReportService.suspendUser()에서 "suspension::{userId}" 키를 TTL과 함께 Redis에 등록
-      if (redisTemplate.hasKey("suspension::" + user.getId())){
+      if (redisTemplate.hasKey(RedisKey.계정_정지_레디스_키 + user.getId())){
         throw new RingoException("계정이 정지된 유저입니다.", ErrorCode.BLOCKED);
       }
 

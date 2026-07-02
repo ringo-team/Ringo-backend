@@ -11,6 +11,7 @@ import com.lingo.lingoproject.shared.domain.model.ReportStatus;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ReportRepository;
+import com.lingo.lingoproject.shared.utils.RedisKey;
 import com.lingo.lingoproject.shared.utils.RedisUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -119,7 +120,7 @@ public class ReportService {
     int suspensionDays = reportDomainService.determineSuspensionDays(status);
     if (suspensionDays > 0) {
       redisTemplate.opsForValue().set(
-          "suspension::" + report.getReportedUserId(), true, suspensionDays, TimeUnit.DAYS);
+          RedisKey.계정_정지_레디스_키 + report.getReportedUserId(), true, suspensionDays, TimeUnit.DAYS);
     }
 
     if (reportDomainService.isPermanentSuspension(status)) {

@@ -496,11 +496,16 @@ public class MatchingRecommendationUseCase {
   }
 
   private List<Long> 정지된_유저_ids() {
-    return redisTemplate.keys("suspension::*")
-        .stream()
-        .map(s -> s.replace("suspension::", ""))
-        .map(Long::parseLong)
-        .toList();
+    List<Long> list = new ArrayList<>();
+    ScanOptions options = ScanOptions.scanOptions()
+        .match(RedisKey.계정_정지_레디스_키 + "*")
+        .count(1000)
+        .build();
+    try(Cursor<String> cursor = redisTemplate.scan(options)){
+      String key = cursor.next();
+      list.add(Long.parseLong(key.replace(RedisKey.계정_정지_레디스_키, "")));
+    }
+    return list;
   }
 
   private List<Long> 내가_요청_보낸_유저_ids(User user) {

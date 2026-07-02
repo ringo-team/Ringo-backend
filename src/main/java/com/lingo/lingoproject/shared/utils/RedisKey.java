@@ -10,4 +10,6 @@ public class RedisKey {
   public static final String 디스코드_재시도_레디스_키         = "discord::retry-queue";
   public static final String 일일_설문_조회_레디스_키         = "daily-survey::";
   public static final String 개인_장소_추천_레디스_키         = "individual-place::";
+  public static final String 로그아웃_레디스_키              = "logout-user::";
+  public static final String 계정_정지_레디스_키             = "suspend-user::";
 }
