@@ -3,16 +3,15 @@ package com.lingo.lingoproject.admin.application;
 import com.lingo.lingoproject.admin.presentation.dto.PostProfileReviewRequestDto;
 import com.lingo.lingoproject.admin.presentation.dto.ProfileReviewListResponseDto;
 import com.lingo.lingoproject.admin.presentation.dto.ProfileReviewResponseDto;
+import com.lingo.lingoproject.image.application.S3ImageStorageService;
 import com.lingo.lingoproject.shared.domain.model.Profile;
 import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.persistence.ProfileRepository;
-import com.lingo.lingoproject.shared.infrastructure.persistence.UserRepository;
 import com.lingo.lingoproject.user.application.UserQueryUseCase;
 import jakarta.transaction.Transactional;
-import jakarta.xml.bind.annotation.XmlType.DEFAULT;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,6 +24,7 @@ import org.springframework.stereotype.Service;
 public class ProfileInspectUseCase {
   private final UserQueryUseCase userQueryUseCase;
   private final ProfileRepository profileRepository;
+  private final S3ImageStorageService s3ImageStorageService;
 
   public ProfileReviewListResponseDto getProfileReviews(String status, int page, int size){
     Pageable pageable = PageRequest.of(page, size);
@@ -51,7 +51,8 @@ public class ProfileInspectUseCase {
 
   public ProfileReviewResponseDto buildProfileReviewResponseDto(User user){
     Profile profile = user.getProfile();
-    List<String> imageUrls = List.of(profile != null ? profile.getImageUrl() : null);
+    String imageUrl = resolveReviewImageUrl(profile, user.getStatus());
+    List<String> imageUrls = List.of(imageUrl);
     String status = switch (user.getStatus()){
       case SignupStatus.COMPLETED -> "APPROVED";
       case SignupStatus.SUBMITTED -> "PENDING";
@@ -69,6 +70,15 @@ public class ProfileInspectUseCase {
     return result;
   }
 
+  private String resolveReviewImageUrl(Profile profile, SignupStatus status) {
+    if (profile == null) return null;
+    return switch (status) {
+      case SignupStatus.COMPLETED -> profile.getImageUrl();
+      case SignupStatus.REJECTED, SignupStatus.SUBMITTED -> profile.getInspectProfileUrl();
+      default -> profile.getInspectProfileUrl();
+    };
+  }
+
   @Transactional
   public void postProfileReview(Long id, PostProfileReviewRequestDto request){
     User user = userQueryUseCase.유저_찾기_혹은_오류(id);
@@ -79,11 +89,14 @@ public class ProfileInspectUseCase {
       case "REJECT" -> SignupStatus.REJECTED;
       default -> throw new RingoException("status 값이 올바르지 않습니다.", ErrorCode.BAD_PARAMETER);
     };
-    // 유저 상태 변경
+
+    if (status == SignupStatus.COMPLETED) {
+      s3ImageStorageService.프로필_검수_승인_처리(profile);
+    }
+
     user.setStatus(status);
     userQueryUseCase.save(user);
 
-    // 사진 반려 시 사유 저장
     if (request.reason() != null) {
       profile.setReason(request.reason());
       profileRepository.save(profile);

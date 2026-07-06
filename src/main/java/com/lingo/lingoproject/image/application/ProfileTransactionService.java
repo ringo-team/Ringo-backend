@@ -44,14 +44,14 @@ public class ProfileTransactionService {
     Profile savedProfile = 프로필_url_저장(user, imageUrl);
     프로필_제출로_상태_변경(user);
 
-    log.info("userId={}, profileUrl={}, status={}", user.getId(), savedProfile.getImageUrl(), user.getStatus());
+    log.info("userId={}, inspectProfileUrl={}, status={}", user.getId(), savedProfile.getInspectProfileUrl(), user.getStatus());
 
     return new GetImageUrlResponseDto(
-        ErrorCode.SUCCESS.getCode(), savedProfile.getImageUrl(), savedProfile.getId());
+        ErrorCode.SUCCESS.getCode(), savedProfile.getInspectProfileUrl(), savedProfile.getId());
   }
 
-  private Profile 프로필_url_저장(User user, String imageUrl) {
-    Profile profile = Profile.프로필_객체_생성(user, imageUrl);
+  private Profile 프로필_url_저장(User user, String inspectProfileUrl) {
+    Profile profile = Profile.프로필_객체_생성(user, inspectProfileUrl);
     Profile saved = profileRepository.save(profile);
     user.setProfile(saved);
     userQueryUseCase.save(user);
@@ -65,7 +65,14 @@ public class ProfileTransactionService {
 
   @Transactional
   public void 프로필_이미지_업데이트(Profile profile, String newImageUrl){
-    profile.setImageUrl(newImageUrl);
+    profile.setInspectProfileUrl(newImageUrl);
+    profileRepository.save(profile);
+  }
+
+  @Transactional
+  public void 프로필_검수_승인(Profile profile) {
+    profile.setImageUrl(profile.getInspectProfileUrl());
+    profile.setInspectProfileUrl(null);
     profileRepository.save(profile);
   }
 

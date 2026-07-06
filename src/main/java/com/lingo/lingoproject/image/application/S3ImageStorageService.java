@@ -121,8 +121,9 @@ public class S3ImageStorageService {
   public GetImageUrlResponseDto fetchProfileImageUrl(Long userId) {
     User user = userQueryUseCase.유저_찾기_혹은_오류(userId);
     Profile profile = user.getProfile();
+    String url = profile.getImageUrl() != null ? profile.getImageUrl() : profile.getInspectProfileUrl();
     return new GetImageUrlResponseDto(
-        ErrorCode.SUCCESS.getCode(), profile.getImageUrl(), profile.getId());
+        ErrorCode.SUCCESS.getCode(), url, profile.getId());
   }
 
   public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long userId) {
@@ -134,7 +135,7 @@ public class S3ImageStorageService {
     프로필_사진_검증(file, user);
     해당_유저의_이미지_권한_검증(profile, userId);
 
-    String 기존_이미지_url = profile.getImageUrl();
+    String 검수_이미지_url = profile.getInspectProfileUrl();
     String 새_이미지_url = S3_버킷에_이미지_업로드(file, "profiles");
 
     try{
@@ -144,9 +145,11 @@ public class S3ImageStorageService {
       throw new RingoException("프로필 업데이트에 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
-    S3_버킷_이미지_삭제(기존_이미지_url);
+    if (검수_이미지_url != null) {
+      S3_버킷_이미지_삭제(검수_이미지_url);
+    }
 
-    log.info("userId={}, newProfileUrl={}", user.getId(), 새_이미지_url);
+    log.info("userId={}, newInspectProfileUrl={}", user.getId(), 새_이미지_url);
 
     sendDiscordNotifForProfileReview(user);
     userQueryUseCase.유저_프로필_상태_변경(user, SignupStatus.SUBMITTED);
@@ -154,16 +157,39 @@ public class S3ImageStorageService {
     return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), 새_이미지_url, profile.getId());
   }
 
+  public void 프로필_검수_승인_처리(Profile profile) {
+    String 승인_url = profile.getInspectProfileUrl();
+    if (승인_url == null) {
+      return;
+    }
+    String 기존_승인_url = profile.getImageUrl();
+
+    profileTransactionService.프로필_검수_승인(profile);
+
+    if (기존_승인_url != null && !기존_승인_url.equals(승인_url)) {
+      S3_버킷_이미지_삭제(기존_승인_url);
+    }
+  }
+
   public void deleteProfileImage(User user) {
     Profile profile = user.getProfile();
 
     if (profile == null) return;
 
-    log.info("userId={}, profileId={}, profileUrl={}, deletedAt={}",
-        user.getId(), profile.getId(), profile.getImageUrl(), LocalDateTime.now());
+    log.info("userId={}, profileId={}, profileUrl={}, inspectProfileUrl={}, deletedAt={}",
+        user.getId(), profile.getId(), profile.getImageUrl(), profile.getInspectProfileUrl(), LocalDateTime.now());
+
+    String imageUrl = profile.getImageUrl();
+    String inspectProfileUrl = profile.getInspectProfileUrl();
 
     profileTransactionService.프로필_이미지_삭제(profile);
-    S3_버킷_이미지_삭제(profile.getImageUrl());
+
+    if (imageUrl != null) {
+      S3_버킷_이미지_삭제(imageUrl);
+    }
+    if (inspectProfileUrl != null) {
+      S3_버킷_이미지_삭제(inspectProfileUrl);
+    }
   }
 
   // ============================================================
@@ -345,7 +371,9 @@ public class S3ImageStorageService {
 
   public boolean verifyFaceIdentity(MultipartFile targetImage, User user) {
     try {
-      byte[] storedProfileBytes = S3_이미지_키로부터_이미지_byte_조회(S3_이미지_키_추출(user.getProfile().getImageUrl()));
+      Profile profile = user.getProfile();
+      String profileUrl = profile.getImageUrl() != null ? profile.getImageUrl() : profile.getInspectProfileUrl();
+      byte[] storedProfileBytes = S3_이미지_키로부터_이미지_byte_조회(S3_이미지_키_추출(profileUrl));
       return hasFaceMatch(storedProfileBytes, targetImage);
     } catch (Exception e) {
       log.error("userId={}, step=얼굴_인증_실패", user.getId(), e);
