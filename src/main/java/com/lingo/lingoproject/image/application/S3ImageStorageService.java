@@ -4,7 +4,6 @@ import com.lingo.lingoproject.shared.domain.model.FeedImage;
 import com.lingo.lingoproject.shared.domain.model.PhotographerImage;
 import com.lingo.lingoproject.shared.domain.model.Profile;
 import com.lingo.lingoproject.shared.domain.model.Role;
-import com.lingo.lingoproject.shared.domain.model.SignupStatus;
 import com.lingo.lingoproject.shared.domain.model.User;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
@@ -31,6 +30,7 @@ import java.util.UUID;
 import javax.imageio.ImageIO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
@@ -85,33 +85,65 @@ public class S3ImageStorageService {
   // Profile image
   // ============================================================
 
-  public GetImageUrlResponseDto 프로필_사진_업로드(MultipartFile file, User user) {
+  public GetImageUrlResponseDto 프로필_사진_신규_등록(MultipartFile file, User user) {
 
     if (file == null) return null;
 
     프로필_사진_검증(file, user);
 
-    GetImageUrlResponseDto response = 회원가입_중_프로필_재업로드_케이스(file, user);
-    if (response != null) {
-      sendDiscordNotifForProfileReview(user);
-      return response;
+    Profile profile = profileTransactionService.유저_프로필_조회_없으면_NULL반환(user);
+
+    String newInspectProfileUrl = S3_버킷에_이미지_업로드(file, "profiles");
+
+    if (profile != null) { // 관리자로부터 최초 검증 받기 전에, 프로필 사진을 재업로드한 경우
+      if (StringUtils.isBlank(profile.getInspectProfileUrl())) { // 검수 이미지가 존재하지 않을 때
+        S3_버킷_이미지_삭제(newInspectProfileUrl);
+        throw new RingoException("잘못된 요청입니다. (이미 프로필 객체 생성된 경우 inspectImageUrl 반드시 있어야함)", ErrorCode.BAD_REQUEST);
+      }
+      String prevInspectProfileUrl = profile.getInspectProfileUrl();
+      S3_버킷_이미지_삭제(prevInspectProfileUrl);
+      profile = profileTransactionService.프로필_이미지_업데이트(profile, newInspectProfileUrl);
+      user.setProfile(profile);
+    } else { // 프로필 객체 최초 생성
+      profile = profileTransactionService.프로필_url_저장(user, newInspectProfileUrl);
     }
 
-    String imageUrl = S3_버킷에_이미지_업로드(file, "profiles");
+    profileTransactionService.프로필_제출로_상태_변경(user);
 
-    response = profileTransactionService.프로필_url_저장과_프로필_제출로_상태변경(imageUrl, user);
-
+    // 디스코드 알림 코드
     sendDiscordNotifForProfileReview(user);
 
-    return response;
+    return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), newInspectProfileUrl, profile.getId());
   }
 
-  public GetImageUrlResponseDto 회원가입_중_프로필_재업로드_케이스(MultipartFile file, User user){
-    if (profileTransactionService.프로필_사진이_존재하는지(user)){
-      return updateProfileImage(file, user.getId());
+
+  public GetImageUrlResponseDto 프로필_사진_수정(MultipartFile file, User user) {
+    if (file == null) return null;
+
+    프로필_사진_검증(file, user);
+
+    Profile profile = profileTransactionService.유저_프로필_조회_없으면_NULL반환(user);
+
+    if (profile == null) {
+      throw new RingoException("유저의 프로필이 존재하지 않습니다.", ErrorCode.BAD_REQUEST);
     }
-    return null;
+
+    String newInspectProfileUrl = S3_버킷에_이미지_업로드(file, "profiles");
+
+    if (StringUtils.isNotBlank(profile.getInspectProfileUrl())) { // 이미 검수 진행 중인 프로필 사진이 있으나, 재업로드 할 경우
+      String prevInspectProfileUrl = profile.getInspectProfileUrl();
+      S3_버킷_이미지_삭제(prevInspectProfileUrl);
+    }
+    profile = profileTransactionService.프로필_이미지_업데이트(profile, newInspectProfileUrl);
+    user.setProfile(profile);
+    profileTransactionService.프로필_제출로_상태_변경(user);
+
+    // 디스코드 알림 코드
+    sendDiscordNotifForProfileReview(user);
+
+    return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), newInspectProfileUrl, profile.getId());
   }
+
 
   @Async
   public void sendDiscordNotifForProfileReview(User user){
@@ -126,7 +158,8 @@ public class S3ImageStorageService {
         ErrorCode.SUCCESS.getCode(), url, profile.getId());
   }
 
-  public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long userId) {
+
+/*  public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long userId) {
     User user = userQueryUseCase.유저_찾기_혹은_오류(userId);
     Profile profile = user.getProfile();
 
@@ -155,7 +188,7 @@ public class S3ImageStorageService {
     userQueryUseCase.유저_프로필_상태_변경(user, SignupStatus.SUBMITTED);
 
     return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), 새_이미지_url, profile.getId());
-  }
+  }*/
 
   public void 프로필_검수_승인_처리(Profile profile) {
     String 승인_url = profile.getInspectProfileUrl();
@@ -362,7 +395,18 @@ public class S3ImageStorageService {
   }
 
   public String S3_이미지_키_추출(String imageUrl) {
-    return imageUrl.substring(imageUrl.lastIndexOf(cloudfrontDomain + "/") + 14);
+    String cloudfrontPrefix = cloudfrontDomain + "/";
+    if (StringUtils.isNotBlank(cloudfrontDomain) && imageUrl.contains(cloudfrontPrefix)) {
+      return imageUrl.substring(imageUrl.lastIndexOf(cloudfrontPrefix) + cloudfrontPrefix.length());
+    }
+
+    String s3DomainPrefix = "amazonaws.com/";
+    int s3KeyStartIndex = imageUrl.lastIndexOf(s3DomainPrefix);
+    if (s3KeyStartIndex != -1) {
+      return imageUrl.substring(s3KeyStartIndex + s3DomainPrefix.length());
+    }
+
+    throw new RingoException("이미지 URL에서 S3 key를 추출할 수 없습니다.", ErrorCode.BAD_REQUEST);
   }
 
   // ============================================================

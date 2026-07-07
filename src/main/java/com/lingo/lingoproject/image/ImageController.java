@@ -30,12 +30,12 @@ public class ImageController implements ImageApi {
 
   public ResponseEntity<?> uploadProfileImage(MultipartFile image, User user) {
     log.info("step=프로필_업로드_시작, userId={}", user.getId());
-    GetImageUrlResponseDto dto = imageService.프로필_사진_업로드(image, user);
+    GetImageUrlResponseDto dto = imageService.프로필_사진_신규_등록(image, user);
 
     if (dto == null) {
-      log.info("step=프로필_업로드_실패, userId={}, reason=이미_존재", user.getId());
+      log.info("step=프로필_업로드_실패, userId={}, reason=첨부된 이미지 없음", user.getId());
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto(
-          ErrorCode.PROFILE_DUPLICATED.getCode(), "이미 프로필 사진이 존재합니다."));
+          ErrorCode.BAD_REQUEST.getCode(), "첨부된 이미지가 없습니다."));
     }
 
     log.info("step=프로필_업로드_완료, userId={}, imageId={}", user.getId(), dto.imageId());
@@ -53,7 +53,7 @@ public class ImageController implements ImageApi {
 
   public ResponseEntity<GetImageUrlResponseDto> updateProfileImage(MultipartFile image, Long profileId, User user) {
     log.info("step=프로필_업데이트_시작, userId={}, profileId={}", user.getId(), profileId);
-    GetImageUrlResponseDto dto = imageService.updateProfileImage(image, user.getId());
+    GetImageUrlResponseDto dto = imageService.프로필_사진_수정(image, user);
     log.info("step=프로필_업데이트_완료, userId={}, profileId={}", user.getId(), profileId);
     return ResponseEntity.status(HttpStatus.OK).body(dto);
   }

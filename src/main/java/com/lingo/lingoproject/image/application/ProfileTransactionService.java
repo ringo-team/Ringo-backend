@@ -35,22 +35,12 @@ public class ProfileTransactionService {
     this.feedImageRepository = feedImageRepository;
   }
 
-  public boolean 프로필_사진이_존재하는지(User user){
-    return profileRepository.existsByUser(user);
+  public Profile 유저_프로필_조회_없으면_NULL반환(User user) {
+    return profileRepository.findByUser(user).orElse(null);
   }
 
   @Transactional
-  public GetImageUrlResponseDto 프로필_url_저장과_프로필_제출로_상태변경(String imageUrl, User user){
-    Profile savedProfile = 프로필_url_저장(user, imageUrl);
-    프로필_제출로_상태_변경(user);
-
-    log.info("userId={}, inspectProfileUrl={}, status={}", user.getId(), savedProfile.getInspectProfileUrl(), user.getStatus());
-
-    return new GetImageUrlResponseDto(
-        ErrorCode.SUCCESS.getCode(), savedProfile.getInspectProfileUrl(), savedProfile.getId());
-  }
-
-  private Profile 프로필_url_저장(User user, String inspectProfileUrl) {
+  public Profile 프로필_url_저장(User user, String inspectProfileUrl) {
     Profile profile = Profile.프로필_객체_생성(user, inspectProfileUrl);
     Profile saved = profileRepository.save(profile);
     user.setProfile(saved);
@@ -64,9 +54,9 @@ public class ProfileTransactionService {
   }
 
   @Transactional
-  public void 프로필_이미지_업데이트(Profile profile, String newImageUrl){
+  public Profile 프로필_이미지_업데이트(Profile profile, String newImageUrl){
     profile.setInspectProfileUrl(newImageUrl);
-    profileRepository.save(profile);
+    return profileRepository.save(profile);
   }
 
   @Transactional
