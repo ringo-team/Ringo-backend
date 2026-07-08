@@ -153,7 +153,7 @@ public class S3ImageStorageService {
   public GetImageUrlResponseDto fetchProfileImageUrl(Long userId) {
     User user = userQueryUseCase.유저_찾기_혹은_오류(userId);
     Profile profile = user.getProfile();
-    String url = profile.getImageUrl() != null ? profile.getImageUrl() : profile.getInspectProfileUrl();
+    String url = profile.getImageUrl() != null ? profile.getImageUrl() : "";
     return new GetImageUrlResponseDto(
         ErrorCode.SUCCESS.getCode(), url, profile.getId());
   }
