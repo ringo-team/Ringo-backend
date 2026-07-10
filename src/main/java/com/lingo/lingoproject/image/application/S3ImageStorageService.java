@@ -1,10 +1,6 @@
 package com.lingo.lingoproject.image.application;
 
-import com.lingo.lingoproject.shared.domain.model.FeedImage;
-import com.lingo.lingoproject.shared.domain.model.PhotographerImage;
-import com.lingo.lingoproject.shared.domain.model.Profile;
-import com.lingo.lingoproject.shared.domain.model.Role;
-import com.lingo.lingoproject.shared.domain.model.User;
+import com.lingo.lingoproject.shared.domain.model.*;
 import com.lingo.lingoproject.shared.exception.ErrorCode;
 import com.lingo.lingoproject.shared.exception.RingoException;
 import com.lingo.lingoproject.shared.infrastructure.discord.DiscordService;
@@ -92,6 +88,8 @@ public class S3ImageStorageService {
     프로필_사진_검증(file, user);
 
     Profile profile = profileTransactionService.유저_프로필_조회_없으면_NULL반환(user);
+    if (!user.getStatus().equals(SignupStatus.SUBMITTED)) throw new RingoException("프로필 검수 중입니다", ErrorCode.BAD_REQUEST);
+
     String newInspectProfileUrl = S3_버킷에_이미지_업로드(file, "profiles");
 
     if (profile == null) profile = Profile.프로필_객체_생성(user, newInspectProfileUrl);
