@@ -35,37 +35,30 @@ public class ProfileTransactionService {
     this.feedImageRepository = feedImageRepository;
   }
 
-  public boolean 프로필_사진이_존재하는지(User user){
-    return profileRepository.existsByUser(user);
+  public Profile 유저_프로필_조회_없으면_NULL반환(User user) {
+    return profileRepository.findByUser(user).orElse(null);
   }
+
 
   @Transactional
-  public GetImageUrlResponseDto 프로필_url_저장과_프로필_제출로_상태변경(String imageUrl, User user){
-    Profile savedProfile = 프로필_url_저장(user, imageUrl);
-    프로필_제출로_상태_변경(user);
-
-    log.info("userId={}, profileUrl={}, status={}", user.getId(), savedProfile.getImageUrl(), user.getStatus());
-
-    return new GetImageUrlResponseDto(
-        ErrorCode.SUCCESS.getCode(), savedProfile.getImageUrl(), savedProfile.getId());
-  }
-
-  private Profile 프로필_url_저장(User user, String imageUrl) {
-    Profile profile = Profile.프로필_객체_생성(user, imageUrl);
-    Profile saved = profileRepository.save(profile);
-    user.setProfile(saved);
-    userQueryUseCase.save(user);
-    return saved;
-  }
-
   public void 프로필_제출로_상태_변경(User user) {
     user.setStatus(SignupStatus.SUBMITTED);
     userQueryUseCase.save(user);
   }
 
   @Transactional
-  public void 프로필_이미지_업데이트(Profile profile, String newImageUrl){
-    profile.setImageUrl(newImageUrl);
+  public Profile 프로필_이미지_업데이트(User user, Profile profile, String newImageUrl){
+    profile.setInspectProfileUrl(newImageUrl);
+    Profile saved = profileRepository.save(profile);
+    user.setProfile(saved);
+    userQueryUseCase.save(user);
+    return saved;
+  }
+
+  @Transactional
+  public void 프로필_검수_승인(Profile profile) {
+    profile.setImageUrl(profile.getInspectProfileUrl());
+    profile.setInspectProfileUrl(null);
     profileRepository.save(profile);
   }
 
@@ -86,10 +79,14 @@ public class ProfileTransactionService {
         .mapToObj(i -> FeedImage.of(user, feedImageUrl.get(i), requests.get(i).getContent()))
         .toList();
 
-    return feedImageRepository.saveAll(feedImages)
+    return buildFeedImageUploadResponseDto(feedImageRepository.saveAll(feedImages));
+  }
+
+  public List<GetImageUrlResponseDto> buildFeedImageUploadResponseDto(List<FeedImage> feedImages){
+    return feedImages
         .stream()
         .map(img -> new GetImageUrlResponseDto(
-            ErrorCode.SUCCESS.getCode(), img.getImageUrl(), img.getId())
+                ErrorCode.SUCCESS.getCode(), img.getImageUrl(), img.getId())
         )
         .toList();
   }
@@ -97,5 +94,25 @@ public class ProfileTransactionService {
   @Transactional
   public FeedImage 피드_이미지_업데이트(FeedImage 피드_이미지){
     return feedImageRepository.save(피드_이미지);
+  }
+
+  @Transactional
+  public FeedImage 피드_이미지_조회(Long 피드_이미지_id){
+    return feedImageRepository.findById(피드_이미지_id)
+            .orElseThrow(() -> new RingoException("피드 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND));
+  }
+
+  @Transactional
+  public void 피드_이미지_삭제(FeedImage feedImage){
+    feedImageRepository.delete(feedImage);
+  }
+
+  public List<FeedImage> 해당_유저의_모든_피드_이미지_조회(User user){
+    return feedImageRepository.findAllByUser(user);
+  }
+
+  @Transactional
+  public void 해당_유저의_모든_피드_이미지_삭제(User user){
+    feedImageRepository.findAllByUser(user);
   }
 }

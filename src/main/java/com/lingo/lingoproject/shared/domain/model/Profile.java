@@ -35,10 +35,10 @@ import org.hibernate.annotations.DynamicInsert;
 @DynamicInsert
 public class Profile extends Timestamp implements Image{
 
-  public static Profile 프로필_객체_생성(User user, String imageUrl) {
+  public static Profile 프로필_객체_생성(User user, String inspectProfileUrl) {
     return Profile.builder()
         .user(user)
-        .imageUrl(imageUrl)
+        .inspectProfileUrl(inspectProfileUrl)
         .build();
   }
 
@@ -51,6 +51,8 @@ public class Profile extends Timestamp implements Image{
   private User user;
 
   private String imageUrl;
+
+  private String inspectProfileUrl;
 
   private String description;
 
