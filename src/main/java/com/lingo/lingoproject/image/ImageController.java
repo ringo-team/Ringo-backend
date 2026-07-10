@@ -30,14 +30,7 @@ public class ImageController implements ImageApi {
 
   public ResponseEntity<?> uploadProfileImage(MultipartFile image, User user) {
     log.info("step=프로필_업로드_시작, userId={}", user.getId());
-    GetImageUrlResponseDto dto = imageService.프로필_사진_신규_등록(image, user);
-
-    if (dto == null) {
-      log.info("step=프로필_업로드_실패, userId={}, reason=첨부된 이미지 없음", user.getId());
-      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResultMessageResponseDto(
-          ErrorCode.BAD_REQUEST.getCode(), "첨부된 이미지가 없습니다."));
-    }
-
+    GetImageUrlResponseDto dto = imageService.프로필_사진_수정(image, user);
     log.info("step=프로필_업로드_완료, userId={}, imageId={}", user.getId(), dto.imageId());
     return ResponseEntity.status(HttpStatus.CREATED).body(dto);
   }

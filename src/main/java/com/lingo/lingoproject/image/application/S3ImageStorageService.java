@@ -85,58 +85,24 @@ public class S3ImageStorageService {
   // Profile image
   // ============================================================
 
-  public GetImageUrlResponseDto 프로필_사진_신규_등록(MultipartFile file, User user) {
-
-    if (file == null) return null;
-
-    프로필_사진_검증(file, user);
-
-    Profile profile = profileTransactionService.유저_프로필_조회_없으면_NULL반환(user);
-
-    String newInspectProfileUrl = S3_버킷에_이미지_업로드(file, "profiles");
-
-    if (profile != null) { // 관리자로부터 최초 검증 받기 전에, 프로필 사진을 재업로드한 경우
-      if (StringUtils.isBlank(profile.getInspectProfileUrl())) { // 검수 이미지가 존재하지 않을 때
-        S3_버킷_이미지_삭제(newInspectProfileUrl);
-        throw new RingoException("잘못된 요청입니다. (이미 프로필 객체 생성된 경우 inspectImageUrl 반드시 있어야함)", ErrorCode.BAD_REQUEST);
-      }
-      String prevInspectProfileUrl = profile.getInspectProfileUrl();
-      S3_버킷_이미지_삭제(prevInspectProfileUrl);
-      profile = profileTransactionService.프로필_이미지_업데이트(profile, newInspectProfileUrl);
-      user.setProfile(profile);
-    } else { // 프로필 객체 최초 생성
-      profile = profileTransactionService.프로필_url_저장(user, newInspectProfileUrl);
-    }
-
-    profileTransactionService.프로필_제출로_상태_변경(user);
-
-    // 디스코드 알림 코드
-    sendDiscordNotifForProfileReview(user);
-
-    return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), newInspectProfileUrl, profile.getId());
-  }
-
 
   public GetImageUrlResponseDto 프로필_사진_수정(MultipartFile file, User user) {
-    if (file == null) return null;
+    if (file == null) new RingoException("사진이 첨부되지 않았습니다.", ErrorCode.BAD_REQUEST);
 
     프로필_사진_검증(file, user);
 
     Profile profile = profileTransactionService.유저_프로필_조회_없으면_NULL반환(user);
-
-    if (profile == null) {
-      throw new RingoException("유저의 프로필이 존재하지 않습니다.", ErrorCode.BAD_REQUEST);
-    }
-
     String newInspectProfileUrl = S3_버킷에_이미지_업로드(file, "profiles");
 
-    if (StringUtils.isNotBlank(profile.getInspectProfileUrl())) { // 이미 검수 진행 중인 프로필 사진이 있으나, 재업로드 할 경우
-      String prevInspectProfileUrl = profile.getInspectProfileUrl();
-      S3_버킷_이미지_삭제(prevInspectProfileUrl);
+    if (profile == null) profile = Profile.프로필_객체_생성(user, newInspectProfileUrl);
+
+    try {
+      profile = profileTransactionService.프로필_이미지_업데이트(user, profile, newInspectProfileUrl);
+      profileTransactionService.프로필_제출로_상태_변경(user);
+    } catch (Exception e) {
+      S3_버킷_이미지_삭제(newInspectProfileUrl);
+      throw new RingoException("프로필 이미지 업데이트에 실패하였습니다", ErrorCode.INTERNAL_SERVER_ERROR);
     }
-    profile = profileTransactionService.프로필_이미지_업데이트(profile, newInspectProfileUrl);
-    user.setProfile(profile);
-    profileTransactionService.프로필_제출로_상태_변경(user);
 
     // 디스코드 알림 코드
     sendDiscordNotifForProfileReview(user);
@@ -158,37 +124,6 @@ public class S3ImageStorageService {
         ErrorCode.SUCCESS.getCode(), url, profile.getId());
   }
 
-
-/*  public GetImageUrlResponseDto updateProfileImage(MultipartFile file, Long userId) {
-    User user = userQueryUseCase.유저_찾기_혹은_오류(userId);
-    Profile profile = user.getProfile();
-
-    if (profile == null) throw new RingoException("프로필 사진이 없습니다", ErrorCode.BAD_REQUEST);
-
-    프로필_사진_검증(file, user);
-    해당_유저의_이미지_권한_검증(profile, userId);
-
-    String 검수_이미지_url = profile.getInspectProfileUrl();
-    String 새_이미지_url = S3_버킷에_이미지_업로드(file, "profiles");
-
-    try{
-      profileTransactionService.프로필_이미지_업데이트(profile, 새_이미지_url);
-    } catch (Exception e) {
-      S3_버킷_이미지_삭제(새_이미지_url);
-      throw new RingoException("프로필 업데이트에 실패하였습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
-    }
-
-    if (검수_이미지_url != null) {
-      S3_버킷_이미지_삭제(검수_이미지_url);
-    }
-
-    log.info("userId={}, newInspectProfileUrl={}", user.getId(), 새_이미지_url);
-
-    sendDiscordNotifForProfileReview(user);
-    userQueryUseCase.유저_프로필_상태_변경(user, SignupStatus.SUBMITTED);
-
-    return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), 새_이미지_url, profile.getId());
-  }*/
 
   public void 프로필_검수_승인_처리(Profile profile) {
     String 승인_url = profile.getInspectProfileUrl();

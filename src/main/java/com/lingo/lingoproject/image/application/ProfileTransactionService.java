@@ -39,14 +39,6 @@ public class ProfileTransactionService {
     return profileRepository.findByUser(user).orElse(null);
   }
 
-  @Transactional
-  public Profile 프로필_url_저장(User user, String inspectProfileUrl) {
-    Profile profile = Profile.프로필_객체_생성(user, inspectProfileUrl);
-    Profile saved = profileRepository.save(profile);
-    user.setProfile(saved);
-    userQueryUseCase.save(user);
-    return saved;
-  }
 
   public void 프로필_제출로_상태_변경(User user) {
     user.setStatus(SignupStatus.SUBMITTED);
@@ -54,9 +46,12 @@ public class ProfileTransactionService {
   }
 
   @Transactional
-  public Profile 프로필_이미지_업데이트(Profile profile, String newImageUrl){
+  public Profile 프로필_이미지_업데이트(User user, Profile profile, String newImageUrl){
     profile.setInspectProfileUrl(newImageUrl);
-    return profileRepository.save(profile);
+    Profile saved = profileRepository.save(profile);
+    user.setProfile(saved);
+    userQueryUseCase.save(user);
+    return saved;
   }
 
   @Transactional
