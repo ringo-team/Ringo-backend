@@ -83,12 +83,10 @@ public class S3ImageStorageService {
 
 
   public GetImageUrlResponseDto 프로필_사진_수정(MultipartFile file, User user) {
-    if (file == null) new RingoException("사진이 첨부되지 않았습니다.", ErrorCode.BAD_REQUEST);
-
-    프로필_사진_검증(file, user);
+    if (file == null) throw new RingoException("사진이 첨부되지 않았습니다.", ErrorCode.BAD_REQUEST);
 
     Profile profile = profileTransactionService.유저_프로필_조회_없으면_NULL반환(user);
-    if (!user.getStatus().equals(SignupStatus.SUBMITTED)) throw new RingoException("프로필 검수 중입니다", ErrorCode.BAD_REQUEST);
+    if (user.getStatus().equals(SignupStatus.SUBMITTED)) throw new RingoException("프로필 검수 중입니다", ErrorCode.BAD_REQUEST);
 
     String newInspectProfileUrl = S3_버킷에_이미지_업로드(file, "profiles");
 
