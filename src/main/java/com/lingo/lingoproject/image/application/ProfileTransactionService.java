@@ -40,6 +40,7 @@ public class ProfileTransactionService {
   }
 
 
+  @Transactional
   public void 프로필_제출로_상태_변경(User user) {
     user.setStatus(SignupStatus.SUBMITTED);
     userQueryUseCase.save(user);
@@ -78,10 +79,14 @@ public class ProfileTransactionService {
         .mapToObj(i -> FeedImage.of(user, feedImageUrl.get(i), requests.get(i).getContent()))
         .toList();
 
-    return feedImageRepository.saveAll(feedImages)
+    return buildFeedImageUploadResponseDto(feedImageRepository.saveAll(feedImages));
+  }
+
+  public List<GetImageUrlResponseDto> buildFeedImageUploadResponseDto(List<FeedImage> feedImages){
+    return feedImages
         .stream()
         .map(img -> new GetImageUrlResponseDto(
-            ErrorCode.SUCCESS.getCode(), img.getImageUrl(), img.getId())
+                ErrorCode.SUCCESS.getCode(), img.getImageUrl(), img.getId())
         )
         .toList();
   }
@@ -89,5 +94,25 @@ public class ProfileTransactionService {
   @Transactional
   public FeedImage 피드_이미지_업데이트(FeedImage 피드_이미지){
     return feedImageRepository.save(피드_이미지);
+  }
+
+  @Transactional
+  public FeedImage 피드_이미지_조회(Long 피드_이미지_id){
+    return feedImageRepository.findById(피드_이미지_id)
+            .orElseThrow(() -> new RingoException("피드 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND));
+  }
+
+  @Transactional
+  public void 피드_이미지_삭제(FeedImage feedImage){
+    feedImageRepository.delete(feedImage);
+  }
+
+  public List<FeedImage> 해당_유저의_모든_피드_이미지_조회(User user){
+    return feedImageRepository.findAllByUser(user);
+  }
+
+  @Transactional
+  public void 해당_유저의_모든_피드_이미지_삭제(User user){
+    feedImageRepository.findAllByUser(user);
   }
 }

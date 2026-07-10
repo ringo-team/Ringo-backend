@@ -202,12 +202,10 @@ public class S3ImageStorageService {
         .toList();
   }
 
-  @Transactional
   public GetImageUrlResponseDto updateFeedImage(
       MultipartFile file, Long 피드_이미지_id, String 피드_이미지_설명글, Long userId
   ) {
-    FeedImage 기존_피드_이미지 = feedImageRepository.findById(피드_이미지_id)
-        .orElseThrow(() -> new RingoException("피드 사진을 찾을 수 없습니다.", ErrorCode.NOT_FOUND));
+    FeedImage 기존_피드_이미지 = profileTransactionService.피드_이미지_조회(피드_이미지_id);
 
     해당_유저의_이미지_권한_검증(기존_피드_이미지, userId);
 
@@ -236,21 +234,19 @@ public class S3ImageStorageService {
     return new GetImageUrlResponseDto(ErrorCode.SUCCESS.getCode(), 새_이미지_url, 기존_피드_이미지.getId());
   }
 
-  @Transactional
   public void deleteFeedImage(Long feedImageId, Long userId) {
     FeedImage feedImage = 피드_이미지_조회_혹은_오류_발생(feedImageId);
     해당_유저의_이미지_권한_검증(feedImage, userId);
-    feedImageRepository.delete(feedImage);
+    profileTransactionService.피드_이미지_삭제(feedImage);
 
     log.info("userId={}, feedImageId={}", userId, feedImageId);
 
     S3_버킷_이미지_삭제(feedImage.getImageUrl());
   }
 
-  @Transactional
   public void deleteAllFeedImagesByUser(User user) {
-    List<FeedImage> images = feedImageRepository.findAllByUser(user);
-    feedImageRepository.deleteAllByUser(user);
+    List<FeedImage> images = profileTransactionService.해당_유저의_모든_피드_이미지_조회(user);
+    profileTransactionService.해당_유저의_모든_피드_이미지_삭제(user);
 
     log.info("userId={}, deletedCount={}", user.getId(), images.size());
     images.forEach(img -> S3_버킷_이미지_삭제(img.getImageUrl()));
@@ -265,7 +261,7 @@ public class S3ImageStorageService {
     해당_유저의_이미지_권한_검증(image, userId);
 
     image.setDescription(dto.description());
-    feedImageRepository.save(image);
+    profileTransactionService.피드_이미지_업데이트(image);
   }
 
   private FeedImage 피드_이미지_조회_혹은_오류_발생(Long feedImageId){
